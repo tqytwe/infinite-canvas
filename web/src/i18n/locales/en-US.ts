@@ -309,7 +309,7 @@ export default {
         },
     },
     navigation: {
-        canvas: "My Canvases",
+        canvas: "AI Creation Space",
         image: "Image Studio",
         video: "Video Studio",
         prompts: "Prompt Library",
@@ -328,6 +328,14 @@ export default {
         shortcuts: "Keyboard shortcuts",
         lightTheme: "Switch to light theme",
         darkTheme: "Switch to dark theme",
+    },
+    managedWorkspace: {
+        readOnlyHint: "You are not signed in. You can browse, but creating, uploading, and saving require a 极速蹬 account.",
+        writeRequiresLogin: "Log in or register for a 极速蹬 account to create, upload, and save.",
+        login: "Log in",
+        register: "Register",
+        storage: "Storage",
+        storagePolicy: "30 GB maximum; least recently accessed resources are removed when space is needed",
     },
     home: {
         promptError: "Failed to load prompts",

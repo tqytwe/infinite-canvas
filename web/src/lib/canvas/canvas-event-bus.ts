@@ -1,5 +1,6 @@
 import localforage from "localforage";
 
+import { canCanvasWrite } from "@/services/canvas-cloud";
 import type { PluginStorage } from "@/types/canvas-plugin";
 
 // Lightweight canvas event bus for communication between nodes and plugins.
@@ -38,9 +39,11 @@ export function createPluginStorage(pluginId: string): PluginStorage {
     return {
         get: (key) => store!.getItem(key),
         set: async (key, value) => {
+            if (!canCanvasWrite()) throw new Error("CANVAS_AUTH_REQUIRED");
             await store!.setItem(key, value);
         },
         remove: async (key) => {
+            if (!canCanvasWrite()) throw new Error("CANVAS_AUTH_REQUIRED");
             await store!.removeItem(key);
         },
     };

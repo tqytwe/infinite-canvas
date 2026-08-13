@@ -6,6 +6,7 @@ import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes } from "@/lib/image-utils";
 import { getNodeDefinition } from "@/lib/canvas/node-registry";
 import { buildNodeContext } from "@/lib/canvas/plugin-node-context";
+import { canCanvasWrite } from "@/services/canvas-cloud";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { CanvasResourceMentionTextarea } from "./canvas-resource-mention-textarea";
 import { CanvasNodeType, type CanvasNodeData, type CanvasNodeImage, type Position } from "@/types/canvas";
@@ -346,6 +347,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                             title={t("canvas.node.renameHint")}
                             onDoubleClick={(event) => {
                                 event.stopPropagation();
+                                if (!canCanvasWrite()) return;
                                 setIsEditingTitle(true);
                             }}
                         >
@@ -381,6 +383,7 @@ export const CanvasNode = React.memo(function CanvasNode({
                     }
                     if (data.type !== CanvasNodeType.Text) return;
                     event.stopPropagation();
+                    if (!canCanvasWrite()) return;
                     setIsEditingContent(true);
                 }}
             >
@@ -531,7 +534,7 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
 
     return (
         <div className="flex h-full w-full flex-col overflow-hidden pt-8">
-            <button
+            {canCanvasWrite() ? <button
                 type="button"
                 className="absolute right-3 top-3 z-20 inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-xs font-medium opacity-85 backdrop-blur-md transition hover:scale-[1.02] hover:opacity-100"
                 style={{ background: `${theme.toolbar.panel}dd`, borderColor: theme.node.stroke, color: theme.node.text }}
@@ -546,7 +549,7 @@ function TextContent({ node, theme, isEditingContent, textareaRef, mentionRefere
             >
                 <ImageIcon className="size-3.5" />
                 {t("canvas.node.generate")}
-            </button>
+            </button> : null}
             {isEditingContent ? (
                 <CanvasResourceMentionTextarea
                     ref={textareaRef}

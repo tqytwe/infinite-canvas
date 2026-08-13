@@ -3,6 +3,7 @@ import localforage from "localforage";
 import { nanoid } from "nanoid";
 import i18n from "@/i18n";
 import { readImageMeta } from "@/lib/image-utils";
+import { canCanvasWrite, deleteCloudObject, getCloudObject, isCanvasAuthenticated, isCanvasManagedMode, putCloudObject, requireCanvasWriteAccess } from "@/services/canvas-cloud";
 
 export type UploadedImage = {
     url: string;
@@ -19,9 +20,11 @@ const videoLogStore = localforage.createInstance({ name: "infinite-canvas", stor
 const objectUrls = new Map<string, string>();
 
 export async function uploadImage(input: string | Blob): Promise<UploadedImage> {
+    if (isCanvasManagedMode()) await requireCanvasWriteAccess();
     const blob = typeof input === "string" ? await (await fetch(input)).blob() : input;
     const storageKey = `image:${nanoid()}`;
     await store.setItem(storageKey, blob);
+    if (isCanvasManagedMode()) await putCloudObject(storageKey, blob);
     const url = URL.createObjectURL(blob);
     objectUrls.set(storageKey, url);
     const meta = await readImageMeta(url);
@@ -30,21 +33,31 @@ export async function uploadImage(input: string | Blob): Promise<UploadedImage> 
 
 export async function resolveImageUrl(storageKey?: string, fallback = "") {
     if (!storageKey) return fallback;
+    if (isCanvasManagedMode() && !isCanvasAuthenticated()) return fallback;
     const cached = objectUrls.get(storageKey);
     if (cached) return cached;
-    const blob = await store.getItem<Blob>(storageKey);
+    const localBlob = await store.getItem<Blob>(storageKey);
+    const blob = localBlob || (await getCloudObject(storageKey));
     if (!blob) return fallback;
+    if (!localBlob && isCanvasManagedMode()) await store.setItem(storageKey, blob);
     const url = URL.createObjectURL(blob);
     objectUrls.set(storageKey, url);
     return url;
 }
 
 export async function getImageBlob(storageKey: string) {
-    return store.getItem<Blob>(storageKey);
+    if (isCanvasManagedMode() && !isCanvasAuthenticated()) return null;
+    const localBlob = await store.getItem<Blob>(storageKey);
+    if (localBlob) return localBlob;
+    const cloudBlob = await getCloudObject(storageKey);
+    if (cloudBlob) await store.setItem(storageKey, cloudBlob);
+    return cloudBlob;
 }
 
 export async function setImageBlob(storageKey: string, blob: Blob) {
+    if (isCanvasManagedMode()) await requireCanvasWriteAccess();
     await store.setItem(storageKey, blob);
+    if (isCanvasManagedMode()) await putCloudObject(storageKey, blob);
     const url = URL.createObjectURL(blob);
     objectUrls.set(storageKey, url);
     return url;
@@ -63,6 +76,13 @@ export async function deleteStoredImages(keys: Iterable<string>) {
             if (url) URL.revokeObjectURL(url);
             objectUrls.delete(key);
             await store.removeItem(key);
+            if (canCanvasWrite()) {
+                try {
+                    await deleteCloudObject(key);
+                } catch (error) {
+                    console.warn("[canvas-cloud] image delete failed", key, error);
+                }
+            }
         }),
     );
 }

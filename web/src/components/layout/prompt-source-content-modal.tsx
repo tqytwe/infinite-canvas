@@ -8,10 +8,12 @@ import { useCopyText } from "@/hooks/use-copy-text";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { fetchSourcePrompts, refreshSource, type Prompt } from "@/services/api/prompts";
 import type { PromptSource } from "@/services/api/prompt-source-presets";
+import { useCanvasCanWrite } from "@/services/canvas-cloud";
 
 export function PromptSourceContentModal({ source, onClose }: { source: PromptSource | null; onClose: () => void }) {
     const { message } = App.useApp();
     const { t } = useTranslation();
+    const canWrite = useCanvasCanWrite();
     const [items, setItems] = useState<Prompt[]>([]);
     const [loading, setLoading] = useState(false);
     const [detail, setDetail] = useState<Prompt | null>(null);
@@ -112,7 +114,7 @@ export function PromptSourceContentModal({ source, onClose }: { source: PromptSo
                                     <Button size="small" type="text" onClick={() => setDetail(item)}>
                                         {t("common.details")}
                                     </Button>
-                                    <Button size="small" type="text" icon={<FolderPlus className="size-3.5" />} onClick={() => saveAsset(item)}>
+                                    <Button disabled={!canWrite} size="small" type="text" icon={<FolderPlus className="size-3.5" />} onClick={() => saveAsset(item)}>
                                         {t("common.addToAssets")}
                                     </Button>
                                 </Space>
@@ -121,7 +123,7 @@ export function PromptSourceContentModal({ source, onClose }: { source: PromptSo
                     ]}
                 />
             </Modal>
-            <PromptDetailDialog prompt={detail} onClose={() => setDetail(null)} onCopy={(prompt) => copyText(prompt, t("common.promptCopied"))} onSaveAsset={saveAsset} />
+            <PromptDetailDialog prompt={detail} onClose={() => setDetail(null)} onCopy={(prompt) => copyText(prompt, t("common.promptCopied"))} onSaveAsset={canWrite ? saveAsset : undefined} />
         </>
     );
 }

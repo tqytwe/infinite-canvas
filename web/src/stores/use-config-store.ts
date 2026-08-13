@@ -4,6 +4,7 @@ import { persist } from "zustand/middleware";
 import { nanoid } from "nanoid";
 
 import i18n from "@/i18n";
+import { isCanvasAuthenticated, isCanvasManagedMode } from "@/services/canvas-cloud";
 
 export type ApiCallFormat = "openai" | "gemini" | "ark";
 export type ModelCapability = "image" | "video" | "text" | "audio";
@@ -13,6 +14,11 @@ export type ChannelModel = {
     name: string;
     capability: ModelCapability;
     script?: string;
+    displayName?: string;
+    platform?: string;
+    useCase?: string;
+    toolCapabilities?: Record<string, unknown>;
+    imageCapabilities?: Record<string, unknown> | boolean;
 };
 
 export type ModelChannel = {
@@ -182,6 +188,7 @@ export function resolveModelScript(config: AiConfig, value: string) {
 }
 
 function isAiConfigReady(config: AiConfig, model: string) {
+    if (isCanvasManagedMode() && !isCanvasAuthenticated()) return false;
     const channel = resolveModelChannel(config, model);
     return Boolean(model.trim() && channel.baseUrl.trim() && channel.apiKey.trim());
 }
@@ -269,7 +276,20 @@ export function normalizeChannelModels(models: Array<string | ChannelModel> | un
         seen.add(name);
         const capability = typeof item === "string" ? guessCapability(name) : item.capability || guessCapability(name);
         const script = typeof item === "string" ? undefined : item.script?.trim() || undefined;
-        result.push({ name, capability, script });
+        if (typeof item === "string") {
+            result.push({ name, capability, script });
+            continue;
+        }
+        result.push({
+            name,
+            capability,
+            script,
+            displayName: item.displayName?.trim() || undefined,
+            platform: item.platform?.trim() || undefined,
+            useCase: item.useCase?.trim() || undefined,
+            toolCapabilities: item.toolCapabilities,
+            imageCapabilities: item.imageCapabilities,
+        });
     }
     return result;
 }
@@ -306,9 +326,14 @@ export function modelOptionName(value: string) {
 
 export function modelOptionLabel(config: AiConfig, value: string) {
     const decoded = decodeChannelModel(value);
-    if (!decoded) return value;
+    if (!decoded) {
+        const matched = config.channels.flatMap((channel) => channel.models).find((model) => model.name === value);
+        return matched?.displayName || value;
+    }
     const channel = config.channels.find((item) => item.id === decoded.channelId);
-    return channel ? `${decoded.model}（${channel.name}）` : decoded.model;
+    const model = channel?.models.find((item) => item.name === decoded.model);
+    const label = model?.displayName || decoded.model;
+    return channel ? `${label}（${channel.name}）` : label;
 }
 
 export function modelOptionsFromChannels(channels: ModelChannel[]) {
@@ -336,6 +361,15 @@ export function resolveModelChannel(config: AiConfig, value: string) {
 
 export function resolveModelRequestConfig(config: AiConfig, value: string) {
     const channel = resolveModelChannel(config, value);
+    if (isCanvasManagedMode() && !isCanvasAuthenticated()) {
+        return {
+            ...config,
+            model: modelOptionName(value || config.model),
+            baseUrl: "",
+            apiKey: "",
+            apiFormat: channel.apiFormat,
+        };
+    }
     return {
         ...config,
         model: modelOptionName(value || config.model),
@@ -390,6 +424,76 @@ export function buildApiUrl(baseUrl: string, path: string) {
     const lowerBaseUrl = normalizedBaseUrl.toLowerCase();
     const apiBaseUrl = lowerBaseUrl.endsWith("/v1") || lowerBaseUrl.endsWith("/api/v3") || lowerBaseUrl.endsWith("/api/plan/v3") ? normalizedBaseUrl : `${normalizedBaseUrl}/v1`;
     return `${apiBaseUrl}${path}`;
+}
+
+export function managedWorkspaceConfig(models: unknown): Partial<AiConfig> {
+    const managedModels = collectManagedModels(models);
+    const channel: ModelChannel = {
+        id: "managed",
+        name: "极速蹬托管模型",
+        baseUrl: "/api/platform/gateway",
+        apiKey: "managed-session",
+        apiFormat: "openai",
+        models: managedModels,
+    };
+    const options = managedModels.map((model) => encodeChannelModel(channel.id, model.name));
+    const modelFor = (capability: ModelCapability) => {
+        const model = managedModels.find((item) => item.capability === capability);
+        return model ? encodeChannelModel(channel.id, model.name) : options[0] || "";
+    };
+    return {
+        channelMode: "remote",
+        baseUrl: channel.baseUrl,
+        apiKey: channel.apiKey,
+        apiFormat: channel.apiFormat,
+        channels: [channel],
+        models: options,
+        model: modelFor("image"),
+        imageModel: modelFor("image"),
+        videoModel: modelFor("video"),
+        textModel: modelFor("text"),
+        audioModel: modelFor("audio"),
+    };
+}
+
+function collectManagedModels(value: unknown): ChannelModel[] {
+    const groups = value && typeof value === "object" && "groups" in value && Array.isArray(value.groups) ? value.groups : [];
+    const seen = new Set<string>();
+    const result: ChannelModel[] = [];
+    for (const group of groups) {
+        const entries = group && typeof group === "object" && "models" in group && Array.isArray(group.models) ? group.models : [];
+        for (const entry of entries) {
+            if (!entry || typeof entry !== "object") continue;
+            const rawName = "name" in entry ? entry.name : "id" in entry ? entry.id : "";
+            const name = typeof rawName === "string" ? rawName.trim() : "";
+            if (!name || seen.has(name)) continue;
+            seen.add(name);
+            const displayName = "display_name" in entry && typeof entry.display_name === "string" ? entry.display_name.trim() : "";
+            const platform = "platform" in entry && typeof entry.platform === "string" ? entry.platform.trim() : "";
+            const useCase = "use_case" in entry && typeof entry.use_case === "string" ? entry.use_case.trim().toLowerCase() : "";
+            const toolCapabilities = "tool_capabilities" in entry && entry.tool_capabilities && typeof entry.tool_capabilities === "object" ? (entry.tool_capabilities as Record<string, unknown>) : undefined;
+            const imageCapabilities = "image_capabilities" in entry && (typeof entry.image_capabilities === "boolean" || (entry.image_capabilities && typeof entry.image_capabilities === "object")) ? (entry.image_capabilities as Record<string, unknown> | boolean) : undefined;
+            result.push({
+                name,
+                displayName: displayName || undefined,
+                platform: platform || undefined,
+                useCase: useCase || undefined,
+                toolCapabilities,
+                imageCapabilities,
+                capability: managedModelCapability({ name, useCase, imageCapabilities }),
+            });
+        }
+    }
+    return result;
+}
+
+function managedModelCapability(model: { name: string; useCase: string; imageCapabilities?: Record<string, unknown> | boolean }): ModelCapability {
+    if (model.imageCapabilities) return "image";
+    if (["image", "image_studio", "image-studio", "vision-image"].includes(model.useCase)) return "image";
+    if (["video", "video_generation", "video-generation"].includes(model.useCase)) return "video";
+    if (["audio", "audio_generation", "audio-generation", "tts", "speech"].includes(model.useCase)) return "audio";
+    if (["text", "chat", "code", "reasoning", "general"].includes(model.useCase)) return "text";
+    return guessCapability(model.name);
 }
 
 function normalizeArkPlanBaseUrl(baseUrl: string) {

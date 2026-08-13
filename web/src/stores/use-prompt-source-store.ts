@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { DEFAULT_PROMPT_SOURCES, createPromptSource, type PromptSource } from "@/services/api/prompt-source-presets";
+import { canCanvasWrite } from "@/services/canvas-cloud";
 
 export type PromptSourceSchedule = {
     intervalMinutes: number;
@@ -34,14 +35,15 @@ export const usePromptSourceStore = create<PromptSourceStore>()(
             schedule: defaultSchedule,
             addSource: () => createPromptSource(),
             saveSource: (source) =>
+                canCanvasWrite() &&
                 set((state) => ({
                     sources: state.sources.some((item) => item.id === source.id)
                         ? state.sources.map((item) => (item.id === source.id && !item.builtIn ? createPromptSource(source) : item))
                         : [...state.sources, createPromptSource(source)],
                 })),
-            removeSource: (id) => set((state) => ({ sources: state.sources.filter((item) => item.id !== id || item.builtIn) })),
-            toggleSource: (id, enabled) => set((state) => ({ sources: state.sources.map((item) => (item.id === id ? { ...item, enabled } : item)) })),
-            updateSchedule: (key, value) => set((state) => ({ schedule: { ...state.schedule, [key]: value } })),
+            removeSource: (id) => canCanvasWrite() && set((state) => ({ sources: state.sources.filter((item) => item.id !== id || item.builtIn) })),
+            toggleSource: (id, enabled) => canCanvasWrite() && set((state) => ({ sources: state.sources.map((item) => (item.id === id ? { ...item, enabled } : item)) })),
+            updateSchedule: (key, value) => canCanvasWrite() && set((state) => ({ schedule: { ...state.schedule, [key]: value } })),
         }),
         {
             name: PROMPT_SOURCE_STORE_KEY,

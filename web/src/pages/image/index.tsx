@@ -17,6 +17,8 @@ import { nanoid } from "nanoid";
 import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
 import { requestEdit, requestGeneration } from "@/services/api/image";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
+import { readCloudWorkbenchLogs, writeCloudWorkbenchLogs } from "@/services/workbench-cloud";
+import { isCanvasAuthenticated, isCanvasManagedMode, useCanvasCanWrite } from "@/services/canvas-cloud";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useWorkbenchAgentStore } from "@/stores/use-workbench-agent-store";
 import type { ReferenceImage } from "@/types/image";
@@ -30,7 +32,7 @@ type GeneratedImage = {
     width: number;
     height: number;
     bytes: number;
-    mimeType?: string;
+    mimeType: string;
 };
 
 type GenerationResult = {
@@ -98,6 +100,7 @@ export default function ImagePage() {
     const imageCommand = useWorkbenchAgentStore((state) => state.imageCommand);
     const clearImageCommand = useWorkbenchAgentStore((state) => state.clearImageCommand);
     const updateAgentTask = useWorkbenchAgentStore((state) => state.updateTask);
+    const canWrite = useCanvasCanWrite();
     const processedCommandRef = useRef(0);
     const agentTaskIdRef = useRef<string | undefined>(undefined);
 
@@ -281,9 +284,12 @@ export default function ImagePage() {
         setPreviewLog(null);
     };
 
-    const deleteSelectedLogs = () => {
+    const deleteSelectedLogs = async () => {
         const imageKeys = logs.filter((log) => selectedLogIds.includes(log.id)).flatMap((log) => log.images.map((image) => image.storageKey).filter((key): key is string => Boolean(key)));
-        void Promise.all([deleteStoredImages(imageKeys), ...selectedLogIds.map((id) => logStore.removeItem(id))]).then(refreshLogs);
+        const nextLogs = logs.filter((log) => !selectedLogIds.includes(log.id));
+        await Promise.all([deleteStoredImages(imageKeys), ...selectedLogIds.map((id) => logStore.removeItem(id))]);
+        if (isCanvasManagedMode() && isCanvasAuthenticated()) await writeCloudWorkbenchLogs("image-workbench", nextLogs.map(serializeLog));
+        await refreshLogs();
         if (previewLog && selectedLogIds.includes(previewLog.id)) {
             setPreviewLog(null);
             setResults([]);
@@ -292,11 +298,33 @@ export default function ImagePage() {
         setDeleteConfirmOpen(false);
     };
 
-    const saveLog = (log: GenerationLog) => {
-        void logStore.setItem(log.id, serializeLog(log)).then(refreshLogs);
+    const saveLog = async (log: GenerationLog) => {
+        const serialized = serializeLog(log);
+        await logStore.setItem(log.id, serialized);
+        if (isCanvasManagedMode() && isCanvasAuthenticated()) {
+            const existing = (await readCloudWorkbenchLogs<GenerationLog>("image-workbench")) || logs;
+            await writeCloudWorkbenchLogs("image-workbench", [...existing.filter((item) => item.id !== log.id), serialized]);
+        }
+        await refreshLogs();
     };
 
-    const refreshLogs = async () => setLogs(await readStoredLogs());
+    const refreshLogs = async () => {
+        if (isCanvasManagedMode() && !isCanvasAuthenticated()) {
+            setLogs([]);
+            return;
+        }
+        const cloudLogs = await readCloudWorkbenchLogs<GenerationLog>("image-workbench");
+        if (cloudLogs) {
+            const nextLogs = (await Promise.all(cloudLogs.map(normalizeLog))).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+            setLogs(nextLogs);
+            return;
+        }
+        const nextLogs = await readStoredLogs();
+        setLogs(nextLogs);
+        if (isCanvasManagedMode() && isCanvasAuthenticated() && nextLogs.length) {
+            await writeCloudWorkbenchLogs("image-workbench", nextLogs.map(serializeLog));
+        }
+    };
 
     const previewGenerationLog = async (log: GenerationLog) => {
         setPreviewLog(log);
@@ -330,8 +358,8 @@ export default function ImagePage() {
             const result = snapshot.references.length ? await requestEdit(snapshot.config, snapshot.text, snapshot.references) : await requestGeneration(snapshot.config, snapshot.text);
             const image = result[0];
             if (!image) throw new Error(t("imageWorkbench.missingResult"));
-            const meta = await readImageMeta(image.dataUrl);
-            const nextImage = { id: image.id, dataUrl: image.dataUrl, durationMs: performance.now() - itemStartedAt, width: meta.width, height: meta.height, bytes: getDataUrlByteSize(image.dataUrl) };
+            const meta = await readGeneratedImageMeta(image.dataUrl);
+            const nextImage = { id: image.id, dataUrl: meta.url, durationMs: performance.now() - itemStartedAt, width: meta.width, height: meta.height, bytes: meta.bytes, mimeType: meta.mimeType };
             setResults((value) => updateResultAt(value, index, { status: "success", image: nextImage }));
             return nextImage;
         } catch (error) {
@@ -423,10 +451,10 @@ export default function ImagePage() {
                                 <div className="mb-2 flex items-center justify-between gap-3">
                                     <span className="text-base font-semibold">{t("imageWorkbench.references")}</span>
                                     <div className="flex gap-2">
-                                        <Button size="small" icon={<ClipboardPaste className="size-3.5" />} onClick={() => void addReferencesFromClipboard()}>
+                                        <Button size="small" icon={<ClipboardPaste className="size-3.5" />} disabled={!canWrite} onClick={() => void addReferencesFromClipboard()}>
                                             {t("workbench.clipboard")}
                                         </Button>
-                                        <Button size="small" icon={<Upload className="size-3.5" />} onClick={() => fileInputRef.current?.click()}>
+                                        <Button size="small" icon={<Upload className="size-3.5" />} disabled={!canWrite} onClick={() => fileInputRef.current?.click()}>
                                             {t("workbench.upload")}
                                         </Button>
                                     </div>
@@ -493,7 +521,7 @@ export default function ImagePage() {
                         </div>
 
                         <div className="mt-auto pt-6">
-                            <Button type="primary" size="large" block icon={<Sparkles className="size-4" />} loading={running} disabled={!canGenerate || running} onClick={() => void generate()}>
+                            <Button type="primary" size="large" block icon={<Sparkles className="size-4" />} loading={running} disabled={!canWrite || !canGenerate || running} onClick={() => void generate()}>
                                 {t("workbench.generate")}
                             </Button>
                         </div>
@@ -556,7 +584,7 @@ export default function ImagePage() {
             </Drawer>
             <PromptSelectDialog open={promptDialogOpen} onOpenChange={setPromptDialogOpen} onSelect={setPrompt} />
             <AssetPickerModal open={assetPickerOpen} defaultTab="my-assets" onInsert={(payload) => void insertPickedAsset(payload)} onClose={() => setAssetPickerOpen(false)} />
-            <Modal title={t("workbench.deleteLogs")} open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={deleteSelectedLogs} okText={t("common.delete")} okButtonProps={{ danger: true }} cancelText={t("common.cancel")}>
+            <Modal title={t("workbench.deleteLogs")} open={deleteConfirmOpen} onCancel={() => setDeleteConfirmOpen(false)} onOk={() => void deleteSelectedLogs()} okText={t("common.delete")} okButtonProps={{ danger: true }} cancelText={t("common.cancel")}>
                 {t("workbench.deleteLogsConfirm", { count: selectedLogIds.length })}
             </Modal>
         </div>
@@ -850,6 +878,22 @@ function moveListItem<T>(items: T[], index: number, offset: number) {
     const next = [...items];
     [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
     return next;
+}
+
+async function readGeneratedImageMeta(url: string) {
+    if (url.startsWith("data:")) {
+        const meta = await readImageMeta(url);
+        return { url, width: meta.width, height: meta.height, mimeType: meta.mimeType, bytes: getDataUrlByteSize(url) };
+    }
+    const blob = await (await fetch(url, { credentials: "same-origin" })).blob();
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+        const meta = await readImageMeta(objectUrl);
+        return { url: objectUrl, width: meta.width, height: meta.height, mimeType: blob.type || meta.mimeType, bytes: blob.size };
+    } catch {
+        URL.revokeObjectURL(objectUrl);
+        throw new Error(i18n.t("common.imageReadFailed"));
+    }
 }
 
 function ReferenceOrderButtons({ index, total, onMove }: { index: number; total: number; onMove: (offset: number) => void }) {

@@ -5,5 +5,17 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3000:8080"
     restart: unless-stopped
+    environment:
+      PORT: 8080
+      CANVAS_DATA_DIR: /data/infinite-canvas
+      CANVAS_MAX_STORAGE_BYTES: 30GB
+      CANVAS_PLATFORM_API_BASE_URL: http://host.docker.internal:8081
+      CANVAS_PLATFORM_WEB_URL: http://localhost:5173
+      CANVAS_EXCHANGE_SECRET: ${CANVAS_EXCHANGE_SECRET:-}
+    volumes:
+      - canvas-data-local:/data/infinite-canvas
+
+volumes:
+  canvas-data-local:

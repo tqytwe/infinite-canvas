@@ -10,6 +10,7 @@ import { uploadImage } from "@/services/image-storage";
 import { cn } from "@/lib/utils";
 import { useAssetStore, type Asset, type AssetKind, type ImageAsset } from "@/stores/use-asset-store";
 import { exportAssets, readAssetPackage } from "./asset-transfer";
+import { useCanvasCanWrite } from "@/services/canvas-cloud";
 
 type AssetFormValues = {
     kind: AssetKind;
@@ -37,6 +38,7 @@ export default function AssetsPage() {
     const addAsset = useAssetStore((state) => state.addAsset);
     const updateAsset = useAssetStore((state) => state.updateAsset);
     const removeAsset = useAssetStore((state) => state.removeAsset);
+    const canWrite = useCanvasCanWrite();
     const [keyword, setKeyword] = useState("");
     const [kindFilter, setKindFilter] = useState<AssetKind | "all">("all");
     const [page, setPage] = useState(1);
@@ -73,6 +75,7 @@ export default function AssetsPage() {
     }, [filteredAssets.length, pageSize]);
 
     const openCreate = () => {
+        if (!canWrite) return;
         setEditingAsset(null);
         setImageDraft(null);
         setFormKind("text");
@@ -81,6 +84,7 @@ export default function AssetsPage() {
     };
 
     const openEdit = (asset: Asset) => {
+        if (!canWrite) return;
         setEditingAsset(asset);
         setFormKind(asset.kind);
         setImageDraft(asset.kind === "image" ? asset.data : null);
@@ -97,6 +101,7 @@ export default function AssetsPage() {
     };
 
     const saveAsset = async () => {
+        if (!canWrite) return;
         const values = await form.validateFields();
         const base = {
             title: values.title.trim(),
@@ -124,13 +129,13 @@ export default function AssetsPage() {
     };
 
     const readCoverFile = async (file?: File) => {
-        if (!file) return;
+        if (!file || !canWrite) return;
         const dataUrl = await readFileAsDataUrl(file);
         form.setFieldValue("coverUrl", dataUrl);
     };
 
     const readImageFile = async (file?: File) => {
-        if (!file || !file.type.startsWith("image/")) return;
+        if (!file || !canWrite || !file.type.startsWith("image/")) return;
         const image = await uploadImage(file);
         const draft = { dataUrl: image.url, storageKey: image.storageKey, width: image.width, height: image.height, bytes: image.bytes, mimeType: image.mimeType };
         setImageDraft(draft);
@@ -157,7 +162,7 @@ export default function AssetsPage() {
     };
 
     const importAssetZip = async (file?: File) => {
-        if (!file) return;
+        if (!file || !canWrite) return;
         try {
             const importedAssets = await readAssetPackage(file);
             importedAssets.forEach((asset) => {
@@ -176,7 +181,7 @@ export default function AssetsPage() {
     };
 
     const confirmDelete = () => {
-        if (!deletingAsset) return;
+        if (!deletingAsset || !canWrite) return;
         removeAsset(deletingAsset.id);
         message.success(t("assets.deleted"));
         setDeletingAsset(null);
@@ -241,12 +246,13 @@ export default function AssetsPage() {
                                 <button
                                     type="button"
                                     className="cursor-pointer text-sm font-medium text-stone-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:underline dark:text-stone-300"
-                                    onClick={() => assetInputRef.current?.click()}
+                                    onClick={() => canWrite && assetInputRef.current?.click()}
                                 >
                                     {t("assets.import")}
                                 </button>
                                 <button
                                     type="button"
+                                    disabled={!canWrite}
                                     className="cursor-pointer text-sm font-medium text-stone-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:underline dark:text-stone-300"
                                     onClick={openCreate}
                                 >
@@ -300,7 +306,7 @@ export default function AssetsPage() {
                         <Form.Item name="coverUrl" label={t("assets.fields.coverUrl")}>
                             <Space.Compact className="w-full">
                                 <Input placeholder={t("assets.fields.coverPlaceholder")} />
-                                <Button icon={<Upload className="size-3.5" />} onClick={() => coverInputRef.current?.click()}>
+                                <Button disabled={!canWrite} icon={<Upload className="size-3.5" />} onClick={() => coverInputRef.current?.click()}>
                                     {t("common.upload")}
                                 </Button>
                             </Space.Compact>
@@ -323,7 +329,7 @@ export default function AssetsPage() {
                         ) : (
                             <Form.Item label={t("assets.fields.imageContent")} required>
                                 <div className="rounded-lg border border-dashed border-stone-300 p-4 dark:border-stone-700">
-                                    <Button icon={<Upload className="size-4" />} onClick={() => imageInputRef.current?.click()}>
+                                    <Button disabled={!canWrite} icon={<Upload className="size-4" />} onClick={() => imageInputRef.current?.click()}>
                                         {t("assets.selectImageFile")}
                                     </Button>
                                     {imageDraft ? (

@@ -2,6 +2,7 @@ import axios from "axios";
 
 import i18n from "@/i18n";
 import { buildApiUrl, resolveModelRequestConfig, resolveModelScript, type AiConfig, type ModelChannel } from "@/stores/use-config-store";
+import { isCanvasAuthenticated, isCanvasManagedMode } from "@/services/canvas-cloud";
 import { normalizePluginImages, runModelPlugin } from "./model-plugin";
 import { nanoid } from "nanoid";
 import { dataUrlToFile } from "@/lib/image-utils";
@@ -75,6 +76,20 @@ type ImageApiResponse = {
     error?: { message?: string };
     code?: number;
     msg?: string;
+};
+type ManagedImageTaskResponse = {
+    id?: string;
+    task_id?: string;
+    status?: string;
+    poll_url?: string;
+    retry_after?: number;
+    error?: { message?: string } | string;
+    msg?: string;
+    message?: string;
+    result?: ImageApiResponse;
+    data?: Array<Record<string, unknown>>;
+    image_url?: string;
+    http_status?: number;
 };
 type GeminiPart = {
     text?: string;
@@ -713,7 +728,150 @@ function parseGeminiImagePayload(payload: GeminiPayload) {
     return images;
 }
 
+async function requestManagedImageGeneration(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions) {
+    if (!isCanvasManagedMode() || !isCanvasAuthenticated()) return null;
+    const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
+    if (resolveModelScript(config, config.model || config.imageModel) || requestConfig.apiFormat !== "openai") return null;
+    const quality = normalizeQuality(config.quality);
+    const requestSize = resolveRequestSize(quality, config.size);
+    const background = normalizeBackground(config.background);
+    const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
+    const requestPrompt = references.length ? buildImageReferencePromptText(prompt, references) : prompt;
+    const idempotencyKey = `canvas-image-${nanoid()}`;
+    const path = references.length ? "/images/edits/async" : "/images/generations/async";
+    const url = aiApiUrl(requestConfig, path);
+    const response = references.length
+        ? await submitManagedImageEdit(url, requestConfig, requestPrompt, references, { quality, requestSize, background, n, idempotencyKey, signal: options?.signal })
+        : await submitManagedImageGeneration(url, requestConfig, requestPrompt, { quality, requestSize, background, n, idempotencyKey, signal: options?.signal });
+    return pollManagedImageTask(requestConfig, response, options);
+}
+
+async function submitManagedImageGeneration(
+    url: string,
+    config: AiConfig,
+    prompt: string,
+    params: { quality?: string; requestSize?: string; background?: string; n: number; idempotencyKey: string; signal?: AbortSignal },
+) {
+    const response = await fetch(url, {
+        method: "POST",
+        headers: {
+            ...aiHeaders(config, "application/json"),
+            Accept: "application/json",
+            "Idempotency-Key": params.idempotencyKey,
+        },
+        body: JSON.stringify({
+            model: config.model,
+            prompt: withSystemPrompt(config, prompt),
+            n: params.n,
+            ...(params.quality ? { quality: params.quality } : {}),
+            ...(params.requestSize ? { size: params.requestSize } : {}),
+            ...(params.background ? { background: params.background } : {}),
+            response_format: "url",
+            output_format: IMAGE_OUTPUT_FORMAT,
+        }),
+        signal: params.signal,
+    });
+    return readManagedTaskResponse(response);
+}
+
+async function submitManagedImageEdit(
+    url: string,
+    config: AiConfig,
+    prompt: string,
+    references: ReferenceImage[],
+    params: { quality?: string; requestSize?: string; background?: string; n: number; idempotencyKey: string; signal?: AbortSignal },
+) {
+    const formData = new FormData();
+    formData.set("model", config.model);
+    formData.set("prompt", withSystemPrompt(config, prompt));
+    formData.set("n", String(params.n));
+    formData.set("response_format", "url");
+    formData.set("output_format", IMAGE_OUTPUT_FORMAT);
+    if (params.quality) formData.set("quality", params.quality);
+    if (params.requestSize) formData.set("size", params.requestSize);
+    if (params.background) formData.set("background", params.background);
+    const files = await Promise.all(references.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
+    files.forEach((file) => formData.append("image", file));
+    const response = await fetch(url, {
+        method: "POST",
+        headers: { ...aiHeaders(config), Accept: "application/json", "Idempotency-Key": params.idempotencyKey },
+        body: formData,
+        signal: params.signal,
+    });
+    return readManagedTaskResponse(response);
+}
+
+async function readManagedTaskResponse(response: Response) {
+    const payload = (await response.json().catch(() => ({}))) as ManagedImageTaskResponse;
+    if (!response.ok) throw new Error(readApiErrorMessage(payload) || readStatusError(response.status, apiText("requestFailed")));
+    const taskId = payload.task_id || payload.id;
+    if (!taskId) throw new Error(apiText("requestFailed"));
+    return payload;
+}
+
+async function pollManagedImageTask(config: AiConfig, task: ManagedImageTaskResponse, options?: RequestOptions) {
+    const pollPath = task.poll_url || `/v1/images/tasks/${encodeURIComponent(task.task_id || task.id || "")}`;
+    const pollUrl = managedGatewayUrl(config, pollPath);
+    for (let attempt = 0; attempt < 160; attempt += 1) {
+        if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+        const response = await fetch(pollUrl, {
+            headers: { ...aiHeaders(config), Accept: "application/json" },
+            signal: options?.signal,
+        });
+        const state = (await response.json().catch(() => ({}))) as ManagedImageTaskResponse;
+        if (!response.ok) throw new Error(readApiErrorMessage(state) || readStatusError(response.status, apiText("requestFailed")));
+        const status = String(state.status || "").toLowerCase();
+        if (status === "completed" || status === "succeeded" || state.result || state.data || state.image_url) return parseManagedImageResult(state);
+        if (status === "failed" || status === "cancelled" || status === "expired") throw new Error(readApiErrorMessage(state) || apiText("requestFailed"));
+        const retryAfter = Number(response.headers.get("retry-after") || state.retry_after || 0);
+        await delay(Math.min(8000, Math.max(1500, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 3000)), options?.signal);
+    }
+    throw new Error(apiText("requestFailed"));
+}
+
+function managedGatewayUrl(config: AiConfig, value: string) {
+    if (value.startsWith("/api/platform/")) return value;
+    if (/^https?:\/\//i.test(value)) {
+        try {
+            const parsed = new URL(value);
+            return buildApiUrl(config.baseUrl, `${parsed.pathname}${parsed.search}`.replace(/^\/v1/, ""));
+        } catch {
+            return buildApiUrl(config.baseUrl, value.replace(/^\/v1/, ""));
+        }
+    }
+    return buildApiUrl(config.baseUrl, value.replace(/^\/v1/, ""));
+}
+
+function parseManagedImageResult(state: ManagedImageTaskResponse) {
+    const payload = state.result || { data: state.data || (state.image_url ? [{ url: state.image_url }] : []) };
+    return parseImagePayload(payload);
+}
+
+function delay(ms: number, signal?: AbortSignal) {
+    return new Promise<void>((resolve, reject) => {
+        if (signal?.aborted) {
+            reject(new DOMException("Aborted", "AbortError"));
+            return;
+        }
+        const timer = window.setTimeout(resolve, ms);
+        signal?.addEventListener(
+            "abort",
+            () => {
+                window.clearTimeout(timer);
+                reject(new DOMException("Aborted", "AbortError"));
+            },
+            { once: true },
+        );
+    });
+}
+
 export async function requestGeneration(config: AiConfig, prompt: string, options?: RequestOptions) {
+    try {
+        const managedResult = await requestManagedImageGeneration(config, prompt, [], options);
+        if (managedResult) return managedResult;
+    } catch (error) {
+        throw new Error(readAxiosError(error, apiText("requestFailed")));
+    }
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const script = resolveModelScript(config, config.model || config.imageModel);
@@ -772,6 +930,14 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
 }
 
 export async function requestEdit(config: AiConfig, prompt: string, references: ReferenceImage[], mask?: ReferenceImage, options?: RequestOptions) {
+    if (!mask) {
+        try {
+            const managedResult = await requestManagedImageGeneration(config, prompt, references, options);
+            if (managedResult) return managedResult;
+        } catch (error) {
+            throw new Error(readAxiosError(error, apiText("requestFailed")));
+        }
+    }
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const requestPrompt = buildImageReferencePromptText(prompt, references);

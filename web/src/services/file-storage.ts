@@ -1,5 +1,6 @@
 import localforage from "localforage";
 import { nanoid } from "nanoid";
+import { canCanvasWrite, deleteCloudObject, getCloudObject, isCanvasAuthenticated, isCanvasManagedMode, putCloudObject, requireCanvasWriteAccess } from "@/services/canvas-cloud";
 
 export type UploadedFile = { url: string; storageKey: string; bytes: number; mimeType: string; width?: number; height?: number; durationMs?: number };
 
@@ -7,9 +8,11 @@ const store = localforage.createInstance({ name: "infinite-canvas", storeName: "
 const objectUrls = new Map<string, string>();
 
 export async function uploadMediaFile(input: string | Blob, prefix = "file"): Promise<UploadedFile> {
+    if (isCanvasManagedMode()) await requireCanvasWriteAccess();
     const blob = typeof input === "string" ? await (await fetch(input)).blob() : input;
     const storageKey = `${prefix}:${nanoid()}`;
     await store.setItem(storageKey, blob);
+    if (isCanvasManagedMode()) await putCloudObject(storageKey, blob);
     const url = URL.createObjectURL(blob);
     objectUrls.set(storageKey, url);
     const meta = blob.type.startsWith("video/") ? await readVideoMeta(url) : blob.type.startsWith("audio/") ? await readAudioMeta(url) : {};
@@ -18,21 +21,31 @@ export async function uploadMediaFile(input: string | Blob, prefix = "file"): Pr
 
 export async function resolveMediaUrl(storageKey?: string, fallback = "") {
     if (!storageKey) return fallback;
+    if (isCanvasManagedMode() && !isCanvasAuthenticated()) return fallback;
     const cached = objectUrls.get(storageKey);
     if (cached) return cached;
-    const blob = await store.getItem<Blob>(storageKey);
+    const localBlob = await store.getItem<Blob>(storageKey);
+    const blob = localBlob || (await getCloudObject(storageKey));
     if (!blob) return fallback;
+    if (!localBlob && isCanvasManagedMode()) await store.setItem(storageKey, blob);
     const url = URL.createObjectURL(blob);
     objectUrls.set(storageKey, url);
     return url;
 }
 
 export async function getMediaBlob(storageKey: string) {
-    return store.getItem<Blob>(storageKey);
+    if (isCanvasManagedMode() && !isCanvasAuthenticated()) return null;
+    const localBlob = await store.getItem<Blob>(storageKey);
+    if (localBlob) return localBlob;
+    const cloudBlob = await getCloudObject(storageKey);
+    if (cloudBlob) await store.setItem(storageKey, cloudBlob);
+    return cloudBlob;
 }
 
 export async function setMediaBlob(storageKey: string, blob: Blob) {
+    if (isCanvasManagedMode()) await requireCanvasWriteAccess();
     await store.setItem(storageKey, blob);
+    if (isCanvasManagedMode()) await putCloudObject(storageKey, blob);
     const url = URL.createObjectURL(blob);
     objectUrls.set(storageKey, url);
     return url;
@@ -45,6 +58,13 @@ export async function deleteStoredMedia(keys: Iterable<string>) {
             if (url) URL.revokeObjectURL(url);
             objectUrls.delete(key);
             await store.removeItem(key);
+            if (canCanvasWrite()) {
+                try {
+                    await deleteCloudObject(key);
+                } catch (error) {
+                    console.warn("[canvas-cloud] media delete failed", key, error);
+                }
+            }
         }),
     );
 }
@@ -55,7 +75,7 @@ export async function cleanupUnusedMedia(usedData: unknown) {
     await store.iterate((_value, key) => {
         if (!usedKeys.has(key)) unused.push(key);
     });
-    await Promise.all(unused.map((key) => store.removeItem(key)));
+    await deleteStoredMedia(unused);
 }
 
 export function collectMediaStorageKeys(value: unknown, keys = new Set<string>()) {

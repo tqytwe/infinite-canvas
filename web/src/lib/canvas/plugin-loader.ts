@@ -3,6 +3,7 @@ import { getPluginRuntime } from "@/lib/canvas/plugin-runtime";
 import { usePluginStore, type InstalledPlugin } from "@/stores/canvas/use-plugin-store";
 import type { CanvasPlugin } from "@/types/canvas-plugin";
 import i18n from "@/i18n";
+import { canCanvasWrite } from "@/services/canvas-cloud";
 
 const cleanups = new Map<string, () => void>();
 
@@ -59,6 +60,7 @@ function withCacheBust(url: string) {
 // Install or replace a plugin from a URL and enable it immediately.
 // bustCache bypasses HTTP/CDN caches during upgrades while persisting a clean URL without the timestamp query.
 export async function installPluginFromUrl(url: string, opts?: { official?: boolean; bustCache?: boolean }) {
+    if (!canCanvasWrite()) throw new Error("CANVAS_AUTH_REQUIRED");
     const source = await fetchPluginSource(opts?.bustCache ? withCacheBust(url) : url);
     const plugin = await evaluatePluginSource(source);
     deactivatePlugin(plugin.id); // Replace the previous version.
@@ -68,11 +70,13 @@ export async function installPluginFromUrl(url: string, opts?: { official?: bool
 }
 
 export async function updatePlugin(record: InstalledPlugin) {
+    if (!canCanvasWrite()) throw new Error("CANVAS_AUTH_REQUIRED");
     // Upgrades must fetch the latest output and therefore always bypass caches.
     return installPluginFromUrl(record.url, { official: record.official, bustCache: true });
 }
 
 export async function setPluginEnabled(record: InstalledPlugin, enabled: boolean) {
+    if (!canCanvasWrite()) throw new Error("CANVAS_AUTH_REQUIRED");
     usePluginStore.getState().setEnabled(record.id, enabled);
     if (!enabled) {
         deactivatePlugin(record.id);
@@ -85,6 +89,7 @@ export async function setPluginEnabled(record: InstalledPlugin, enabled: boolean
 }
 
 export function uninstallPlugin(id: string) {
+    if (!canCanvasWrite()) return;
     deactivatePlugin(id);
     usePluginStore.getState().remove(id);
 }

@@ -309,7 +309,7 @@ export default {
         },
     },
     navigation: {
-        canvas: "我的画布",
+        canvas: "AI创作空间",
         image: "生图工作台",
         video: "视频创作台",
         prompts: "提示词库",
@@ -328,6 +328,14 @@ export default {
         shortcuts: "快捷键",
         lightTheme: "切换到浅色主题",
         darkTheme: "切换到深色主题",
+    },
+    managedWorkspace: {
+        readOnlyHint: "当前未登录，只能浏览内容。登录或注册极速蹬账号后才能创作、上传和保存。",
+        writeRequiresLogin: "登录或注册极速蹬账号后才能进行创作、上传和保存。",
+        login: "登录",
+        register: "注册",
+        storage: "空间使用",
+        storagePolicy: "最多 30GB，空间不足时按最久未访问资源滚动清理",
     },
     home: {
         promptError: "获取提示词失败",

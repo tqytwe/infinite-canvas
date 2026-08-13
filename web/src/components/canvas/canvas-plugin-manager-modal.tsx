@@ -8,11 +8,13 @@ import { installPluginFromUrl, setPluginEnabled, uninstallPlugin, updatePlugin }
 import { fetchOfficialPlugins, hasUpgrade, type OfficialPluginEntry } from "@/lib/canvas/plugin-registry";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { usePluginStore, type InstalledPlugin } from "@/stores/canvas/use-plugin-store";
+import { useCanvasCanWrite } from "@/services/canvas-cloud";
 
 export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onClose: () => void }) {
     const { t } = useTranslation();
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const { message } = App.useApp();
+    const canWrite = useCanvasCanWrite();
     const plugins = usePluginStore((state) => state.plugins);
     const [url, setUrl] = useState("");
     const [installing, setInstalling] = useState(false);
@@ -198,8 +200,8 @@ export function CanvasPluginManagerModal({ open, onClose }: { open: boolean; onC
     const thirdPartyTab = (
         <div className="space-y-3">
             <div className="flex gap-2">
-                <Input placeholder={t("canvas.plugins.urlPlaceholder")} value={url} onChange={(event) => setUrl(event.target.value)} onPressEnter={handleInstallUrl} allowClear />
-                <Button type="primary" loading={installing} onClick={handleInstallUrl} icon={<Puzzle className="size-4" />}>
+            <Input disabled={!canWrite} placeholder={t("canvas.plugins.urlPlaceholder")} value={url} onChange={(event) => setUrl(event.target.value)} onPressEnter={handleInstallUrl} allowClear />
+                <Button disabled={!canWrite} type="primary" loading={installing} onClick={handleInstallUrl} icon={<Puzzle className="size-4" />}>
                     {t("canvas.plugins.install")}
                 </Button>
             </div>

@@ -3,9 +3,22 @@ services:
     image: ghcr.io/basketikun/infinite-canvas:latest
     container_name: infinite-canvas
     ports:
-      - "3000:3000"
+      - "3000:8080"
     restart: unless-stopped
+    environment:
+      PORT: 8080
+      CANVAS_DATA_DIR: /data/infinite-canvas
+      CANVAS_MAX_STORAGE_BYTES: 30GB
+      CANVAS_PLATFORM_API_BASE_URL: https://api.jisudeng.com
+      CANVAS_PLATFORM_WEB_URL: https://www.jisudeng.com
+      # 必须与主平台 nextchat.exchange_secret 相同；不要提交真实值。
+      CANVAS_EXCHANGE_SECRET: ${CANVAS_EXCHANGE_SECRET:-}
+    volumes:
+      - canvas-data:/data/infinite-canvas
     # 统计分析（可选，默认关闭）。每家一个独立变量，填了谁就启用谁，可同时启用多家：
     # environment:
     #   ANALYTICS_GA4_ID: G-XXXXXXXXXX                    # Google Analytics 4 衡量 ID
     #   ANALYTICS_BAIDU_ID: xxxxxxxxxxxxxxxxxxxxxxxxxxxx   # 百度统计站点 ID
+
+volumes:
+  canvas-data:

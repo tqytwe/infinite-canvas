@@ -10,6 +10,7 @@ import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { modelOptionLabel, modelOptionName, normalizeModelOptionValue, selectableModelsByCapability, useConfigStore } from "@/stores/use-config-store";
 import { useWorkbenchAgentStore } from "@/stores/use-workbench-agent-store";
+import { canCanvasWrite } from "@/services/canvas-cloud";
 
 // Execute site-level Agent tools in the browser, including canvas lists, workbench generation, prompt search, and asset operations.
 // Their data lives locally in the browser through localforage and Zustand, so this module accesses the relevant stores directly.
@@ -62,20 +63,27 @@ export async function runSiteTool(name: SiteToolName, input: SiteToolInput, navi
         case "workbench_image_get_config":
             return getImageConfig();
         case "workbench_image_generate":
+            requireSiteWrite();
             return runImageWorkbench(input, navigate);
         case "workbench_video_get_config":
             return getVideoConfig();
         case "workbench_video_generate":
+            requireSiteWrite();
             return runVideoWorkbench(input, navigate);
         case "prompts_search":
             return searchPrompts(input);
         case "assets_list":
             return listAssets(input);
         case "assets_add":
+            requireSiteWrite();
             return addAsset(input);
         default:
             throw new Error(siteText("unknownTool", { name }));
     }
+}
+
+function requireSiteWrite() {
+    if (!canCanvasWrite()) throw new Error("CANVAS_AUTH_REQUIRED");
 }
 
 function getGenerationStatus(input: SiteToolInput, canvasSnapshot?: CanvasAgentSnapshot | null) {
