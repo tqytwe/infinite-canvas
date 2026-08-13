@@ -38,7 +38,7 @@ async function responseJson(response) {
     return response.json();
 }
 
-async function createSession(dataDir, userId, suffix) {
+async function createSession(dataDir, userId, suffix, extra = {}) {
     const token = `integration-session-${userId}-${suffix}-${"x".repeat(32)}`;
     await mkdir(join(dataDir, "sessions"), { recursive: true });
     await writeFile(
@@ -49,6 +49,7 @@ async function createSession(dataDir, userId, suffix) {
             apiKey: `integration-key-${userId}`,
             apiKeyId: userId,
             expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+            ...extra,
         }),
         { mode: 0o600 },
     );
@@ -314,4 +315,104 @@ test("HTTP platform gateway rewrites async image asset URLs to local proxies", a
     const payload = await responseJson(response);
     assert.equal(payload.image_url, "/api/platform/gateway/v1/images/task-assets/images/imgtask_1-0.png");
     assert.equal(payload.result.data[0].url, "/api/platform/gateway/v1/images/task-assets/images/imgtask_1-0.png");
+});
+
+test("HTTP managed prompt handoff requires a Canvas session and uses the platform BFF", async (t) => {
+    const dataDir = await mkdtemp(join(tmpdir(), "infinite-canvas-http-prompt-handoff-"));
+    let receivedHeaders;
+    const platform = await startPlatformServer((req, res) => {
+        if (req.method === "POST" && req.url === "/api/v1/nextchat/image-prompts/42/use") {
+            receivedHeaders = req.headers;
+            res.writeHead(200, { "content-type": "application/json" });
+            res.end(JSON.stringify({ code: 0, data: { prompt_id: 42, version: 3, title: "海报", prompt_text: "a studio poster", models: ["gpt-image-1"], sizes: ["1024x1024"] } }));
+            return;
+        }
+        res.writeHead(404, { "content-type": "application/json" });
+        res.end("{}");
+    });
+    const port = await freePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const child = spawn(process.execPath, ["index.mjs"], {
+        cwd: SERVER_DIR,
+        env: {
+            ...process.env,
+            NODE_ENV: "test",
+            PORT: String(port),
+            STATIC_DIR,
+            CANVAS_DATA_DIR: dataDir,
+            CANVAS_PLATFORM_API_BASE_URL: platform.baseUrl,
+            CANVAS_PLATFORM_WEB_URL: "http://platform.test",
+            CANVAS_EXCHANGE_SECRET: "secret",
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    t.after(async () => {
+        child.kill("SIGTERM");
+        await new Promise((resolvePromise) => child.once("exit", resolvePromise));
+        await new Promise((resolvePromise) => platform.server.close(resolvePromise));
+        await rm(dataDir, { recursive: true, force: true });
+    });
+
+    await waitForHealth(baseUrl);
+    const anonymous = await fetch(`${baseUrl}/api/platform/image-prompts/42/use`, { method: "POST" });
+    assert.equal(anonymous.status, 401);
+
+    const token = await createSession(dataDir, 106, "prompt-handoff");
+    const response = await fetch(`${baseUrl}/api/platform/image-prompts/42/use`, { method: "POST", headers: { cookie: cookie(token) } });
+    assert.equal(response.status, 200);
+    assert.equal((await responseJson(response)).data.prompt_text, "a studio poster");
+    assert.equal(receivedHeaders["x-nextchat-secret"], "secret");
+    assert.equal(receivedHeaders["x-nextchat-user-id"], "106");
+    assert.equal(receivedHeaders["x-nextchat-api-key-id"], "106");
+});
+
+test("HTTP admin documentation requires an authenticated administrator", async (t) => {
+    const dataDir = await mkdtemp(join(tmpdir(), "infinite-canvas-http-admin-docs-"));
+    const platform = await startPlatformServer((req, res) => {
+        if (req.method === "GET" && req.url === "/api/v1/nextchat/bootstrap") {
+            const userId = String(req.headers["x-nextchat-user-id"] || "");
+            res.writeHead(200, { "content-type": "application/json" });
+            res.end(JSON.stringify({ code: 0, data: { user: { id: Number(userId), role: userId === "108" ? "admin" : "user" } } }));
+            return;
+        }
+        res.writeHead(404, { "content-type": "application/json" });
+        res.end("{}");
+    });
+    const port = await freePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const child = spawn(process.execPath, ["index.mjs"], {
+        cwd: SERVER_DIR,
+        env: {
+            ...process.env,
+            NODE_ENV: "test",
+            PORT: String(port),
+            STATIC_DIR,
+            CANVAS_DATA_DIR: dataDir,
+            CANVAS_PLATFORM_API_BASE_URL: platform.baseUrl,
+            CANVAS_PLATFORM_WEB_URL: "http://platform.test",
+            CANVAS_EXCHANGE_SECRET: "secret",
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    t.after(async () => {
+        child.kill("SIGTERM");
+        await new Promise((resolvePromise) => child.once("exit", resolvePromise));
+        await new Promise((resolvePromise) => platform.server.close(resolvePromise));
+        await rm(dataDir, { recursive: true, force: true });
+    });
+
+    await waitForHealth(baseUrl);
+    assert.equal((await fetch(`${baseUrl}/api/admin/docs`)).status, 401);
+
+    const userToken = await createSession(dataDir, 107, "admin-docs-user");
+    assert.equal((await fetch(`${baseUrl}/api/admin/docs`, { headers: { cookie: cookie(userToken) } })).status, 403);
+
+    const adminToken = await createSession(dataDir, 108, "admin-docs-admin");
+    const response = await fetch(`${baseUrl}/api/admin/docs`, { headers: { cookie: cookie(adminToken) } });
+    assert.equal(response.status, 200);
+    const payload = await responseJson(response);
+    assert.equal(payload.title, "管理员与部署文档");
+    assert.equal(payload.metrics[0].value, "全站共 30GB");
 });

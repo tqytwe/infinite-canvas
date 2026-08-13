@@ -19,6 +19,7 @@ import { requestEdit, requestGeneration } from "@/services/api/image";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { readCloudWorkbenchLogs, writeCloudWorkbenchLogs } from "@/services/workbench-cloud";
 import { isCanvasAuthenticated, isCanvasManagedMode, useCanvasCanWrite } from "@/services/canvas-cloud";
+import { takeImagePromptHandoff } from "@/services/creation-intent";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useWorkbenchAgentStore } from "@/stores/use-workbench-agent-store";
 import type { ReferenceImage } from "@/types/image";
@@ -117,6 +118,17 @@ export default function ImagePage() {
     useEffect(() => {
         void refreshLogs();
     }, []);
+
+    useEffect(() => {
+        const handoff = takeImagePromptHandoff();
+        if (!handoff) return;
+        setPrompt(handoff.prompt_text);
+        const recommendedModel = handoff.models?.find((value) => value.trim());
+        const recommendedSize = handoff.sizes?.find((value) => value.trim());
+        if (recommendedModel) updateConfig("imageModel", recommendedModel);
+        if (recommendedSize) updateConfig("size", recommendedSize);
+        message.success(t("imageWorkbench.promptLoaded"));
+    }, [message, t, updateConfig]);
 
     const addReferences = async (files?: FileList | null) => {
         const imageFiles = Array.from(files || []).filter((file) => file.type.startsWith("image/"));

@@ -152,6 +152,7 @@ export default {
     },
     imageWorkbench: {
         title: "生图工作台",
+        promptLoaded: "已带入极速蹬提示词，请确认后再生成",
         promptPlaceholder: "描述画面主体、风格、构图、光线和用途",
         references: "参考图",
         removeReference: "移除参考图",

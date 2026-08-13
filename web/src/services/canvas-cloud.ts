@@ -7,6 +7,8 @@ export type CanvasCloudUser = {
     display_name?: string;
     email?: string;
     avatar_url?: string;
+    role?: string;
+    is_admin?: boolean;
 };
 
 export type CanvasCloudSession = {
@@ -69,6 +71,13 @@ export function isCanvasAuthenticated() {
 
 export function canCanvasWrite() {
     return isCanvasAuthenticated();
+}
+
+export function isCanvasAdminSession(value: CanvasCloudSession | null | undefined = session) {
+    if (!value?.authenticated) return false;
+    const role = String(value.user?.role || "").trim().toLowerCase();
+    if (role === "admin") return true;
+    return value.user?.is_admin === true;
 }
 
 export function useCanvasCanWrite() {

@@ -23,6 +23,7 @@ const PLATFORM_LOGIN_PATH = process.env.CANVAS_PLATFORM_LOGIN_PATH || "/login";
 const PLATFORM_REGISTER_PATH = process.env.CANVAS_PLATFORM_REGISTER_PATH || "/register";
 const EXCHANGE_SECRET = process.env.CANVAS_EXCHANGE_SECRET || process.env.SUB2API_NEXTCHAT_SECRET || "";
 const PLATFORM_ASSET_PROXY_ORIGINS = parseAllowedOrigins(process.env.CANVAS_PLATFORM_ASSET_PROXY_ORIGINS, [PLATFORM_API_BASE_URL, "https://jisu.zeabur.app"]);
+const ADMIN_USER_IDS = parseIdSet(process.env.CANVAS_ADMIN_USER_IDS);
 const IS_PRODUCTION = process.env.NODE_ENV === "production" || Boolean(process.env.ZEABUR);
 const userLocks = new Map();
 let storageLock = Promise.resolve();
@@ -91,8 +92,17 @@ async function handleApi(req, res, url, method) {
         await proxyPlatformImageStudio(req, res, url);
         return;
     }
+    const imagePromptUseMatch = url.pathname.match(/^\/api\/platform\/image-prompts\/(\d+)\/use$/);
+    if (imagePromptUseMatch && method === "POST") {
+        await proxyPlatformImagePromptUse(req, res, imagePromptUseMatch[1]);
+        return;
+    }
     if (url.pathname === "/api/platform/asset-proxy" && (method === "GET" || method === "HEAD")) {
         await handlePlatformAssetProxy(req, res, url, method);
+        return;
+    }
+    if (url.pathname === "/api/admin/docs" && method === "GET") {
+        await handleAdminDocs(req, res);
         return;
     }
 
@@ -193,6 +203,7 @@ async function handleExchange(req, res) {
         userId,
         apiKey: String(data.api_key),
         apiKeyId,
+        isAdmin: isAdminPayload(data?.user) || isAdminPayload(data) || ADMIN_USER_IDS.has(userId),
         createdAt: now.toISOString(),
         expiresAt: expiresAt.toISOString(),
     };
@@ -213,10 +224,11 @@ async function handleSession(req, res) {
         return;
     }
     const bootstrap = await fetchPlatformBootstrap(session);
+    const user = bootstrap?.user || { id: session.userId };
     sendJson(res, 200, {
         ok: true,
         authenticated: true,
-        user: bootstrap?.user || { id: session.userId },
+        user: { ...user, ...(session.isAdmin ? { is_admin: true, role: "admin" } : {}) },
         models: bootstrap?.models || null,
         api_key_id: session.apiKeyId,
         expires_at: session.expiresAt,
@@ -275,6 +287,24 @@ async function proxyPlatformImageStudio(req, res, url) {
     }, { rewriteJson: true });
 }
 
+async function proxyPlatformImagePromptUse(req, res, promptId) {
+    const session = await readSessionFromRequest(req);
+    if (!session) {
+        sendJson(res, 401, { ok: false, error: "AUTH_REQUIRED" });
+        return;
+    }
+    if (!EXCHANGE_SECRET || !PLATFORM_API_BASE_URL) {
+        sendJson(res, 503, { ok: false, error: "PLATFORM_PROXY_NOT_CONFIGURED" });
+        return;
+    }
+    await proxyRequest(req, res, `${PLATFORM_API_BASE_URL}/api/v1/nextchat/image-prompts/${promptId}/use`, {
+        "x-nextchat-secret": EXCHANGE_SECRET,
+        "x-nextchat-user-id": String(session.userId),
+        "x-nextchat-api-key-id": String(session.apiKeyId),
+        authorization: `Bearer ${session.apiKey}`,
+    }, { rewriteJson: true });
+}
+
 async function handlePlatformAssetProxy(req, res, url, method) {
     const session = await readSessionFromRequest(req);
     if (!session) {
@@ -304,6 +334,70 @@ async function handlePlatformAssetProxy(req, res, url, method) {
     }
     for await (const chunk of upstream.body) res.write(chunk);
     res.end();
+}
+
+async function handleAdminDocs(req, res) {
+    const session = await readSessionFromRequest(req);
+    if (!session) {
+        sendJson(res, 401, { ok: false, error: "AUTH_REQUIRED", login_url: buildAuthUrl(PLATFORM_LOGIN_PATH) });
+        return;
+    }
+    const bootstrap = await fetchPlatformBootstrap(session);
+    if (!session.isAdmin && !ADMIN_USER_IDS.has(Number(session.userId)) && !isAdminPayload(bootstrap?.user)) {
+        sendJson(res, 403, { ok: false, error: "ADMIN_REQUIRED" });
+        return;
+    }
+    sendJson(res, 200, { ok: true, ...adminDocsPayload() });
+}
+
+function adminDocsPayload() {
+    return {
+        title: "管理员与部署文档",
+        subtitle: "仅面向极速蹬运营、部署和管理员，说明 AI创作空间与主平台之间的职责边界。",
+        metrics: [
+            { label: "空间上限", value: "全站共 30GB" },
+            { label: "访问策略", value: "管理员可见" },
+            { label: "管理归属", value: "主平台统一管理" },
+        ],
+        sections: [
+            {
+                id: "boundary",
+                title: "管理边界",
+                icon: "userRoundCog",
+                body: [
+                    "当前 AI创作空间本身没有独立管理员后台，也没有内置用户管理、套餐管理、封禁、充值、模型授权等管理页面。",
+                    "管理员登录、用户管理、模型权限、消费统计和账号治理都由极速蹬主平台负责。Canvas 只消费平台会话、模型权限和网关能力，并保存当前用户的创作文件。",
+                ],
+            },
+            {
+                id: "deployment",
+                title: "部署配置",
+                icon: "database",
+                body: [
+                    "容器必须挂载持久卷，并设置 CANVAS_DATA_DIR。当前生产约定为 /data/infinite-canvas，用户文件按 users/<userId> 分目录存放。",
+                    "CANVAS_MAX_STORAGE_BYTES=30GB 表示全站共享空间上限；健康检查中的 storage.scope=global、storage.max_bytes 表示当前全站容量池。PORT 使用 8080，对外域名为当前 Canvas 域名。",
+                ],
+            },
+            {
+                id: "platform",
+                title: "主平台接入",
+                icon: "shieldCheck",
+                body: [
+                    "CANVAS_PLATFORM_API_BASE_URL 指向极速蹬 API，CANVAS_PLATFORM_WEB_URL 指向极速蹬网页主站。CANVAS_EXCHANGE_SECRET 必须与主平台的 NextChat/Canvas 会话交换密钥一致。",
+                    "用户直访 Canvas 域名时，登录和注册按钮必须跳回主平台；主平台再通过 /ai-creation-space 入口把用户带回 Canvas，保证极速蹬仍是账号与权限中枢。",
+                ],
+            },
+            {
+                id: "queue",
+                title: "队列与生成",
+                icon: "sparkles",
+                body: [
+                    "图片生成和图片编辑的异步排队仍由主平台接口承担，Canvas 不在本项目内重建全局任务队列，避免把计费、限流、重试和模型权限拆成两套。",
+                    "视频、文本、音频请求通过主平台会话网关读取用户可用模型。后续如果要做跨用户任务后台、管理员查看任务、失败重试审计，应优先放在主平台管理端实现。",
+                ],
+            },
+        ],
+    };
 }
 
 async function handleObject(req, res, storageKey, method, session) {
@@ -901,6 +995,21 @@ function parseAllowedOrigins(value, defaults) {
             })
             .filter(Boolean),
     );
+}
+
+function parseIdSet(value) {
+    return new Set(
+        String(value || "")
+            .split(",")
+            .map((item) => Number(item.trim()))
+            .filter((item) => Number.isSafeInteger(item) && item > 0),
+    );
+}
+
+function isAdminPayload(value) {
+    if (!value || typeof value !== "object") return false;
+    const role = String(value.role || value.user_role || "").trim().toLowerCase();
+    return role === "admin" || value.is_admin === true || value.admin === true;
 }
 
 function isJsonResponse(headers) {

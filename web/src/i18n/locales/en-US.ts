@@ -152,6 +152,7 @@ export default {
     },
     imageWorkbench: {
         title: "Image Studio",
+        promptLoaded: "Jisudeng prompt loaded. Review it before generating.",
         promptPlaceholder: "Describe the subject, style, composition, lighting, and intended use",
         references: "Reference images",
         removeReference: "Remove reference image",

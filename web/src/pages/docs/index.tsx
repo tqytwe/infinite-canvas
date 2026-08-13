@@ -1,13 +1,27 @@
 import { ArrowLeft, Cloud, Database, ExternalLink, HardDrive, Lock, ShieldCheck, Sparkles, UserRoundCog } from "lucide-react";
-import type { ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 
 import { CANVAS_PLATFORM_WEB_URL } from "@/constant/runtime-config";
 import { cn } from "@/lib/utils";
+import { canvasLoginUrl, getCanvasSession, isCanvasAdminSession, useCanvasSessionStore } from "@/services/canvas-cloud";
 
 type DocMode = "user" | "admin";
+type AdminDocStatus = "idle" | "loading" | "ready" | "login" | "forbidden" | "error";
+type DisplayDocSection = { id: string; title: string; icon: LucideIcon; body: readonly string[] };
+type AdminDocSection = { id: string; title: string; icon: keyof typeof adminIconMap; body: string[] };
+type DocMetric = { label: string; value: string };
+type AdminDocsPayload = { title: string; subtitle: string; metrics: DocMetric[]; sections: AdminDocSection[] };
 
-const userSections = [
+const adminIconMap = {
+    userRoundCog: UserRoundCog,
+    database: Database,
+    shieldCheck: ShieldCheck,
+    sparkles: Sparkles,
+};
+
+const userSections: readonly DisplayDocSection[] = [
     {
         id: "account",
         title: "账号与访问",
@@ -46,54 +60,64 @@ const userSections = [
     },
 ] as const;
 
-const adminSections = [
-    {
-        id: "boundary",
-        title: "管理边界",
-        icon: UserRoundCog,
-        body: [
-            "当前 AI创作空间本身没有独立管理员后台，也没有内置用户管理、套餐管理、封禁、充值、模型授权等管理页面。",
-            "管理员登录、用户管理、模型权限、消费统计和账号治理都由极速蹬主平台负责。Canvas 只消费平台会话、模型权限和网关能力，并保存当前用户的创作文件。",
-        ],
-    },
-    {
-        id: "deployment",
-        title: "部署配置",
-        icon: Database,
-        body: [
-            "容器必须挂载持久卷，并设置 CANVAS_DATA_DIR。当前生产约定为 /data/infinite-canvas，用户文件按 users/<userId> 分目录存放。",
-            "CANVAS_MAX_STORAGE_BYTES=30GB 表示全站共享空间上限；健康检查中的 storage.scope=global、storage.max_bytes 表示当前全站容量池。PORT 使用 8080，对外域名为当前 Canvas 域名。",
-        ],
-    },
-    {
-        id: "platform",
-        title: "主平台接入",
-        icon: ShieldCheck,
-        body: [
-            "CANVAS_PLATFORM_API_BASE_URL 指向极速蹬 API，CANVAS_PLATFORM_WEB_URL 指向极速蹬网页主站。CANVAS_EXCHANGE_SECRET 必须与主平台的 NextChat/Canvas 会话交换密钥一致。",
-            "用户直访 Canvas 域名时，登录和注册按钮必须跳回主平台；主平台再通过 /ai-creation-space 入口把用户带回 Canvas，保证极速蹬仍是账号与权限中枢。",
-        ],
-    },
-    {
-        id: "queue",
-        title: "队列与生成",
-        icon: Sparkles,
-        body: [
-            "图片生成和图片编辑的异步排队仍由主平台接口承担，Canvas 不在本项目内重建全局任务队列，避免把计费、限流、重试和模型权限拆成两套。",
-            "视频、文本、音频请求通过主平台会话网关读取用户可用模型。后续如果要做跨用户任务后台、管理员查看任务、失败重试审计，应优先放在主平台管理端实现。",
-        ],
-    },
-] as const;
+const userMetrics: DocMetric[] = [
+    { label: "空间规则", value: "全站共 30GB" },
+    { label: "访问策略", value: "未登录只读" },
+    { label: "数据建议", value: "及时导出成果" },
+];
 
 export default function DocsPage({ mode = "user" }: { mode?: DocMode }) {
     const { pathname } = useLocation();
     const activeMode: DocMode = pathname.startsWith("/docs/admin") ? "admin" : mode;
-    const sections = activeMode === "admin" ? adminSections : userSections;
-    const title = activeMode === "admin" ? "管理员与部署文档" : "用户使用文档";
-    const subtitle =
-        activeMode === "admin"
-            ? "面向极速蹬运营、部署和管理员，说明 AI创作空间与主平台之间的职责边界。"
-            : "面向普通用户，说明登录、创作、上传、保存、导出和全站共享 30GB 空间规则。";
+    const session = useCanvasSessionStore((state) => state.session);
+    const [adminDocs, setAdminDocs] = useState<AdminDocsPayload | null>(null);
+    const [adminStatus, setAdminStatus] = useState<AdminDocStatus>("idle");
+    const isAdminRoute = activeMode === "admin";
+    const canShowAdminTab = isCanvasAdminSession(session) || adminStatus === "ready";
+    const sections = isAdminRoute && adminDocs ? adminDocs.sections.map(toDisplaySection) : userSections;
+    const metrics = isAdminRoute && adminDocs ? adminDocs.metrics : userMetrics;
+    const title = isAdminRoute ? adminDocs?.title || "管理员文档需要权限" : "用户使用文档";
+    const subtitle = isAdminRoute ? adminDocs?.subtitle || "管理员部署和运维文档仅限极速蹬管理员查看。" : "面向普通用户，说明登录、创作、上传、保存、导出和全站共享 30GB 空间规则。";
+
+    useEffect(() => {
+        if (!isAdminRoute) return;
+        let cancelled = false;
+        setAdminDocs(null);
+        setAdminStatus("loading");
+        void (async () => {
+            try {
+                const nextSession = await getCanvasSession(true);
+                if (cancelled) return;
+                if (!nextSession.authenticated) {
+                    setAdminStatus("login");
+                    return;
+                }
+                const response = await fetch("/api/admin/docs", { credentials: "same-origin", cache: "no-store" });
+                if (cancelled) return;
+                if (response.status === 401) {
+                    setAdminStatus("login");
+                    return;
+                }
+                if (response.status === 403) {
+                    setAdminStatus("forbidden");
+                    return;
+                }
+                if (!response.ok) {
+                    setAdminStatus("error");
+                    return;
+                }
+                const payload = (await response.json()) as AdminDocsPayload & { ok?: boolean };
+                setAdminDocs(payload);
+                setAdminStatus("ready");
+            } catch (error) {
+                console.error("[docs] admin docs load failed", error);
+                if (!cancelled) setAdminStatus("error");
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [isAdminRoute]);
 
     return (
         <main className="h-full overflow-y-auto bg-background text-stone-950 dark:text-stone-100">
@@ -108,17 +132,21 @@ export default function DocsPage({ mode = "user" }: { mode?: DocMode }) {
                             <DocTab to="/docs/user" active={activeMode === "user"}>
                                 用户指南
                             </DocTab>
-                            <DocTab to="/docs/admin" active={activeMode === "admin"}>
-                                管理员与部署
-                            </DocTab>
+                            {canShowAdminTab ? (
+                                <DocTab to="/docs/admin" active={activeMode === "admin"}>
+                                    管理员与部署
+                                </DocTab>
+                            ) : null}
                         </nav>
-                        <div className="mt-8 space-y-2 text-sm">
-                            {sections.map((section) => (
-                                <a key={section.id} href={`#${section.id}`} className="block rounded-md px-3 py-2 text-stone-500 transition hover:bg-stone-100 hover:text-stone-950 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100">
-                                    {section.title}
-                                </a>
-                            ))}
-                        </div>
+                        {(!isAdminRoute || adminStatus === "ready") ? (
+                            <div className="mt-8 space-y-2 text-sm">
+                                {sections.map((section) => (
+                                    <a key={section.id} href={`#${section.id}`} className="block rounded-md px-3 py-2 text-stone-500 transition hover:bg-stone-100 hover:text-stone-950 dark:text-stone-400 dark:hover:bg-stone-900 dark:hover:text-stone-100">
+                                        {section.title}
+                                    </a>
+                                ))}
+                            </div>
+                        ) : null}
                     </div>
                     <a href={CANVAS_PLATFORM_WEB_URL} className="inline-flex items-center gap-2 text-sm font-medium text-stone-600 transition hover:text-stone-950 dark:text-stone-300 dark:hover:text-white">
                         返回极速蹬主平台
@@ -131,9 +159,11 @@ export default function DocsPage({ mode = "user" }: { mode?: DocMode }) {
                         <DocTab to="/docs/user" active={activeMode === "user"}>
                             用户指南
                         </DocTab>
-                        <DocTab to="/docs/admin" active={activeMode === "admin"}>
-                            管理员与部署
-                        </DocTab>
+                        {canShowAdminTab ? (
+                            <DocTab to="/docs/admin" active={activeMode === "admin"}>
+                                管理员与部署
+                            </DocTab>
+                        ) : null}
                     </div>
 
                     <header className="border-b border-stone-200 pb-8 dark:border-stone-800">
@@ -142,35 +172,83 @@ export default function DocsPage({ mode = "user" }: { mode?: DocMode }) {
                         <p className="mt-4 max-w-3xl text-base leading-7 text-stone-500 dark:text-stone-400">{subtitle}</p>
                     </header>
 
-                    <div className="grid gap-4 py-8 md:grid-cols-3">
-                        <Metric label="空间上限" value="全站共 30GB" />
-                        <Metric label="访问策略" value="未登录只读" />
-                        <Metric label="管理归属" value="主平台统一管理" />
-                    </div>
+                    {!isAdminRoute || adminStatus === "ready" ? (
+                        <div className="grid gap-4 py-8 md:grid-cols-3">
+                            {metrics.map((metric) => (
+                                <Metric key={metric.label} label={metric.label} value={metric.value} />
+                            ))}
+                        </div>
+                    ) : null}
 
-                    <div className="space-y-5 pb-14">
-                        {sections.map((section) => {
-                            const Icon = section.icon;
-                            return (
-                                <section id={section.id} key={section.id} className="scroll-mt-20 border border-stone-200 bg-card p-6 dark:border-stone-800">
-                                    <div className="flex items-center gap-3">
-                                        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-stone-100 text-stone-700 dark:bg-stone-900 dark:text-stone-200">
-                                            <Icon className="size-4" />
-                                        </span>
-                                        <h2 className="text-xl font-semibold tracking-normal">{section.title}</h2>
-                                    </div>
-                                    <div className="mt-4 space-y-3 text-sm leading-7 text-stone-600 dark:text-stone-300">
-                                        {section.body.map((item) => (
-                                            <p key={item}>{item}</p>
-                                        ))}
-                                    </div>
-                                </section>
-                            );
-                        })}
-                    </div>
+                    {isAdminRoute && adminStatus !== "ready" ? <AdminDocsGate status={adminStatus} /> : <DocSections sections={sections} />}
                 </section>
             </div>
         </main>
+    );
+}
+
+function toDisplaySection(section: AdminDocSection): DisplayDocSection {
+    return { ...section, icon: adminIconMap[section.icon] || ShieldCheck };
+}
+
+function DocSections({ sections }: { sections: readonly DisplayDocSection[] }) {
+    return (
+        <div className="space-y-5 pb-14">
+            {sections.map((section) => {
+                const Icon = section.icon;
+                return (
+                    <section id={section.id} key={section.id} className="scroll-mt-20 border border-stone-200 bg-card p-6 dark:border-stone-800">
+                        <div className="flex items-center gap-3">
+                            <span className="grid size-9 shrink-0 place-items-center rounded-md bg-stone-100 text-stone-700 dark:bg-stone-900 dark:text-stone-200">
+                                <Icon className="size-4" />
+                            </span>
+                            <h2 className="text-xl font-semibold tracking-normal">{section.title}</h2>
+                        </div>
+                        <div className="mt-4 space-y-3 text-sm leading-7 text-stone-600 dark:text-stone-300">
+                            {section.body.map((item) => (
+                                <p key={item}>{item}</p>
+                            ))}
+                        </div>
+                    </section>
+                );
+            })}
+        </div>
+    );
+}
+
+function AdminDocsGate({ status }: { status: AdminDocStatus }) {
+    const copy =
+        status === "loading"
+            ? { title: "正在验证管理员权限", body: "请稍候，系统正在确认当前极速蹬账号是否拥有管理员权限。" }
+            : status === "login"
+              ? { title: "请先登录管理员账号", body: "管理员部署和运维文档不向游客开放。请回到极速蹬主平台登录管理员账号后再进入。" }
+              : status === "forbidden"
+                ? { title: "当前账号没有管理员权限", body: "普通用户不能查看部署、密钥、存储路径和运维边界文档。你仍然可以查看用户指南并正常使用创作空间。" }
+                : { title: "管理员文档暂时无法加载", body: "权限服务或文档接口暂时不可用，请稍后重试，或回到主平台检查管理员状态。" };
+
+    return (
+        <section className="my-8 border border-stone-200 bg-card p-6 dark:border-stone-800">
+            <div className="flex items-center gap-3">
+                <span className="grid size-9 shrink-0 place-items-center rounded-md bg-stone-100 text-stone-700 dark:bg-stone-900 dark:text-stone-200">
+                    <Lock className="size-4" />
+                </span>
+                <h2 className="text-xl font-semibold tracking-normal">{copy.title}</h2>
+            </div>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-stone-600 dark:text-stone-300">{copy.body}</p>
+            <div className="mt-5 flex flex-wrap gap-2">
+                {status === "login" ? (
+                    <a href={canvasLoginUrl()} className="inline-flex h-9 items-center rounded-md bg-stone-950 px-3 text-sm font-medium text-white transition hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-stone-200">
+                        登录主平台
+                    </a>
+                ) : null}
+                <Link to="/docs/user" className="inline-flex h-9 items-center rounded-md px-3 text-sm font-medium text-stone-600 transition hover:bg-stone-100 hover:text-stone-950 dark:text-stone-300 dark:hover:bg-stone-900 dark:hover:text-stone-100">
+                    查看用户指南
+                </Link>
+                <a href={CANVAS_PLATFORM_WEB_URL} className="inline-flex h-9 items-center rounded-md px-3 text-sm font-medium text-stone-600 transition hover:bg-stone-100 hover:text-stone-950 dark:text-stone-300 dark:hover:bg-stone-900 dark:hover:text-stone-100">
+                    返回极速蹬主平台
+                </a>
+            </div>
+        </section>
     );
 }
 

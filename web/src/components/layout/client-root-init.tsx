@@ -7,6 +7,7 @@ import { createModelChannel, managedWorkspaceConfig, useConfigStore } from "@/st
 import { usePromptSourceScheduler } from "@/hooks/use-prompt-source-scheduler";
 import { CANVAS_MANAGED_MODE } from "@/constant/runtime-config";
 import { exchangeCanvasLaunchToken, getCanvasSession, useCanvasSessionStore } from "@/services/canvas-cloud";
+import { consumeImagePromptHandoff, storeImagePromptHandoff } from "@/services/creation-intent";
 import { useCanvasStore } from "@/stores/canvas/use-canvas-store";
 import { useAssetStore } from "@/stores/use-asset-store";
 
@@ -30,6 +31,8 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
         const cleanLaunchToken = () => {
             const url = new URL(window.location.href);
             url.searchParams.delete("launch_token");
+            url.searchParams.delete("creation_prompt");
+            url.searchParams.delete("creation_prompt_version");
             return `${url.pathname}${url.search}${url.hash}`;
         };
 
@@ -38,6 +41,18 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
             if (launchToken) {
                 try {
                     await exchangeCanvasLaunchToken(launchToken);
+                    const promptId = Number(new URLSearchParams(window.location.search).get("creation_prompt"));
+                    if (Number.isSafeInteger(promptId) && promptId > 0) {
+                        try {
+                            const handoff = await consumeImagePromptHandoff(promptId);
+                            storeImagePromptHandoff(handoff);
+                            if (!cancelled) window.location.replace("/image");
+                        } catch (error) {
+                            console.error("[canvas-auth] prompt handoff failed", error);
+                            if (!cancelled) window.location.replace(cleanLaunchToken());
+                        }
+                        return;
+                    }
                     if (!cancelled) window.location.replace(cleanLaunchToken());
                     return;
                 } catch (error) {
