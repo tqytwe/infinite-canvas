@@ -336,7 +336,8 @@ export default {
         login: "登录",
         register: "注册",
         storage: "空间使用",
-        storagePolicy: "最多 30GB，空间不足时按最久未访问资源滚动清理",
+        storageRemaining: "全站剩余 {{available}} / 共 {{total}}",
+        storagePolicy: "全站共 30GB，完成创作后请及时导出或保存自己的成果；空间不足时按最久未访问资源滚动清理",
     },
     home: {
         promptError: "获取提示词失败",

@@ -22,8 +22,8 @@ const userSections = [
         title: "30GB 空间规则",
         icon: HardDrive,
         body: [
-            "30GB 是单个已登录用户的独立可用空间，不是全部用户共享。每个用户的数据单独存放、单独统计、单独滚动清理。",
-            "空间没有固定过期时间。只有当该用户空间不足时，系统才会优先清理最久未访问、且没有被当前画布/素材/生成历史引用保护的媒体文件。",
+            "30GB 是当前 AI创作空间全站共享容量，不是单个用户独享。所有已登录用户上传、生成、保存到空间内的素材都会计入同一个容量池。",
+            "空间没有固定过期时间。全站容量不足时，系统会优先清理最久未访问、且没有被当前画布/素材/生成历史引用保护的媒体文件。完成创作后请及时导出或保存自己的成果。",
         ],
     },
     {
@@ -32,7 +32,7 @@ const userSections = [
         icon: Sparkles,
         body: [
             "画布、生图工作台、视频创作台、提示词库和我的资产都在 AI创作空间内使用。已登录用户可以持续上传素材、保存画布、导出结果，并把可复用内容加入资产库。",
-            "图片生成和图片编辑走主平台异步任务队列；完成后的结果会通过当前域名代理读取，并在保存时转存进用户自己的持久空间。",
+            "图片生成和图片编辑走主平台异步任务队列；完成后的结果会通过当前域名代理读取，并在保存时转存进全站共享空间。",
         ],
     },
     {
@@ -40,7 +40,7 @@ const userSections = [
         title: "上传与导出",
         icon: Cloud,
         body: [
-            "上传的图片、视频、音频和画布状态会计入当前用户空间。导出画布或素材时会从已保存数据中打包，不改变用户空间占用。",
+            "上传的图片、视频、音频和画布状态会计入全站共享空间。导出画布或素材时会从已保存数据中打包，不改变线上空间占用。",
             "如果某个历史结果已经被滚动清理，界面仍会尽量保留画布结构和文本信息；建议把长期需要复用的关键成果加入我的资产或导出备份。",
         ],
     },
@@ -62,7 +62,7 @@ const adminSections = [
         icon: Database,
         body: [
             "容器必须挂载持久卷，并设置 CANVAS_DATA_DIR。当前生产约定为 /data/infinite-canvas，用户文件按 users/<userId> 分目录存放。",
-            "CANVAS_MAX_STORAGE_BYTES=30GB 表示每个用户的空间上限；健康检查中的 max_user_bytes 也是单用户上限。PORT 使用 8080，对外域名为当前 Canvas 域名。",
+            "CANVAS_MAX_STORAGE_BYTES=30GB 表示全站共享空间上限；健康检查中的 storage.scope=global、storage.max_bytes 表示当前全站容量池。PORT 使用 8080，对外域名为当前 Canvas 域名。",
         ],
     },
     {
@@ -93,7 +93,7 @@ export default function DocsPage({ mode = "user" }: { mode?: DocMode }) {
     const subtitle =
         activeMode === "admin"
             ? "面向极速蹬运营、部署和管理员，说明 AI创作空间与主平台之间的职责边界。"
-            : "面向普通用户，说明登录、创作、上传、保存、导出和单用户 30GB 空间规则。";
+            : "面向普通用户，说明登录、创作、上传、保存、导出和全站共享 30GB 空间规则。";
 
     return (
         <main className="h-full overflow-y-auto bg-background text-stone-950 dark:text-stone-100">
@@ -143,7 +143,7 @@ export default function DocsPage({ mode = "user" }: { mode?: DocMode }) {
                     </header>
 
                     <div className="grid gap-4 py-8 md:grid-cols-3">
-                        <Metric label="空间上限" value="30GB / 用户" />
+                        <Metric label="空间上限" value="全站共 30GB" />
                         <Metric label="访问策略" value="未登录只读" />
                         <Metric label="管理归属" value="主平台统一管理" />
                     </div>

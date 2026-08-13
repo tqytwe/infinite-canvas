@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { mkdir, readFile, rename, rm, stat, statfs, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, rm, stat, statfs, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { extname, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,6 +25,7 @@ const EXCHANGE_SECRET = process.env.CANVAS_EXCHANGE_SECRET || process.env.SUB2AP
 const PLATFORM_ASSET_PROXY_ORIGINS = parseAllowedOrigins(process.env.CANVAS_PLATFORM_ASSET_PROXY_ORIGINS, [PLATFORM_API_BASE_URL, "https://jisu.zeabur.app"]);
 const IS_PRODUCTION = process.env.NODE_ENV === "production" || Boolean(process.env.ZEABUR);
 const userLocks = new Map();
+let storageLock = Promise.resolve();
 
 await mkdir(USERS_DIR, { recursive: true, mode: 0o700 });
 await mkdir(SESSIONS_DIR, { recursive: true, mode: 0o700 });
@@ -43,7 +44,7 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`[canvas-server] listening on ${PORT}`);
     console.log(`[canvas-server] data directory: ${DATA_DIR}`);
-    console.log(`[canvas-server] per-user storage limit: ${formatBytes(MAX_STORAGE_BYTES)}`);
+    console.log(`[canvas-server] global storage limit: ${formatBytes(MAX_STORAGE_BYTES)}`);
 });
 
 async function handleRequest(req, res) {
@@ -112,7 +113,7 @@ async function handleApi(req, res, url, method) {
         return;
     }
     if (url.pathname === "/api/storage/usage" && method === "GET") {
-        await withUserLock(session.userId, async () => sendJson(res, 200, { ok: true, ...(await getUsage(session.userId)) }));
+        await withStorageLock(async () => sendJson(res, 200, { ok: true, ...(await getUsage(session.userId)) }));
         return;
     }
     const stateMatch = url.pathname.match(/^\/api\/storage\/state\/([^/]+)$/);
@@ -134,7 +135,8 @@ async function handleHealth(res) {
         status: "ok",
         storage: {
             data_dir: DATA_DIR,
-            max_user_bytes: MAX_STORAGE_BYTES,
+            scope: "global",
+            max_bytes: MAX_STORAGE_BYTES,
             min_free_bytes: MIN_FREE_BYTES,
             free_bytes: freeBytes,
         },
@@ -312,7 +314,7 @@ async function handleObject(req, res, storageKey, method, session) {
         return;
     }
     if (method === "DELETE") {
-        await withUserLock(userId, async () => {
+        await withStorageLock(async () => {
             const metadata = await readMetadata(userId);
             const item = metadata.objects[storageKey];
             if (item?.kind === "file") {
@@ -328,7 +330,7 @@ async function handleObject(req, res, storageKey, method, session) {
         sendJson(res, 405, { ok: false, error: "METHOD_NOT_ALLOWED" });
         return;
     }
-    await withUserLock(userId, async () => {
+    await withStorageLock(async () => {
         const contentType = sanitizeMimeType(req.headers["content-type"]);
         const tempName = `.upload-${randomBytes(12).toString("hex")}`;
         const tempPath = join(userDir(userId), tempName);
@@ -363,7 +365,7 @@ async function handleObject(req, res, storageKey, method, session) {
 async function handlePin(req, res, storageKey, session) {
     validateStorageKey(storageKey);
     const body = await readJson(req, 16 * 1024);
-    await withUserLock(session.userId, async () => {
+    await withStorageLock(async () => {
         const metadata = await readMetadata(session.userId);
         const item = metadata.objects[storageKey];
         if (!item) {
@@ -380,7 +382,7 @@ async function handleState(req, res, domain, method, session) {
     validateDomain(domain);
     const storageKey = `state:${domain}`;
     const statePath = join("state", `${domain}.json`);
-    await withUserLock(session.userId, async () => {
+    await withStorageLock(async () => {
         const metadata = await readMetadata(session.userId);
         const item = metadata.objects[storageKey];
         const absolutePath = join(userDir(session.userId), statePath);
@@ -468,7 +470,8 @@ async function serveObject(req, res, storageKey, userId, method) {
 
 async function ensureCapacity(userId, metadata, delta, incomingKey, protectedKeys = new Set()) {
     if (delta <= 0) return;
-    const used = Object.values(metadata.objects).reduce((total, item) => total + Number(item.bytes || 0), 0);
+    const users = await readAllUserMetadata(userId, metadata);
+    const used = totalBytes(users);
     const availableAfterExisting = MAX_STORAGE_BYTES - used;
     if (delta <= availableAfterExisting) {
         await ensureFreeDisk();
@@ -476,26 +479,40 @@ async function ensureCapacity(userId, metadata, delta, incomingKey, protectedKey
     }
 
     let need = delta - availableAfterExisting;
-    const currentProtectedKeys = await collectProtectedStorageKeys(userId, metadata);
-    for (const key of currentProtectedKeys) protectedKeys.add(key);
-    const candidates = Object.values(metadata.objects)
-        .filter((item) => item.kind === "file" && item.storageKey !== incomingKey && !item.pinned && !protectedKeys.has(item.storageKey))
-        .sort((a, b) => Date.parse(a.lastAccessedAt || a.createdAt || "") - Date.parse(b.lastAccessedAt || b.createdAt || ""));
+    const currentUserId = String(userId);
+    const protectedByUser = new Map();
+    for (const user of users) {
+        const keys = await collectProtectedStorageKeys(user.userId, user.metadata);
+        if (user.userId === currentUserId) for (const key of protectedKeys) keys.add(key);
+        protectedByUser.set(user.userId, keys);
+    }
+    const candidates = users
+        .flatMap((user) =>
+            Object.values(user.metadata.objects)
+                .filter((item) => item.kind === "file" && !(user.userId === currentUserId && item.storageKey === incomingKey) && !item.pinned && !protectedByUser.get(user.userId)?.has(item.storageKey))
+                .map((item) => ({ user, item })),
+        )
+        .sort((a, b) => Date.parse(a.item.lastAccessedAt || a.item.createdAt || "") - Date.parse(b.item.lastAccessedAt || b.item.createdAt || ""));
 
     const removable = [];
-    for (const item of candidates) {
+    for (const candidate of candidates) {
         if (need <= 0) break;
-        removable.push(item);
-        need -= Number(item.bytes || 0);
+        removable.push(candidate);
+        need -= Number(candidate.item.bytes || 0);
     }
     if (need > 0) {
         const error = new Error("STORAGE_QUOTA_EXCEEDED");
         error.statusCode = 413;
         throw error;
     }
-    for (const item of removable) {
-        await rm(join(userDir(userId), item.path), { force: true });
-        delete metadata.objects[item.storageKey];
+    const changedUserIds = new Set();
+    for (const { user, item } of removable) {
+        await rm(join(userDir(user.userId), item.path), { force: true });
+        delete user.metadata.objects[item.storageKey];
+        changedUserIds.add(user.userId);
+    }
+    for (const changedUserId of changedUserIds) {
+        if (changedUserId !== currentUserId) await writeMetadata(changedUserId, users.find((user) => user.userId === changedUserId).metadata);
     }
     await ensureFreeDisk();
 }
@@ -515,13 +532,17 @@ async function ensureFreeDisk() {
 }
 
 async function getUsage(userId) {
+    const users = await readAllUserMetadata();
     const metadata = await readMetadata(userId);
     const protectedKeys = await collectProtectedStorageKeys(userId, metadata);
-    const usedBytes = Object.values(metadata.objects).reduce((total, item) => total + Number(item.bytes || 0), 0);
+    const usedBytes = totalBytes(users);
+    const userUsedBytes = Object.values(metadata.objects).reduce((total, item) => total + Number(item.bytes || 0), 0);
     return {
         used_bytes: usedBytes,
         max_bytes: MAX_STORAGE_BYTES,
         available_bytes: Math.max(0, MAX_STORAGE_BYTES - usedBytes),
+        user_used_bytes: userUsedBytes,
+        scope: "global",
         object_count: Object.values(metadata.objects).filter((item) => item.kind === "file").length,
         protected_object_count: Object.values(metadata.objects).filter((item) => item.kind === "file" && (item.pinned || protectedKeys.has(item.storageKey))).length,
         state_count: Object.values(metadata.objects).filter((item) => item.kind === "state").length,
@@ -608,6 +629,25 @@ async function writeMetadata(userId, metadata) {
     await writePrivateJson(join(userDir(userId), "metadata.json"), { version: 1, objects: metadata.objects });
 }
 
+async function readAllUserMetadata(currentUserId, currentMetadata) {
+    const users = [];
+    try {
+        const entries = await readdir(USERS_DIR, { withFileTypes: true });
+        for (const entry of entries) {
+            if (!entry.isDirectory() || !/^\d+$/.test(entry.name)) continue;
+            users.push({ userId: entry.name, metadata: entry.name === String(currentUserId) && currentMetadata ? currentMetadata : await readMetadata(entry.name) });
+        }
+    } catch {}
+    if (currentUserId && !users.some((user) => user.userId === String(currentUserId))) {
+        users.push({ userId: String(currentUserId), metadata: currentMetadata || { version: 1, objects: {} } });
+    }
+    return users;
+}
+
+function totalBytes(users) {
+    return users.reduce((total, user) => total + Object.values(user.metadata.objects).reduce((sum, item) => sum + Number(item.bytes || 0), 0), 0);
+}
+
 async function collectProtectedStorageKeys(userId, metadata) {
     const keys = new Set();
     const stateItems = Object.values(metadata.objects).filter((item) => item.kind === "state");
@@ -654,6 +694,20 @@ async function withUserLock(userId, callback) {
     } finally {
         release();
         if (userLocks.get(userId) === current) userLocks.delete(userId);
+    }
+}
+
+async function withStorageLock(callback) {
+    const previous = storageLock;
+    let release;
+    storageLock = new Promise((resolve) => {
+        release = resolve;
+    });
+    await previous;
+    try {
+        return await callback();
+    } finally {
+        release();
     }
 }
 

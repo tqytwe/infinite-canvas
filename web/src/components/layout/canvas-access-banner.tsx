@@ -51,7 +51,7 @@ export function CanvasAccessBanner() {
                 <span className="shrink-0 font-medium text-stone-700 dark:text-stone-200">{t("managedWorkspace.storage")}</span>
                 <Progress percent={percent} showInfo={false} size="small" className="max-w-44 min-w-24" />
                 <span className="shrink-0">
-                    {formatBytes(usage.used_bytes)} / {formatBytes(usage.max_bytes)}
+                    {t("managedWorkspace.storageRemaining", { available: formatBytes(usage.available_bytes), total: formatBytes(usage.max_bytes) })}
                 </span>
                 <span className="hidden truncate sm:inline">{t("managedWorkspace.storagePolicy")}</span>
             </div>

@@ -336,7 +336,8 @@ export default {
         login: "Log in",
         register: "Register",
         storage: "Storage",
-        storagePolicy: "30 GB maximum; least recently accessed resources are removed when space is needed",
+        storageRemaining: "Site remaining {{available}} / {{total}} total",
+        storagePolicy: "The whole site shares 30 GB. Export or save your results promptly after finishing; least recently accessed resources are removed when space is needed.",
     },
     home: {
         promptError: "Failed to load prompts",

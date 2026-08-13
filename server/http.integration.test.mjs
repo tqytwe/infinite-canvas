@@ -103,6 +103,10 @@ test("HTTP storage enforces auth, persistence, range reads, quota, LRU, and pinn
     });
 
     await waitForHealth(baseUrl);
+    const health = await fetch(`${baseUrl}/health`);
+    const healthPayload = await responseJson(health);
+    assert.equal(healthPayload.storage.scope, "global");
+    assert.equal(healthPayload.storage.max_bytes, 10);
 
     const anonymousUpload = await fetch(`${baseUrl}/api/storage/objects/image%3Aanonymous`, {
         method: "PUT",
@@ -137,22 +141,60 @@ test("HTTP storage enforces auth, persistence, range reads, quota, LRU, and pinn
     const statePayload = await responseJson(state);
     assert.equal(statePayload.state_count, 1);
     assert.equal(statePayload.object_count, 1);
+    assert.equal(statePayload.scope, "global");
 
     const tooLargeFiles = await readdir(join(dataDir, "users", "101"));
     assert.equal(tooLargeFiles.some((name) => name.startsWith(".upload-")), false);
 
     const lruToken = await createSession(dataDir, 102, "lru");
+    const crossUserUpload = await putObject(baseUrl, lruToken, "image:other-user", "5555");
+    assert.equal(crossUserUpload.status, 200);
+    assert.equal((await responseJson(crossUserUpload)).used_bytes, 10);
+    assert.equal("image:range" in JSON.parse(await readFile(join(dataDir, "users", "101", "metadata.json"), "utf8")).objects, true);
     assert.equal((await putObject(baseUrl, lruToken, "image:old", "1111")).status, 200);
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 10));
     assert.equal((await putObject(baseUrl, lruToken, "image:new", "2222")).status, 200);
     const rolled = await putObject(baseUrl, lruToken, "image:incoming", "333333");
     assert.equal(rolled.status, 200);
     const rolledUsage = await responseJson(rolled);
-    assert.equal(rolledUsage.used_bytes, 10);
+    assert.equal(rolledUsage.used_bytes, 8);
+    assert.equal("image:range" in JSON.parse(await readFile(join(dataDir, "users", "101", "metadata.json"), "utf8")).objects, false);
     const lruMetadata = JSON.parse(await readFile(join(dataDir, "users", "102", "metadata.json"), "utf8"));
     assert.equal("image:old" in lruMetadata.objects, false);
-    assert.equal("image:new" in lruMetadata.objects, true);
+    assert.equal("image:new" in lruMetadata.objects, false);
     assert.equal("image:incoming" in lruMetadata.objects, true);
+});
+
+test("HTTP global storage keeps pinned objects during shared LRU cleanup", async (t) => {
+    const dataDir = await mkdtemp(join(tmpdir(), "infinite-canvas-http-pinned-"));
+    const port = await freePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const child = spawn(process.execPath, ["index.mjs"], {
+        cwd: SERVER_DIR,
+        env: {
+            ...process.env,
+            NODE_ENV: "test",
+            PORT: String(port),
+            STATIC_DIR,
+            CANVAS_DATA_DIR: dataDir,
+            CANVAS_MAX_STORAGE_BYTES: "10b",
+            CANVAS_MAX_UPLOAD_BYTES: "8b",
+            CANVAS_MAX_STATE_BYTES: "1kb",
+            CANVAS_MIN_FREE_BYTES: "1b",
+            CANVAS_PLATFORM_API_BASE_URL: "",
+            CANVAS_PLATFORM_WEB_URL: "http://platform.test",
+            CANVAS_EXCHANGE_SECRET: "",
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    t.after(async () => {
+        child.kill("SIGTERM");
+        await new Promise((resolvePromise) => child.once("exit", resolvePromise));
+        await rm(dataDir, { recursive: true, force: true });
+    });
+
+    await waitForHealth(baseUrl);
 
     const pinnedToken = await createSession(dataDir, 103, "pinned");
     assert.equal((await putObject(baseUrl, pinnedToken, "image:pinned", "4444")).status, 200);
