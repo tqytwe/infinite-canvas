@@ -4,7 +4,8 @@ import { mkdir, readFile, readdir, rename, rm, stat, statfs, writeFile } from "n
 import { createServer } from "node:http";
 import { extname, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createBrotliCompress, createGzip } from "node:zlib";
+import { brotliCompress, constants as zlibConstants, gzip } from "node:zlib";
+import { promisify } from "node:util";
 
 const ROOT_DIR = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const STATIC_DIR = resolve(process.env.STATIC_DIR || join(ROOT_DIR, "web-dist"));
@@ -27,6 +28,11 @@ const EXCHANGE_SECRET = process.env.CANVAS_EXCHANGE_SECRET || process.env.SUB2AP
 const PLATFORM_ASSET_PROXY_ORIGINS = parseAllowedOrigins(process.env.CANVAS_PLATFORM_ASSET_PROXY_ORIGINS, [PLATFORM_API_BASE_URL, "https://jisu.zeabur.app"]);
 const ADMIN_USER_IDS = parseIdSet(process.env.CANVAS_ADMIN_USER_IDS);
 const IS_PRODUCTION = process.env.NODE_ENV === "production" || Boolean(process.env.ZEABUR);
+const compressBrotli = promisify(brotliCompress);
+const compressGzip = promisify(gzip);
+const staticCompressionCache = new Map();
+let staticCompressionCacheBytes = 0;
+const STATIC_COMPRESSION_CACHE_LIMIT = 64 * 1024 * 1024;
 const userLocks = new Map();
 let storageLock = Promise.resolve();
 
@@ -831,11 +837,13 @@ async function serveStatic(req, res, pathname) {
     const safePath = relative(STATIC_DIR, candidate);
     const isSafe = safePath && !safePath.startsWith("..") && !safePath.includes(`${"/"}..${"/"}`);
     let filePath = isSafe ? candidate : join(STATIC_DIR, "index.html");
+    let info;
     try {
-        const info = await stat(filePath);
+        info = await stat(filePath);
         if (!info.isFile()) throw new Error("not a file");
     } catch {
         filePath = join(STATIC_DIR, "index.html");
+        info = await stat(filePath);
     }
     const contentType = mimeType(extname(filePath));
     const headers = {
@@ -844,18 +852,36 @@ async function serveStatic(req, res, pathname) {
         vary: "Accept-Encoding",
     };
     const encoding = selectStaticEncoding(req, contentType);
-    if (encoding === "br") {
-        res.writeHead(200, { ...headers, "content-encoding": "br" });
-        createReadStream(filePath).pipe(createBrotliCompress()).pipe(res);
-        return;
-    }
-    if (encoding === "gzip") {
-        res.writeHead(200, { ...headers, "content-encoding": "gzip" });
-        createReadStream(filePath).pipe(createGzip()).pipe(res);
+    if (encoding) {
+        const body = await getCompressedStaticBody(filePath, info, encoding);
+        res.writeHead(200, { ...headers, "content-encoding": encoding, "content-length": body.length });
+        res.end(body);
         return;
     }
     res.writeHead(200, headers);
     createReadStream(filePath).pipe(res);
+}
+
+async function getCompressedStaticBody(filePath, info, encoding) {
+    const key = `${filePath}:${info.size}:${info.mtimeMs}:${encoding}`;
+    const cached = staticCompressionCache.get(key);
+    if (cached) return cached;
+    const source = await readFile(filePath);
+    const body = encoding === "br"
+        ? await compressBrotli(source, { params: { [zlibConstants.BROTLI_PARAM_QUALITY]: 5 } })
+        : await compressGzip(source, { level: 6 });
+    if (body.length <= STATIC_COMPRESSION_CACHE_LIMIT) {
+        while (staticCompressionCacheBytes + body.length > STATIC_COMPRESSION_CACHE_LIMIT) {
+            const oldest = staticCompressionCache.keys().next().value;
+            if (!oldest) break;
+            const oldestBody = staticCompressionCache.get(oldest);
+            staticCompressionCache.delete(oldest);
+            staticCompressionCacheBytes -= oldestBody?.length || 0;
+        }
+        staticCompressionCache.set(key, body);
+        staticCompressionCacheBytes += body.length;
+    }
+    return body;
 }
 
 function selectStaticEncoding(req, contentType) {
