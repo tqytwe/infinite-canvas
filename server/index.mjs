@@ -4,6 +4,7 @@ import { mkdir, readFile, readdir, rename, rm, stat, statfs, writeFile } from "n
 import { createServer } from "node:http";
 import { extname, join, normalize, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createBrotliCompress, createGzip } from "node:zlib";
 
 const ROOT_DIR = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const STATIC_DIR = resolve(process.env.STATIC_DIR || join(ROOT_DIR, "web-dist"));
@@ -65,7 +66,7 @@ async function handleRequest(req, res) {
         await handleApi(req, res, url, method);
         return;
     }
-    await serveStatic(res, url.pathname);
+    await serveStatic(req, res, url.pathname);
 }
 
 async function handleApi(req, res, url, method) {
@@ -231,9 +232,11 @@ async function handleSession(req, res) {
         });
         return;
     }
-    const bootstrap = await fetchPlatformBootstrap(session);
     const imageSession = gatewaySessionForPurpose(session, "image");
-    const imageBootstrap = imageSession !== session ? await fetchPlatformBootstrap(session, imageSession) : null;
+    const [bootstrap, imageBootstrap] = await Promise.all([
+        fetchPlatformBootstrap(session),
+        imageSession !== session ? fetchPlatformBootstrap(session, imageSession) : Promise.resolve(null),
+    ]);
     const user = bootstrap?.user || { id: session.userId };
     sendJson(res, 200, {
         ok: true,
@@ -822,7 +825,7 @@ async function withStorageLock(callback) {
     }
 }
 
-async function serveStatic(res, pathname) {
+async function serveStatic(req, res, pathname) {
     const requested = pathname === "/" ? "/index.html" : pathname;
     const candidate = resolve(STATIC_DIR, `.${normalize(requested)}`);
     const safePath = relative(STATIC_DIR, candidate);
@@ -835,8 +838,32 @@ async function serveStatic(res, pathname) {
         filePath = join(STATIC_DIR, "index.html");
     }
     const contentType = mimeType(extname(filePath));
-    res.writeHead(200, { "content-type": `${contentType}; charset=utf-8`, "cache-control": filePath.endsWith("index.html") ? "no-cache" : "public, max-age=31536000, immutable" });
+    const headers = {
+        "content-type": `${contentType}; charset=utf-8`,
+        "cache-control": filePath.endsWith("index.html") ? "no-cache" : "public, max-age=31536000, immutable",
+        vary: "Accept-Encoding",
+    };
+    const encoding = selectStaticEncoding(req, contentType);
+    if (encoding === "br") {
+        res.writeHead(200, { ...headers, "content-encoding": "br" });
+        createReadStream(filePath).pipe(createBrotliCompress()).pipe(res);
+        return;
+    }
+    if (encoding === "gzip") {
+        res.writeHead(200, { ...headers, "content-encoding": "gzip" });
+        createReadStream(filePath).pipe(createGzip()).pipe(res);
+        return;
+    }
+    res.writeHead(200, headers);
     createReadStream(filePath).pipe(res);
+}
+
+function selectStaticEncoding(req, contentType) {
+    if (!/^(text\/|application\/(javascript|json|xml)|image\/svg\+xml)/i.test(contentType)) return null;
+    const accepted = String(req.headers["accept-encoding"] || "").toLowerCase();
+    if (/\bbr(?:\s*;|,|$)/.test(accepted)) return "br";
+    if (/\bgzip(?:\s*;|,|$)/.test(accepted)) return "gzip";
+    return null;
 }
 
 async function streamToFile(req, path, maxBytes) {
