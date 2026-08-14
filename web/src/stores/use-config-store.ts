@@ -447,26 +447,21 @@ export function buildApiUrl(baseUrl: string, path: string) {
 }
 
 export function managedWorkspaceConfig(models: unknown): Partial<AiConfig> {
-    const managedModels = collectManagedModels(models);
-    const channel: ModelChannel = {
-        id: "managed",
-        name: "极速蹬托管模型",
-        baseUrl: "/api/platform/gateway",
-        apiKey: "managed-session",
-        apiFormat: "openai",
-        models: managedModels,
-    };
-    const options = managedModels.map((model) => encodeChannelModel(channel.id, model.name));
+    const channels = collectManagedChannels(models);
+    const options = modelOptionsFromChannels(channels);
     const modelFor = (capability: ModelCapability) => {
-        const model = managedModels.find((item) => item.capability === capability);
-        return model ? encodeChannelModel(channel.id, model.name) : "";
+        for (const channel of channels) {
+            const model = channel.models.find((item) => item.capability === capability);
+            if (model) return encodeChannelModel(channel.id, model.name);
+        }
+        return "";
     };
     return {
         channelMode: "remote",
-        baseUrl: channel.baseUrl,
-        apiKey: channel.apiKey,
-        apiFormat: channel.apiFormat,
-        channels: [channel],
+        baseUrl: "/api/platform/gateway",
+        apiKey: "managed-session",
+        apiFormat: "openai",
+        channels,
         models: options,
         model: modelFor("text") || modelFor("image") || modelFor("video") || modelFor("audio") || options[0] || "",
         imageModel: modelFor("image"),
@@ -504,35 +499,70 @@ function matchingModelOption(options: string[], value: string | undefined) {
     return options.find((option) => modelOptionName(option) === name) || "";
 }
 
-function collectManagedModels(value: unknown): ChannelModel[] {
+function collectManagedChannels(value: unknown): ModelChannel[] {
     const groups = value && typeof value === "object" && "groups" in value && Array.isArray(value.groups) ? value.groups : [];
+    return groups
+        .map((group, index) => createManagedChannel(group, index))
+        .filter((channel): channel is ModelChannel => Boolean(channel?.models.length));
+}
+
+function createManagedChannel(group: unknown, index: number): ModelChannel | null {
+    const groupRecord = group && typeof group === "object" ? (group as Record<string, unknown>) : {};
+    const entries = Array.isArray(groupRecord.models) ? groupRecord.models : [];
+    const models = collectManagedModels(entries);
+    if (!models.length) return null;
+    const rawId = stringValue(groupRecord.id) || stringValue(groupRecord.key) || stringValue(groupRecord.name) || stringValue(groupRecord.platform) || String(index + 1);
+    const name = stringValue(groupRecord.name) || stringValue(groupRecord.display_name) || stringValue(groupRecord.platform) || i18n.t("config.channels.indexedName", { index: index + 1 });
+    return {
+        id: `managed-${sanitizeChannelId(rawId, index)}-${index + 1}`,
+        name,
+        baseUrl: "/api/platform/gateway",
+        apiKey: "managed-session",
+        apiFormat: "openai",
+        models,
+    };
+}
+
+function collectManagedModels(entries: unknown[]): ChannelModel[] {
     const seen = new Set<string>();
     const result: ChannelModel[] = [];
-    for (const group of groups) {
-        const entries = group && typeof group === "object" && "models" in group && Array.isArray(group.models) ? group.models : [];
-        for (const entry of entries) {
-            if (!entry || typeof entry !== "object") continue;
-            const rawName = "name" in entry ? entry.name : "id" in entry ? entry.id : "";
-            const name = typeof rawName === "string" ? rawName.trim() : "";
-            if (!name || seen.has(name)) continue;
-            seen.add(name);
-            const displayName = "display_name" in entry && typeof entry.display_name === "string" ? entry.display_name.trim() : "";
-            const platform = "platform" in entry && typeof entry.platform === "string" ? entry.platform.trim() : "";
-            const useCase = "use_case" in entry && typeof entry.use_case === "string" ? entry.use_case.trim().toLowerCase() : "";
-            const toolCapabilities = "tool_capabilities" in entry && entry.tool_capabilities && typeof entry.tool_capabilities === "object" ? (entry.tool_capabilities as Record<string, unknown>) : undefined;
-            const imageCapabilities = "image_capabilities" in entry && (typeof entry.image_capabilities === "boolean" || (entry.image_capabilities && typeof entry.image_capabilities === "object")) ? (entry.image_capabilities as Record<string, unknown> | boolean) : undefined;
-            result.push({
-                name,
-                displayName: displayName || undefined,
-                platform: platform || undefined,
-                useCase: useCase || undefined,
-                toolCapabilities,
-                imageCapabilities,
-                capability: managedModelCapability({ name, useCase, imageCapabilities }),
-            });
-        }
+    for (const entry of entries) {
+        if (!entry || typeof entry !== "object") continue;
+        const record = entry as Record<string, unknown>;
+        const name = stringValue(record.name) || stringValue(record.id);
+        if (!name || seen.has(name)) continue;
+        seen.add(name);
+        const displayName = stringValue(record.display_name) || stringValue(record.displayName);
+        const platform = stringValue(record.platform);
+        const useCase = stringValue(record.use_case || record.useCase).toLowerCase();
+        const toolCapabilities = record.tool_capabilities && typeof record.tool_capabilities === "object" ? (record.tool_capabilities as Record<string, unknown>) : undefined;
+        const imageCapabilities = typeof record.image_capabilities === "boolean" || (record.image_capabilities && typeof record.image_capabilities === "object") ? (record.image_capabilities as Record<string, unknown> | boolean) : undefined;
+        result.push({
+            name,
+            displayName: displayName || undefined,
+            platform: platform || undefined,
+            useCase: useCase || undefined,
+            toolCapabilities,
+            imageCapabilities,
+            capability: managedModelCapability({ name, useCase, imageCapabilities }),
+        });
     }
     return result;
+}
+
+function sanitizeChannelId(value: string, index: number) {
+    return (
+        value
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9_-]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .slice(0, 48) || String(index + 1)
+    );
+}
+
+function stringValue(value: unknown) {
+    return typeof value === "string" ? value.trim() : "";
 }
 
 function managedModelCapability(model: { name: string; useCase: string; imageCapabilities?: Record<string, unknown> | boolean }): ModelCapability {

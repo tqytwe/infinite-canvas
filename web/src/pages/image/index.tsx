@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, BookOpen, CheckSquare, ClipboardPaste, Download, FolderPlus, History, ImagePlus, LoaderCircle, PenLine, Plus, SlidersHorizontal, Sparkles, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, CheckSquare, ClipboardPaste, Download, FolderPlus, History, ImagePlus, LoaderCircle, PenLine, Plus, RefreshCw, SlidersHorizontal, Sparkles, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { App, Button, Checkbox, Drawer, Empty, Image, Input, Modal, Tag, Tooltip, Typography } from "antd";
 import localforage from "localforage";
@@ -14,11 +14,11 @@ import { imageReferenceLabel } from "@/lib/image-reference-prompt";
 import { modelMatchesCapability, modelOptionLabel, selectableModelsByCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { nanoid } from "nanoid";
-import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
-import { createManagedImageGenerationTask, pollManagedImageGenerationTask, requestEdit, requestGeneration, type ManagedImageGenerationTask } from "@/services/api/image";
+import { formatBytes, formatDuration } from "@/lib/image-utils";
+import { createManagedImageGenerationTask, isRetryableManagedImageTaskError, pollManagedImageGenerationTask, requestEdit, requestGeneration, type ManagedImageGenerationTask } from "@/services/api/image";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
-import { readCloudWorkbenchLogs, writeCloudWorkbenchLogs } from "@/services/workbench-cloud";
-import { isCanvasAuthenticated, isCanvasManagedMode, useCanvasCanWrite } from "@/services/canvas-cloud";
+import { readCloudWorkbenchLogs, replaceCloudWorkbenchLogs, upsertCloudWorkbenchLog } from "@/services/workbench-cloud";
+import { isCanvasAuthenticated, isCanvasManagedMode, useCanvasCanWrite, useCanvasSessionStore } from "@/services/canvas-cloud";
 import { takeImagePromptHandoff } from "@/services/creation-intent";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useWorkbenchAgentStore } from "@/stores/use-workbench-agent-store";
@@ -28,12 +28,14 @@ import i18n from "@/i18n";
 type GeneratedImage = {
     id: string;
     dataUrl: string;
+    sourceUrl?: string;
     storageKey?: string;
     durationMs: number;
     width: number;
     height: number;
     bytes: number;
     mimeType: string;
+    deliveryError?: string;
 };
 
 type GenerationResult = {
@@ -46,6 +48,7 @@ type GenerationResult = {
 type GenerationLog = {
     id: string;
     createdAt: number;
+    updatedAt?: number;
     title: string;
     prompt: string;
     time: string;
@@ -63,6 +66,8 @@ type GenerationLog = {
     error?: string;
     images: GeneratedImage[];
     thumbnails: string[];
+    deliveryStatus?: "stored" | "pending";
+    deliveryError?: string;
 };
 
 type GenerationLogConfig = Pick<AiConfig, "model" | "imageModel" | "quality" | "size" | "count">;
@@ -105,8 +110,10 @@ export default function ImagePage() {
     const clearImageCommand = useWorkbenchAgentStore((state) => state.clearImageCommand);
     const updateAgentTask = useWorkbenchAgentStore((state) => state.updateTask);
     const canWrite = useCanvasCanWrite();
+    const sessionAuthenticated = useCanvasSessionStore((state) => state.session?.authenticated);
     const processedCommandRef = useRef(0);
     const agentTaskIdRef = useRef<string | undefined>(undefined);
+    const currentLogIdRef = useRef<string | undefined>(undefined);
 
     const imageModelOptions = selectableModelsByCapability(effectiveConfig, "image");
     const model = effectiveConfig.imageModel && modelMatchesCapability(effectiveConfig, effectiveConfig.imageModel, "image") ? effectiveConfig.imageModel : imageModelOptions[0] || "";
@@ -121,7 +128,8 @@ export default function ImagePage() {
 
     useEffect(() => {
         void refreshLogs();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sessionAuthenticated]);
 
     useEffect(() => {
         const handoff = takeImagePromptHandoff();
@@ -211,6 +219,7 @@ export default function ImagePage() {
                     task: managedTask,
                     images: [],
                 });
+                currentLogIdRef.current = log.id;
                 await saveLog(log, false);
                 void pollGenerationLog(log, snapshot.config, agentTaskId);
                 return;
@@ -241,7 +250,7 @@ export default function ImagePage() {
         const tasks = Array.from({ length: generationCount }, (_, index) => runGenerationSlot(index, snapshot));
 
         const result = await Promise.allSettled(tasks);
-        const successImages = result.filter((item): item is PromiseFulfilledResult<GeneratedImage> => item.status === "fulfilled").map((item) => item.value);
+        const successImages = result.flatMap((item) => (item.status === "fulfilled" ? [item.value] : []));
         const successCount = successImages.length;
         const failCount = generationCount - successCount;
         const failed = result.find((item): item is PromiseRejectedResult => item.status === "rejected");
@@ -249,26 +258,37 @@ export default function ImagePage() {
         if (agentTaskId) updateAgentTask(agentTaskId, { status: successCount ? "succeeded" : "failed", successCount, failCount, error: successCount ? undefined : error });
 
         try {
-            const logImages = await Promise.all(
-                successImages.map(async (image) => {
-                    const stored = await uploadImage(image.dataUrl);
-                    return { ...image, dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
-                }),
-            );
-            await saveLog(
-                buildLog({
-                    prompt: text,
-                    model,
-                    config: snapshot.config,
-                    references: snapshot.references,
-                    durationMs: performance.now() - batchStartedAt,
-                    successCount,
-                    failCount,
-                    status: successCount ? "success" : "failed",
-                    images: logImages,
-                }),
-            );
-            successCount ? message.success(t("imageWorkbench.generated")) : message.error(failed?.reason instanceof Error ? failed.reason.message : t("workbench.generationFailed"));
+            const logImages = await deliverImageResults(successImages);
+            const deliveryFailed = logImages.some((image) => image.deliveryError);
+            setResults([
+                ...logImages.map((image) => ({ id: image.id, status: "success" as const, image })),
+                ...Array.from({ length: failCount }, () => ({ id: nanoid(), status: "failed" as const, error: error || t("workbench.generationFailed") })),
+            ]);
+            const finalLog = buildLog({
+                prompt: text,
+                model,
+                config: snapshot.config,
+                references: snapshot.references,
+                durationMs: performance.now() - batchStartedAt,
+                successCount,
+                failCount,
+                status: successCount ? "success" : "failed",
+                images: logImages,
+            });
+            const finalLogWithDelivery = {
+                ...finalLog,
+                deliveryStatus: deliveryFailed ? ("pending" as const) : finalLog.deliveryStatus,
+                deliveryError: deliveryFailed ? t("imageWorkbench.deliveryPending") : undefined,
+            };
+            currentLogIdRef.current = finalLogWithDelivery.id;
+            await saveLog(finalLogWithDelivery);
+            if (!successCount) {
+                message.error(error || t("workbench.generationFailed"));
+            } else if (deliveryFailed) {
+                message.warning(t("imageWorkbench.deliveryPending"));
+            } else {
+                message.success(t("imageWorkbench.generated"));
+            }
         } finally {
             setRunning(false);
         }
@@ -280,10 +300,6 @@ export default function ImagePage() {
         processedCommandRef.current = imageCommand.nonce;
         clearImageCommand();
         if (typeof imageCommand.prompt === "string") setPrompt(imageCommand.prompt);
-        if (imageCommand.run && running) {
-            if (imageCommand.taskId) updateAgentTask(imageCommand.taskId, { status: "failed", error: t("imageWorkbench.busy") });
-            return;
-        }
         if (imageCommand.run) {
             agentTaskIdRef.current = imageCommand.taskId;
             setAutoRunToken((value) => value + 1);
@@ -314,7 +330,7 @@ export default function ImagePage() {
             coverUrl: stored.url,
             tags: [],
             source: t("imageWorkbench.source"),
-            data: { dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType },
+            data: { dataUrl: stored.url, sourceUrl: stored.sourceUrl || image.sourceUrl, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType },
             metadata: { source: "image-page", prompt },
         });
         message.success(t("common.addedToAssets"));
@@ -346,7 +362,7 @@ export default function ImagePage() {
         const imageKeys = logs.filter((log) => selectedLogIds.includes(log.id)).flatMap((log) => log.images.map((image) => image.storageKey).filter((key): key is string => Boolean(key)));
         const nextLogs = logs.filter((log) => !selectedLogIds.includes(log.id));
         await Promise.all([deleteStoredImages(imageKeys), ...selectedLogIds.map((id) => logStore.removeItem(id))]);
-        if (isCanvasManagedMode() && isCanvasAuthenticated()) await writeCloudWorkbenchLogs("image-workbench", nextLogs.map(serializeLog));
+        if (isCanvasManagedMode() && isCanvasAuthenticated()) await replaceCloudWorkbenchLogs("image-workbench", nextLogs.map(serializeLog));
         await refreshLogs();
         if (previewLog && selectedLogIds.includes(previewLog.id)) {
             setPreviewLog(null);
@@ -358,12 +374,23 @@ export default function ImagePage() {
 
     const saveLog = async (log: GenerationLog, resumePending = true) => {
         const serialized = serializeLog(log);
-        await logStore.setItem(log.id, serialized);
-        if (isCanvasManagedMode() && isCanvasAuthenticated()) {
-            const existing = (await readCloudWorkbenchLogs<GenerationLog>("image-workbench")) || logs;
-            await writeCloudWorkbenchLogs("image-workbench", [...existing.filter((item) => item.id !== log.id), serialized]);
+        try {
+            await logStore.setItem(log.id, serialized);
+        } catch (error) {
+            console.warn("[canvas-local] image workbench log save failed", log.id, error);
         }
-        await refreshLogs(resumePending);
+        if (isCanvasManagedMode() && isCanvasAuthenticated()) {
+            try {
+                await upsertCloudWorkbenchLog("image-workbench", serialized, logs.map(serializeLog));
+            } catch (error) {
+                console.warn("[canvas-cloud] image workbench log save pending", error);
+            }
+        }
+        try {
+            await refreshLogs(resumePending);
+        } catch (error) {
+            console.warn("[canvas-cloud] image workbench refresh failed", error);
+        }
     };
 
     const refreshLogs = async (resumePending = true) => {
@@ -371,13 +398,22 @@ export default function ImagePage() {
             setLogs([]);
             return [];
         }
-        const cloudLogs = await readCloudWorkbenchLogs<GenerationLog>("image-workbench");
-        const nextLogs = cloudLogs
-            ? (await Promise.all(cloudLogs.map(normalizeLog))).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-            : await readStoredLogs();
+        let cloudLogs: GenerationLog[] | null = null;
+        let cloudReadFailed = false;
+        try {
+            cloudLogs = await readCloudWorkbenchLogs<GenerationLog>("image-workbench");
+        } catch (error) {
+            cloudReadFailed = true;
+            console.warn("[canvas-cloud] image workbench log read failed", error);
+        }
+        const localLogs = await readStoredLogs();
+        const remoteLogs = cloudLogs ? await Promise.all(cloudLogs.map(normalizeLog)) : null;
+        const nextLogs = remoteLogs ? mergeLogs(remoteLogs, localLogs) : localLogs;
         setLogs(nextLogs);
-        if (!cloudLogs && isCanvasManagedMode() && isCanvasAuthenticated() && nextLogs.length) {
-            await writeCloudWorkbenchLogs("image-workbench", nextLogs.map(serializeLog));
+        if (cloudLogs && remoteLogs && !sameLogSet(remoteLogs, nextLogs) && isCanvasManagedMode() && isCanvasAuthenticated()) {
+            await replaceCloudWorkbenchLogs("image-workbench", nextLogs.map(serializeLog));
+        } else if (!cloudLogs && !cloudReadFailed && isCanvasManagedMode() && isCanvasAuthenticated() && nextLogs.length) {
+            await replaceCloudWorkbenchLogs("image-workbench", nextLogs.map(serializeLog));
         }
         if (resumePending) resumePendingLogs(nextLogs);
         return nextLogs;
@@ -395,7 +431,9 @@ export default function ImagePage() {
         const expectedCount = Math.max(1, Number(log.config.count) || log.imageCount || 1);
         setRunning(true);
         setStartedAt((value) => value || performance.now());
-        setResults((value) => (value.length ? value : Array.from({ length: expectedCount }, () => ({ id: nanoid(), status: "pending" }))));
+        if (currentLogIdRef.current === log.id) {
+            setResults((value) => (value.length ? value : Array.from({ length: expectedCount }, () => ({ id: nanoid(), status: "pending" }))));
+        }
         const taskConfig = {
             ...effectiveConfig,
             ...log.config,
@@ -404,61 +442,92 @@ export default function ImagePage() {
             count: String(expectedCount),
         };
         let generatedImages: GeneratedImage[] = [];
+        let lastTransientError: Error | undefined;
         try {
             for (let attempt = 0; attempt < 160; attempt += 1) {
-                const state = await pollManagedImageGenerationTask(configOverride || taskConfig, log.task);
+                let state: Awaited<ReturnType<typeof pollManagedImageGenerationTask>>;
+                try {
+                    state = await pollManagedImageGenerationTask(configOverride || taskConfig, log.task);
+                    lastTransientError = undefined;
+                } catch (error) {
+                    if (!isRetryableManagedImageTaskError(error) || attempt === 159) throw error;
+                    lastTransientError = error instanceof Error ? error : new Error(t("workbench.generationFailed"));
+                    await delay(3000);
+                    continue;
+                }
                 if (state.status === "completed") {
-                    generatedImages = [];
-                    for (const image of state.images) {
-                        const meta = await readGeneratedImageMeta(image.dataUrl);
-                        const stored = await uploadImage(meta.url);
-                        generatedImages.push({
-                            id: image.id,
-                            dataUrl: stored.url,
-                            storageKey: stored.storageKey,
-                            durationMs: Date.now() - log.createdAt,
-                            width: stored.width,
-                            height: stored.height,
-                            bytes: stored.bytes,
-                            mimeType: stored.mimeType,
-                        });
-                    }
-                    const successCount = generatedImages.length;
+                    const providerImages = state.images.map((image) => ({
+                        id: image.id,
+                        dataUrl: image.dataUrl,
+                        sourceUrl: image.dataUrl,
+                        durationMs: Date.now() - log.createdAt,
+                        width: 1024,
+                        height: 1024,
+                        bytes: 0,
+                        mimeType: "image/png",
+                    }));
+                    generatedImages = providerImages;
+                    const successCount = providerImages.length;
                     const failCount = Math.max(0, expectedCount - successCount);
-                    setResults([
-                        ...generatedImages.map((image) => ({ id: image.id, status: "success" as const, image })),
-                        ...Array.from({ length: failCount }, () => ({ id: nanoid(), status: "failed" as const, error: t("imageWorkbench.missingResult") })),
-                    ]);
+                    const providerLog: GenerationLog = {
+                        ...log,
+                        status: successCount ? "success" : "failed",
+                        durationMs: Date.now() - log.createdAt,
+                        successCount,
+                        failCount,
+                        imageCount: expectedCount,
+                        images: providerImages,
+                        thumbnails: providerImages.map((image) => image.dataUrl),
+                        deliveryStatus: successCount ? "pending" : undefined,
+                        error: successCount ? undefined : t("imageWorkbench.missingResult"),
+                    };
+                    if (currentLogIdRef.current === log.id) {
+                        setResults([
+                            ...providerImages.map((image) => ({ id: image.id, status: "success" as const, image })),
+                            ...Array.from({ length: failCount }, () => ({ id: nanoid(), status: "failed" as const, error: t("imageWorkbench.missingResult") })),
+                        ]);
+                    }
                     if (agentTaskId) updateAgentTask(agentTaskId, { status: successCount ? "succeeded" : "failed", successCount, failCount, error: successCount ? undefined : t("imageWorkbench.missingResult") });
-                    await saveLog(
-                        {
-                            ...log,
-                            status: successCount ? "success" : "failed",
-                            durationMs: Date.now() - log.createdAt,
-                            successCount,
-                            failCount,
-                            imageCount: expectedCount,
-                            images: generatedImages,
-                            thumbnails: generatedImages.map((image) => image.dataUrl),
-                            error: successCount ? undefined : t("imageWorkbench.missingResult"),
-                        },
-                        false,
-                    );
-                    successCount ? message.success(t("imageWorkbench.generated")) : message.error(t("imageWorkbench.missingResult"));
+                    await saveLog(providerLog, false);
+                    if (!successCount) {
+                        message.error(t("imageWorkbench.missingResult"));
+                        return;
+                    }
+                    generatedImages = await deliverImageResults(providerImages);
+                    const deliveryFailed = generatedImages.some((image) => image.deliveryError);
+                    const finalLog: GenerationLog = {
+                        ...providerLog,
+                        images: generatedImages,
+                        thumbnails: generatedImages.map((image) => image.dataUrl),
+                        deliveryStatus: deliveryFailed ? "pending" : "stored",
+                        deliveryError: deliveryFailed ? t("imageWorkbench.deliveryPending") : undefined,
+                    };
+                    if (currentLogIdRef.current === log.id) {
+                        setResults([
+                            ...generatedImages.map((image) => ({ id: image.id, status: "success" as const, image })),
+                            ...Array.from({ length: failCount }, () => ({ id: nanoid(), status: "failed" as const, error: t("imageWorkbench.missingResult") })),
+                        ]);
+                    }
+                    await saveLog(finalLog, false);
+                    deliveryFailed ? message.warning(t("imageWorkbench.deliveryPending")) : message.success(t("imageWorkbench.generated"));
                     return;
                 }
-                if (state.status === "failed") throw new Error(state.error);
-                if (attempt === 159) throw new Error(t("workbench.generationFailed"));
+                if (state.status === "failed") {
+                    throw new Error(state.error);
+                }
+                if (attempt === 159) throw lastTransientError || new Error(t("workbench.generationFailed"));
                 await delay(3000);
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : t("workbench.generationFailed");
             const successCount = generatedImages.length;
             const failCount = Math.max(0, expectedCount - successCount);
-            setResults([
-                ...generatedImages.map((image) => ({ id: image.id, status: "success" as const, image })),
-                ...Array.from({ length: Math.max(1, failCount) }, () => ({ id: nanoid(), status: "failed" as const, error: errorMessage })),
-            ]);
+            if (currentLogIdRef.current === log.id) {
+                setResults([
+                    ...generatedImages.map((image) => ({ id: image.id, status: "success" as const, image })),
+                    ...Array.from({ length: Math.max(1, failCount) }, () => ({ id: nanoid(), status: "failed" as const, error: errorMessage })),
+                ]);
+            }
             if (agentTaskId) updateAgentTask(agentTaskId, { status: "failed", successCount, failCount, error: errorMessage });
             await saveLog(
                 {
@@ -485,6 +554,7 @@ export default function ImagePage() {
     };
 
     const previewGenerationLog = async (log: GenerationLog) => {
+        currentLogIdRef.current = log.id;
         setPreviewLog(log);
         setLogsOpen(false);
         setPrompt(log.prompt);
@@ -500,6 +570,24 @@ export default function ImagePage() {
         );
     };
 
+    const retryDelivery = async (log: GenerationLog) => {
+        const images = await deliverImageResults(log.images);
+        const failed = images.some((image) => image.deliveryError);
+        const nextLog: GenerationLog = {
+            ...log,
+            images,
+            thumbnails: images.map((image) => image.dataUrl),
+            deliveryStatus: failed ? "pending" : "stored",
+            deliveryError: failed ? t("imageWorkbench.deliveryPending") : undefined,
+        };
+        await saveLog(nextLog, false);
+        if (currentLogIdRef.current === log.id) {
+            setPreviewLog(nextLog);
+            setResults(images.map((image) => ({ id: image.id, status: "success" as const, image })));
+        }
+        failed ? message.warning(t("imageWorkbench.deliveryPending")) : message.success(t("imageWorkbench.deliveryRecovered"));
+    };
+
     const buildRequestSnapshot = () => {
         const text = prompt.trim();
         if (!text) {
@@ -511,7 +599,7 @@ export default function ImagePage() {
             openConfigDialog(true);
             return null;
         }
-        return { text, config: { ...effectiveConfig, model, count: String(generationCount) }, references: [...references] };
+        return { text, config: { ...effectiveConfig, model, imageModel: model, count: String(generationCount) }, references: [...references] };
     };
 
     const runGenerationSlot = async (index: number, snapshot: { text: string; config: AiConfig; references: ReferenceImage[] }) => {
@@ -521,8 +609,16 @@ export default function ImagePage() {
             const result = snapshot.references.length ? await requestEdit(requestConfig, snapshot.text, snapshot.references) : await requestGeneration(requestConfig, snapshot.text);
             const image = result[0];
             if (!image) throw new Error(t("imageWorkbench.missingResult"));
-            const meta = await readGeneratedImageMeta(image.dataUrl);
-            const nextImage = { id: image.id, dataUrl: meta.url, durationMs: performance.now() - itemStartedAt, width: meta.width, height: meta.height, bytes: meta.bytes, mimeType: meta.mimeType };
+            const nextImage = {
+                id: image.id,
+                dataUrl: image.dataUrl,
+                sourceUrl: image.dataUrl || undefined,
+                durationMs: performance.now() - itemStartedAt,
+                width: 1024,
+                height: 1024,
+                bytes: 0,
+                mimeType: "image/png",
+            };
             setResults((value) => updateResultAt(value, index, { status: "success", image: nextImage }));
             return nextImage;
         } catch (error) {
@@ -539,11 +635,10 @@ export default function ImagePage() {
         const retryStartedAt = performance.now();
         try {
             const image = await runGenerationSlot(index, snapshot);
-            const stored = await uploadImage(image.dataUrl);
-            const logImage = { ...image, dataUrl: stored.url, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType };
-            setResults((value) => updateResultAt(value, index, { image: { ...image, dataUrl: stored.url, storageKey: stored.storageKey } }));
-            saveLog(
-                buildLog({
+            const logImage = (await deliverImageResults([image]))[0];
+            setResults((value) => updateResultAt(value, index, { image: logImage }));
+            await saveLog({
+                ...buildLog({
                     prompt: snapshot.text,
                     model,
                     config: { ...snapshot.config, count: "1" },
@@ -554,8 +649,10 @@ export default function ImagePage() {
                     status: "success",
                     images: [logImage],
                 }),
-            );
-            message.success(t("workbench.retrySuccess"));
+                deliveryStatus: logImage.deliveryError ? "pending" : "stored",
+                deliveryError: logImage.deliveryError ? t("imageWorkbench.deliveryPending") : undefined,
+            });
+            logImage.deliveryError ? message.warning(t("imageWorkbench.deliveryPending")) : message.success(t("workbench.retrySuccess"));
         } catch {
             // runGenerationSlot has already marked the result as failed.
         }
@@ -684,7 +781,7 @@ export default function ImagePage() {
                         </div>
 
                         <div className="mt-auto pt-6">
-                            <Button type="primary" size="large" block icon={<Sparkles className="size-4" />} loading={running} disabled={!canWrite || !canGenerate || running} onClick={() => void generate()}>
+                            <Button type="primary" size="large" block icon={<Sparkles className="size-4" />} disabled={!canWrite || !canGenerate} onClick={() => void generate()}>
                                 {t("workbench.generate")}
                             </Button>
                         </div>
@@ -698,10 +795,22 @@ export default function ImagePage() {
                             {running ? <Tag className="m-0 px-2 py-1">{t("workbench.waiting", { time: formatDuration(elapsedMs) })}</Tag> : null}
                         </div>
                         {results.length ? (
-                            <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
+                        <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-3">
                                 {results.map((result, index) =>
                                     result.status === "success" && result.image ? (
-                                        <ResultImageCard key={result.id} image={result.image} index={index} onEdit={addResultToReferences} onDownload={downloadImage} onSaveAsset={saveResultToAssets} />
+                                        <ResultImageCard
+                                            key={result.id}
+                                            image={result.image}
+                                            index={index}
+                                            onEdit={addResultToReferences}
+                                            onDownload={downloadImage}
+                                            onSaveAsset={saveResultToAssets}
+                                            onRetryDelivery={
+                                                (previewLog || logs.find((item) => item.id === currentLogIdRef.current))?.deliveryStatus === "pending"
+                                                    ? () => void retryDelivery(previewLog || logs.find((item) => item.id === currentLogIdRef.current)!)
+                                                    : undefined
+                                            }
+                                        />
                                     ) : result.status === "failed" ? (
                                         <FailedImageCard key={result.id} error={result.error || t("workbench.generationFailed")} onRetry={() => retryResult(index)} />
                                     ) : (
@@ -777,12 +886,14 @@ function ResultImageCard({
     onEdit,
     onDownload,
     onSaveAsset,
+    onRetryDelivery,
 }: {
     image: GeneratedImage;
     index: number;
     onEdit: (image: GeneratedImage, index: number) => void;
     onDownload: (image: GeneratedImage, index: number) => void;
     onSaveAsset: (image: GeneratedImage, index: number) => void;
+    onRetryDelivery?: () => void;
 }) {
     const { t } = useTranslation();
     return (
@@ -796,7 +907,7 @@ function ResultImageCard({
                     <span>{formatBytes(image.bytes)}</span>
                     <span>{formatDuration(image.durationMs)}</span>
                 </div>
-                <div className="grid min-w-0 grid-cols-3 gap-2">
+                <div className={`grid min-w-0 gap-2 ${onRetryDelivery ? "grid-cols-4" : "grid-cols-3"}`}>
                     <Tooltip title={t("common.addToAssets")}>
                         <Button className={RESULT_ACTION_BUTTON_CLASS} size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => void onSaveAsset(image, index)}>
                             {t("common.addToAssets")}
@@ -812,6 +923,13 @@ function ResultImageCard({
                             {t("common.download")}
                         </Button>
                     </Tooltip>
+                    {onRetryDelivery ? (
+                        <Tooltip title={t("imageWorkbench.retryDelivery")}>
+                            <Button className={RESULT_ACTION_BUTTON_CLASS} size="small" icon={<RefreshCw className="size-3.5" />} onClick={onRetryDelivery}>
+                                {t("imageWorkbench.retryDelivery")}
+                            </Button>
+                        </Tooltip>
+                    ) : null}
                 </div>
             </div>
         </div>
@@ -981,6 +1099,38 @@ async function readStoredLogs() {
     }
 }
 
+async function deliverImageResults(images: GeneratedImage[]) {
+    return Promise.all(
+        images.map(async (image) => {
+            if (image.storageKey && !image.deliveryError) return image;
+            const sourceUrl = image.sourceUrl || image.dataUrl;
+            if (!sourceUrl) return { ...image, deliveryError: i18n.t("imageWorkbench.deliveryPending") };
+            try {
+                const stored = await uploadImage(sourceUrl);
+                const pending = isCanvasManagedMode() && stored.cloudStatus === "pending";
+                return {
+                    ...image,
+                    dataUrl: stored.url,
+                    sourceUrl,
+                    storageKey: stored.storageKey,
+                    width: stored.width,
+                    height: stored.height,
+                    bytes: stored.bytes,
+                    mimeType: stored.mimeType,
+                    deliveryError: pending ? stored.cloudError || i18n.t("imageWorkbench.deliveryPending") : undefined,
+                };
+            } catch (error) {
+                return {
+                    ...image,
+                    dataUrl: sourceUrl,
+                    sourceUrl,
+                    deliveryError: error instanceof Error ? error.message : i18n.t("imageWorkbench.deliveryPending"),
+                };
+            }
+        }),
+    );
+}
+
 async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog> {
     const references = await Promise.all(
         (log.references || []).map(async (item) => ({
@@ -991,13 +1141,14 @@ async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog>
     const images = await Promise.all(
         (log.images || []).map(async (item) => ({
             ...item,
-            dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl),
+            dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl?.startsWith("blob:") ? item.sourceUrl || item.dataUrl : item.dataUrl || item.sourceUrl || ""),
         })),
     );
     const config = normalizeLogConfig(log);
     return {
         id: log.id || nanoid(),
         createdAt: log.createdAt || Date.now(),
+        updatedAt: log.updatedAt || log.createdAt || Date.now(),
         title: log.title || log.model || i18n.t("workbench.untitled"),
         prompt: log.prompt || log.title || "",
         time: log.time || new Date().toLocaleString(i18n.resolvedLanguage, { hour12: false }),
@@ -1013,6 +1164,8 @@ async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog>
         status: log.status || "success",
         task: log.task,
         error: log.error,
+        deliveryStatus: log.deliveryStatus,
+        deliveryError: log.deliveryError,
         images,
         thumbnails: images.map((image) => image.dataUrl).filter(Boolean),
     };
@@ -1021,6 +1174,7 @@ async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog>
 function serializeLog(log: GenerationLog): GenerationLog {
     return {
         ...log,
+        updatedAt: Date.now(),
         references: log.references.map((item) => ({ ...item, dataUrl: item.storageKey ? "" : item.dataUrl })),
         images: log.images.map((image) => ({ ...image, dataUrl: image.storageKey ? "" : image.dataUrl })),
         thumbnails: [],
@@ -1043,22 +1197,6 @@ function moveListItem<T>(items: T[], index: number, offset: number) {
     const next = [...items];
     [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
     return next;
-}
-
-async function readGeneratedImageMeta(url: string) {
-    if (url.startsWith("data:")) {
-        const meta = await readImageMeta(url);
-        return { url, width: meta.width, height: meta.height, mimeType: meta.mimeType, bytes: getDataUrlByteSize(url) };
-    }
-    const blob = await (await fetch(url, { credentials: "same-origin" })).blob();
-    const objectUrl = URL.createObjectURL(blob);
-    try {
-        const meta = await readImageMeta(objectUrl);
-        return { url: objectUrl, width: meta.width, height: meta.height, mimeType: blob.type || meta.mimeType, bytes: blob.size };
-    } catch {
-        URL.revokeObjectURL(objectUrl);
-        throw new Error(i18n.t("common.imageReadFailed"));
-    }
 }
 
 function ReferenceOrderButtons({ index, total, onMove }: { index: number; total: number; onMove: (offset: number) => void }) {
@@ -1106,6 +1244,7 @@ function buildLog({
     return {
         id: nanoid(),
         createdAt: Date.now(),
+        updatedAt: Date.now(),
         title: prompt.slice(0, 12) || i18n.t("workbench.untitled"),
         prompt,
         time: new Date().toLocaleString(i18n.resolvedLanguage, { hour12: false }),
@@ -1123,7 +1262,23 @@ function buildLog({
         error,
         images,
         thumbnails: images.map((image) => image.dataUrl).filter(Boolean),
+        deliveryStatus: images.length ? (images.some((image) => image.deliveryError) ? "pending" : "stored") : undefined,
     };
+}
+
+function mergeLogs(remote: GenerationLog[], local: GenerationLog[]) {
+    const merged = new Map(remote.map((log) => [log.id, log]));
+    for (const log of local) {
+        const current = merged.get(log.id);
+        if (!current || (log.updatedAt || log.createdAt) > (current.updatedAt || current.createdAt)) merged.set(log.id, log);
+    }
+    return Array.from(merged.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+function sameLogSet(first: GenerationLog[], second: GenerationLog[]) {
+    if (first.length !== second.length) return false;
+    const secondById = new Map(second.map((log) => [log.id, log]));
+    return first.every((log) => (log.updatedAt || log.createdAt) === (secondById.get(log.id)?.updatedAt || secondById.get(log.id)?.createdAt));
 }
 
 function delay(ms: number) {

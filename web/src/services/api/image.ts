@@ -103,6 +103,20 @@ export type ManagedImageGenerationTaskState =
     | { status: "pending" }
     | { status: "completed"; images: Array<{ id: string; dataUrl: string }> }
     | { status: "failed"; error: string };
+
+class ManagedImageTaskError extends Error {
+    readonly retryable: boolean;
+
+    constructor(message: string, retryable: boolean) {
+        super(message);
+        this.name = "ManagedImageTaskError";
+        this.retryable = retryable;
+    }
+}
+
+export function selectImageModel(config: Pick<AiConfig, "model" | "imageModel">) {
+    return (config.imageModel?.trim() || config.model?.trim() || "").trim();
+}
 type GeminiPart = {
     text?: string;
     inlineData?: { mimeType?: string; data?: string };
@@ -364,6 +378,10 @@ function readStatusError(status: number | undefined, fallback: string) {
     if (status === 502) return apiText("badGateway");
     if (status === 503) return apiText("serviceBusy");
     return status ? apiText("httpFailed", { status }) : fallback;
+}
+
+function isRetryableStatus(status: number | undefined) {
+    return status === undefined || status === 408 || status === 425 || status === 429 || status >= 500;
 }
 
 function withSystemPrompt(config: AiConfig, prompt: string) {
@@ -760,8 +778,9 @@ async function requestManagedImageGeneration(config: AiConfig, prompt: string, r
 
 export async function createManagedImageGenerationTask(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions): Promise<ManagedImageGenerationTask | null> {
     if (!isCanvasManagedMode() || !isCanvasAuthenticated()) return null;
-    const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
-    if (resolveModelScript(config, config.model || config.imageModel) || requestConfig.apiFormat !== "openai") return null;
+    const selectedModel = selectImageModel(config);
+    const requestConfig = resolveModelRequestConfig(config, selectedModel);
+    if (resolveModelScript(config, selectedModel) || requestConfig.apiFormat !== "openai") return null;
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
     const background = normalizeBackground(config.background);
@@ -786,7 +805,7 @@ async function submitManagedImageGeneration(
     prompt: string,
     params: { quality?: string; requestSize?: string; background?: string; n: number; idempotencyKey: string; signal?: AbortSignal },
 ) {
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
         method: "POST",
         headers: {
             ...aiHeaders(config, "application/json"),
@@ -804,7 +823,7 @@ async function submitManagedImageGeneration(
             output_format: IMAGE_OUTPUT_FORMAT,
         }),
         signal: params.signal,
-    });
+    }, 30_000);
     return readManagedTaskResponse(response);
 }
 
@@ -826,12 +845,12 @@ async function submitManagedImageEdit(
     if (params.background) formData.set("background", params.background);
     const files = await Promise.all(references.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
     files.forEach((file) => formData.append("image", file));
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
         method: "POST",
         headers: { ...aiHeaders(config), Accept: "application/json", "Idempotency-Key": params.idempotencyKey },
         body: formData,
         signal: params.signal,
-    });
+    }, 60_000);
     return readManagedTaskResponse(response);
 }
 
@@ -858,20 +877,28 @@ export async function pollManagedImageGenerationTask(config: AiConfig, task: Man
     const pollPath = task.pollUrl || `/v1/images/tasks/${encodeURIComponent(task.id)}`;
     const pollUrl = managedGatewayUrl(config, pollPath);
     if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-    const response = await fetch(pollUrl, {
+    const response = await fetchWithTimeout(pollUrl, {
         headers: { ...aiHeaders(config), Accept: "application/json" },
         signal: options?.signal,
-    });
+    }, 30_000);
     const state = (await response.json().catch(() => ({}))) as ManagedImageTaskResponse;
-    if (!response.ok) throw new Error(readApiErrorMessage(state) || readStatusError(response.status, apiText("requestFailed")));
+    if (!response.ok) throw new ManagedImageTaskError(readApiErrorMessage(state) || readStatusError(response.status, apiText("requestFailed")), isRetryableStatus(response.status));
     const status = String(state.status || "").toLowerCase();
-    if (status === "completed" || status === "succeeded" || state.result || state.data || state.image_url) {
+    if (["completed", "succeeded", "success", "done"].includes(status)) {
         return { status: "completed", images: parseManagedImageResult(state, config) };
     }
     if (status === "failed" || status === "cancelled" || status === "expired") {
         return { status: "failed", error: readApiErrorMessage(state) || apiText("requestFailed") };
     }
     return { status: "pending" };
+}
+
+export function isRetryableManagedImageTaskError(error: unknown) {
+    if (error instanceof ManagedImageTaskError) return error.retryable;
+    if (error instanceof DOMException && error.name === "AbortError") return false;
+    if (error instanceof TypeError) return true;
+    if (error instanceof Error) return /\b(?:408|425|429|5\d{2})\b|network|fetch failed|timeout|超时|网关错误|服务繁忙/i.test(error.message);
+    return false;
 }
 
 function managedGatewayUrl(config: AiConfig, value: string) {
@@ -896,7 +923,7 @@ function parseManagedImageResult(state: ManagedImageTaskResponse, config: AiConf
 }
 
 function normalizeManagedImageUrl(config: AiConfig, value: string) {
-    if (value.startsWith("data:") || value.startsWith("/api/platform/")) return value;
+    if (value.startsWith("data:") || value.startsWith("/api/platform/") || /^https?:\/\//i.test(value)) return value;
     return managedGatewayUrl(config, value);
 }
 
@@ -918,6 +945,19 @@ function delay(ms: number, signal?: AbortSignal) {
     });
 }
 
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs: number) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    const onAbort = () => controller.abort();
+    init.signal?.addEventListener("abort", onAbort, { once: true });
+    try {
+        return await fetch(input, { ...init, signal: controller.signal });
+    } finally {
+        window.clearTimeout(timer);
+        init.signal?.removeEventListener("abort", onAbort);
+    }
+}
+
 export async function requestGeneration(config: AiConfig, prompt: string, options?: RequestOptions) {
     try {
         const managedResult = await requestManagedImageGeneration(config, prompt, [], options);
@@ -925,9 +965,10 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
     } catch (error) {
         throw new Error(readAxiosError(error, apiText("requestFailed")));
     }
-    const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
+    const selectedModel = selectImageModel(config);
+    const requestConfig = resolveModelRequestConfig(config, selectedModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
-    const script = resolveModelScript(config, config.model || config.imageModel);
+    const script = resolveModelScript(config, selectedModel);
     if (script) {
         const quality = normalizeQuality(config.quality);
         const requestSize = resolveRequestSize(quality, config.size);
@@ -991,10 +1032,11 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
             throw new Error(readAxiosError(error, apiText("requestFailed")));
         }
     }
-    const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
+    const selectedModel = selectImageModel(config);
+    const requestConfig = resolveModelRequestConfig(config, selectedModel);
     const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
     const requestPrompt = buildImageReferencePromptText(prompt, references);
-    const script = resolveModelScript(config, config.model || config.imageModel);
+    const script = resolveModelScript(config, selectedModel);
     if (script) {
         const quality = normalizeQuality(config.quality);
         const requestSize = resolveRequestSize(quality, config.size);

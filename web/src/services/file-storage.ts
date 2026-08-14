@@ -2,21 +2,23 @@ import localforage from "localforage";
 import { nanoid } from "nanoid";
 import { canCanvasWrite, deleteCloudObject, getCloudObject, isCanvasAuthenticated, isCanvasManagedMode, putCloudObject, requireCanvasWriteAccess } from "@/services/canvas-cloud";
 
-export type UploadedFile = { url: string; storageKey: string; bytes: number; mimeType: string; width?: number; height?: number; durationMs?: number };
+export type UploadedFile = { url: string; sourceUrl?: string; storageKey: string; bytes: number; mimeType: string; width?: number; height?: number; durationMs?: number; cloudStatus?: "stored" | "pending"; cloudError?: string };
 
 const store = localforage.createInstance({ name: "infinite-canvas", storeName: "media_files" });
 const objectUrls = new Map<string, string>();
+const CLOUD_SAVE_WAIT_MS = 3000;
 
 export async function uploadMediaFile(input: string | Blob, prefix = "file"): Promise<UploadedFile> {
     if (isCanvasManagedMode()) await requireCanvasWriteAccess();
-    const blob = typeof input === "string" ? await (await fetch(input)).blob() : input;
+    const blob = typeof input === "string" ? await readBlobResponse(await fetchWithTimeout(input, 10 * 60_000)) : input;
     const storageKey = `${prefix}:${nanoid()}`;
     await store.setItem(storageKey, blob);
-    if (isCanvasManagedMode()) await putCloudObject(storageKey, blob);
+    const cloud = await putCloudObjectBestEffort(storageKey, blob);
     const url = URL.createObjectURL(blob);
     objectUrls.set(storageKey, url);
     const meta = blob.type.startsWith("video/") ? await readVideoMeta(url) : blob.type.startsWith("audio/") ? await readAudioMeta(url) : {};
-    return { url, storageKey, bytes: blob.size, mimeType: blob.type || "application/octet-stream", ...meta };
+    const sourceUrl = typeof input === "string" && !input.startsWith("data:") && !input.startsWith("blob:") ? input : undefined;
+    return { url, sourceUrl, storageKey, bytes: blob.size, mimeType: blob.type || "application/octet-stream", ...meta, cloudStatus: cloud.cloudStatus, ...(cloud.cloudError ? { cloudError: cloud.cloudError } : {}) };
 }
 
 export async function resolveMediaUrl(storageKey?: string, fallback = "") {
@@ -103,4 +105,37 @@ function readAudioMeta(url: string) {
         audio.onerror = done;
         audio.src = url;
     });
+}
+
+async function fetchWithTimeout(input: RequestInfo | URL, timeoutMs: number) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        return await fetch(input, { credentials: "same-origin", signal: controller.signal });
+    } finally {
+        window.clearTimeout(timer);
+    }
+}
+
+async function readBlobResponse(response: Response) {
+    if (!response.ok) throw new Error(`MEDIA_FETCH_FAILED_${response.status}`);
+    return response.blob();
+}
+
+async function putCloudObjectBestEffort(storageKey: string, blob: Blob): Promise<Pick<UploadedFile, "cloudStatus" | "cloudError">> {
+    if (!isCanvasManagedMode()) return {};
+    const upload = putCloudObject(storageKey, blob)
+        .then(() => ({ cloudStatus: "stored" as const }))
+        .catch((error) => {
+            console.warn("[canvas-cloud] media upload pending", storageKey, error);
+            return { cloudStatus: "pending" as const, cloudError: error instanceof Error ? error.message : "CANVAS_OBJECT_WRITE_FAILED" };
+        });
+    const settled = await Promise.race([upload, delay(CLOUD_SAVE_WAIT_MS).then(() => null)]);
+    if (settled) return settled;
+    void upload;
+    return { cloudStatus: "pending" };
+}
+
+function delay(ms: number) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
 }

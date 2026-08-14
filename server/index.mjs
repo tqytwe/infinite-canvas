@@ -972,7 +972,12 @@ function platformApiPath(value) {
 }
 
 function isPlatformGatewayPath(value) {
-    return typeof value === "string" && /^\/v1\/images\/task-assets\/[A-Za-z0-9._~!$&'()*+,;=:@/%-]+$/.test(value);
+    return (
+        typeof value === "string" &&
+        (/^\/v1\/images\/task-assets\/[A-Za-z0-9._~!$&'()*+,;=:@/%-]+$/.test(value) ||
+            /^\/v1\/videos\/[A-Za-z0-9._~!$&'()*+,;=:@/%-]+\/(?:content|download)(?:[/?#].*)?$/.test(value) ||
+            /^\/v1\/contents\/generations\/tasks\/[A-Za-z0-9._~!$&'()*+,;=:@/%-]+\/(?:content|download)(?:[/?#].*)?$/.test(value))
+    );
 }
 
 function isPlatformImageStudioPath(value) {
@@ -1009,7 +1014,15 @@ function isLikelyFetchableAssetUrl(value) {
     try {
         const parsed = new URL(value);
         const path = parsed.pathname.toLowerCase();
-        return /\.(png|jpe?g|webp|gif|avif|bmp|mp4|mov|webm|mp3|wav|m4a|ogg)$/i.test(path) || path.includes("image-task-results/") || path.includes("image-studio/") || path.includes("/task-assets/") || path.includes("/images/");
+        return (
+            /\.(png|jpe?g|webp|gif|avif|bmp|mp4|mov|webm|mp3|wav|m4a|ogg)$/i.test(path) ||
+            path.includes("image-task-results/") ||
+            path.includes("image-studio/") ||
+            path.includes("/task-assets/") ||
+            path.includes("/images/") ||
+            path.includes("/videos/") ||
+            path.includes("/contents/")
+        );
     } catch {
         return false;
     }
@@ -1092,7 +1105,7 @@ function gatewaySessionForPurpose(session, purpose) {
 
 function gatewaySessionForPath(session, suffix) {
     const path = String(suffix || "").toLowerCase();
-    if (path.startsWith("/v1/images/")) return gatewaySessionForPurpose(session, "image");
+    if (path.startsWith("/v1/images/") || path === "/v1/videos" || path.startsWith("/v1/videos/") || path === "/v1/agnesapi" || path.startsWith("/v1/contents/generations/")) return gatewaySessionForPurpose(session, "image");
     return gatewaySessionForPurpose(session, "chat");
 }
 

@@ -11,7 +11,20 @@ import { runModelPlugin } from "./model-plugin";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 
-type VideoResponse = { id: string; status?: string; error?: { message?: string }; url?: string; result_url?: string; video_url?: string; content?: { video_url?: string; url?: string } | null };
+type VideoResponse = {
+    id?: string;
+    request_id?: string;
+    task_id?: string;
+    video_id?: string;
+    status?: string;
+    error?: { message?: string } | string;
+    url?: string;
+    result_url?: string;
+    video_url?: string;
+    content?: Record<string, unknown> | null;
+    metadata?: Record<string, unknown> | null;
+    [key: string]: unknown;
+};
 type ApiVideoResponse = VideoResponse | { code?: number | string; data?: VideoResponse | null; msg?: string; message?: string; error?: { message?: string } };
 type SeedanceTask = {
     id: string;
@@ -27,8 +40,19 @@ type RequestOptions = { signal?: AbortSignal };
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
 export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
-export type VideoGenerationTask = { id: string; provider: "openai" | "seedance" | "plugin"; model: string };
+export type VideoGenerationProvider = "openai" | "agnes" | "grok" | "seedance" | "plugin";
+export type VideoGenerationTask = { id: string; provider: VideoGenerationProvider; model: string };
 export type VideoGenerationTaskState = { status: "pending" } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
+
+class VideoRequestError extends Error {
+    readonly retryable: boolean;
+
+    constructor(message: string, retryable: boolean) {
+        super(message);
+        this.name = "VideoRequestError";
+        this.retryable = retryable;
+    }
+}
 
 /** Results for scripted (plugin) video models, which run their own create+poll in one shot at task creation. */
 const pluginVideoResults = new Map<string, VideoGenerationResult>();
@@ -46,20 +70,20 @@ function aiHeaders(config: AiConfig, contentType?: string) {
 
 export async function requestVideoGeneration(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = [], options?: RequestOptions): Promise<VideoGenerationResult> {
     const task = await createVideoGenerationTask(config, prompt, references, videoReferences, audioReferences, options);
-    const delayMs = task.provider === "seedance" ? 5000 : 2500;
+    const delayMs = task.provider === "seedance" || task.provider === "agnes" ? 5000 : 2500;
     for (let attempt = 0; attempt < 120; attempt += 1) {
         if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
         const state = await pollVideoGenerationTask(config, task, options);
         if (state.status === "completed") return state.result;
         if (state.status === "failed") throw new Error(state.error);
-        if (attempt === 119) throw new Error(apiText("videoTimeout", { provider: task.provider === "seedance" ? "Seedance " : "" }));
+        if (attempt === 119) throw new Error(apiText("videoTimeout", { provider: videoProviderLabel(task.provider) }));
         await delay(delayMs, options?.signal);
     }
     throw new Error(apiText("videoTimeout", { provider: "" }));
 }
 
 export async function createVideoGenerationTask(config: AiConfig, prompt: string, references: ReferenceImage[] = [], videoReferences: ReferenceVideo[] = [], audioReferences: ReferenceAudio[] = [], options?: RequestOptions): Promise<VideoGenerationTask> {
-    const selectedModel = (config.model || config.videoModel).trim();
+    const selectedModel = selectVideoModel(config);
     const requestConfig = resolveModelRequestConfig(config, selectedModel);
     const script = resolveModelScript(config, selectedModel);
     if (script) return createPluginVideoTask(requestConfig, selectedModel, script, prompt, references, options);
@@ -70,7 +94,22 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
     if (videoReferences.length || audioReferences.length) {
         throw new Error(apiText("videoReferencesUnsupported"));
     }
+    const provider = videoProviderForModel(selectedModel, requestConfig.apiFormat);
+    if (provider === "agnes") return createAgnesVideoTask(requestConfig, selectedModel, prompt, references, options);
+    if (provider === "grok") return createGrokVideoTask(requestConfig, selectedModel, prompt, references, options);
     return createOpenAIVideoTask(requestConfig, selectedModel, prompt, references, options);
+}
+
+export function selectVideoModel(config: Pick<AiConfig, "model" | "videoModel">) {
+    return (config.videoModel?.trim() || config.model?.trim() || "").trim();
+}
+
+export function videoProviderForModel(model: string, apiFormat: AiConfig["apiFormat"] = "openai"): Exclude<VideoGenerationProvider, "plugin"> {
+    if (apiFormat === "ark") return "seedance";
+    const normalized = modelOptionName(model).trim().toLowerCase();
+    if (normalized.startsWith("agnes-") || normalized === "agnes") return "agnes";
+    if (normalized.startsWith("grok-") || normalized === "grok") return "grok";
+    return "openai";
 }
 
 export async function pollVideoGenerationTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
@@ -80,7 +119,10 @@ export async function pollVideoGenerationTask(config: AiConfig, task: VideoGener
     }
     const requestConfig = resolveModelRequestConfig(config, task.model);
     assertVideoConfig(requestConfig, requestConfig.model);
-    return task.provider === "seedance" ? pollSeedanceTask(requestConfig, task, options) : pollOpenAIVideoTask(requestConfig, task, options);
+    if (task.provider === "seedance") return pollSeedanceTask(requestConfig, task, options);
+    if (task.provider === "agnes") return pollAgnesVideoTask(requestConfig, task, options);
+    if (task.provider === "grok") return pollGrokVideoTask(requestConfig, task, options);
+    return pollOpenAIVideoTask(requestConfig, task, options);
 }
 
 async function createPluginVideoTask(config: AiConfig, model: string, script: string, prompt: string, references: ReferenceImage[], options?: RequestOptions): Promise<VideoGenerationTask> {
@@ -123,15 +165,153 @@ function videoPluginResult(result: unknown): VideoGenerationResult {
 }
 
 export async function storeGeneratedVideo(result: VideoGenerationResult): Promise<UploadedFile> {
-    if (result.blob) return uploadMediaFile(result.blob, "video");
+    if (result.blob) {
+        try {
+            const stored = await uploadMediaFile(result.blob, "video");
+            return { ...stored, sourceUrl: result.url || stored.sourceUrl };
+        } catch {
+            return {
+                url: URL.createObjectURL(result.blob),
+                sourceUrl: result.url,
+                storageKey: "",
+                bytes: result.blob.size,
+                mimeType: result.mimeType || result.blob.type || "video/mp4",
+            };
+        }
+    }
     if (result.url) {
         try {
             return await uploadMediaFile(result.url, "video");
         } catch {
-            return { url: result.url, storageKey: "", bytes: 0, mimeType: result.mimeType || "video/mp4" };
+            return { url: result.url, sourceUrl: result.url, storageKey: "", bytes: 0, mimeType: result.mimeType || "video/mp4" };
         }
     }
     throw new Error(apiText("noPlayableVideo"));
+}
+
+export function previewGeneratedVideo(result: VideoGenerationResult): UploadedFile {
+    if (result.blob) {
+        const url = URL.createObjectURL(result.blob);
+        return {
+            url,
+            sourceUrl: result.url,
+            storageKey: "",
+            bytes: result.blob.size,
+            mimeType: result.mimeType || result.blob.type || "video/mp4",
+            width: 1280,
+            height: 720,
+            cloudStatus: "pending",
+        };
+    }
+    if (result.url) {
+        return {
+            url: result.url,
+            sourceUrl: result.url,
+            storageKey: "",
+            bytes: 0,
+            mimeType: result.mimeType || "video/mp4",
+            width: 1280,
+            height: 720,
+            cloudStatus: "pending",
+        };
+    }
+    throw new Error(apiText("noPlayableVideo"));
+}
+
+async function createAgnesVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], options?: RequestOptions): Promise<VideoGenerationTask> {
+    const image = references[0] ? await imageToDataUrl(references[0]) : "";
+    const payload = {
+        model: modelOptionName(model),
+        prompt: withSystemPrompt(config, prompt),
+        dimensions: normalizeVideoSize(config.size) || "1280x720",
+        num_frames: normalizeAgnesFrameCount(config.videoSeconds),
+        frame_rate: AGNES_FRAME_RATE,
+        ...(image ? { image } : {}),
+    };
+    try {
+        const created = unwrapVideoResponse(
+            (
+                await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), payload, {
+                    headers: aiHeaders(config, "application/json"),
+                    signal: options?.signal,
+                    timeout: 30_000,
+                })
+            ).data,
+        );
+        const id = videoTaskId(created);
+        if (!id) throw new Error(apiText("noVideoTaskId"));
+        return { id, provider: "agnes", model };
+    } catch (error) {
+        throw readAxiosError(error, apiText("videoTaskCreateFailed"));
+    }
+}
+
+async function pollAgnesVideoTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
+    try {
+        const response = await axios.get<ApiVideoResponse>(aiApiUrl(config, `/agnesapi?video_id=${encodeURIComponent(task.id)}`), {
+            headers: aiHeaders(config),
+            signal: options?.signal,
+            timeout: 30_000,
+        });
+        const video = unwrapVideoResponse(response.data);
+        const url = videoResultUrl(video);
+        if (url) return { status: "completed", result: await videoResultFromUrl(config, normalizeVideoResultUrl(config, url), options) };
+        const status = normalizeVideoStatus(video.status);
+        if (isVideoFailureStatus(status)) return { status: "failed", error: readApiErrorMessage(video.error) || apiText("videoGenerationFailed") };
+        if (isVideoSuccessStatus(status)) return { status: "failed", error: apiText("noPlayableVideo") };
+        return { status: "pending" };
+    } catch (error) {
+        throw readAxiosError(error, apiText("videoTaskQueryFailed"));
+    }
+}
+
+async function createGrokVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], options?: RequestOptions): Promise<VideoGenerationTask> {
+    const image = references[0] ? await imageToDataUrl(references[0]) : "";
+    const payload = {
+        model: modelOptionName(model),
+        prompt: withSystemPrompt(config, prompt),
+        duration: normalizeGrokVideoSeconds(config.videoSeconds),
+        resolution: normalizeVideoResolution(config.vquality),
+        ...(image ? { image: { url: image } } : {}),
+    };
+    try {
+        const created = unwrapVideoResponse(
+            (
+                await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos/generations"), payload, {
+                    headers: aiHeaders(config, "application/json"),
+                    signal: options?.signal,
+                    timeout: 30_000,
+                })
+            ).data,
+        );
+        const id = videoTaskId(created);
+        if (!id) throw new Error(apiText("noVideoTaskId"));
+        return { id, provider: "grok", model };
+    } catch (error) {
+        throw readAxiosError(error, apiText("videoTaskCreateFailed"));
+    }
+}
+
+async function pollGrokVideoTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
+    try {
+        const response = await axios.get<ApiVideoResponse>(aiApiUrl(config, `/videos/${encodeURIComponent(task.id)}`), {
+            headers: aiHeaders(config),
+            signal: options?.signal,
+            timeout: 30_000,
+        });
+        const video = unwrapVideoResponse(response.data);
+        const url = videoResultUrl(video);
+        if (url) return { status: "completed", result: await videoResultFromUrl(config, normalizeVideoResultUrl(config, url), options) };
+        const status = normalizeVideoStatus(video.status);
+        if (isVideoFailureStatus(status)) return { status: "failed", error: readApiErrorMessage(video.error) || apiText("videoGenerationFailed") };
+        if (isVideoSuccessStatus(status)) {
+            const contentUrl = aiApiUrl(config, `/videos/${encodeURIComponent(task.id)}/content`);
+            return { status: "completed", result: await videoResultFromUrl(config, contentUrl, options) };
+        }
+        return { status: "pending" };
+    } catch (error) {
+        throw readAxiosError(error, apiText("videoTaskQueryFailed"));
+    }
 }
 
 async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], options?: RequestOptions): Promise<VideoGenerationTask> {
@@ -145,28 +325,43 @@ async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: st
     const files = await Promise.all(references.slice(0, 7).map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
     files.forEach((file) => body.append("input_reference[]", file));
     try {
-        const created = unwrapVideoResponse((await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), body, { headers: aiHeaders(config), signal: options?.signal })).data);
-        if (!created.id) throw new Error(apiText("noVideoTaskId"));
-        return { id: created.id, provider: "openai", model };
+        const created = unwrapVideoResponse(
+            (
+                await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), body, {
+                    headers: aiHeaders(config),
+                    signal: options?.signal,
+                    timeout: 30_000,
+                })
+            ).data,
+        );
+        const id = videoTaskId(created);
+        if (!id) throw new Error(apiText("noVideoTaskId"));
+        return { id, provider: "openai", model };
     } catch (error) {
-        throw new Error(readAxiosError(error, apiText("videoTaskCreateFailed")));
+        throw readAxiosError(error, apiText("videoTaskCreateFailed"));
     }
 }
 
 async function pollOpenAIVideoTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
     try {
-        const video = unwrapVideoResponse((await axios.get<ApiVideoResponse>(aiApiUrl(config, `/videos/${task.id}`), { headers: aiHeaders(config), signal: options?.signal })).data);
+        const video = unwrapVideoResponse(
+            (
+                await axios.get<ApiVideoResponse>(aiApiUrl(config, `/videos/${task.id}`), {
+                    headers: aiHeaders(config),
+                    signal: options?.signal,
+                    timeout: 30_000,
+                })
+            ).data,
+        );
         const url = videoResultUrl(video);
-        if (url) return { status: "completed", result: await videoResultFromUrl(url, options) };
-        if (video.status === "completed") {
-            const content = await axios.get<Blob>(aiApiUrl(config, `/videos/${task.id}/content`), { headers: aiHeaders(config), responseType: "blob", signal: options?.signal });
-            await assertVideoBlob(content.data);
-            return { status: "completed", result: { blob: content.data } };
+        if (url) return { status: "completed", result: await videoResultFromUrl(config, normalizeVideoResultUrl(config, url), options) };
+        if (isVideoSuccessStatus(normalizeVideoStatus(video.status))) {
+            return { status: "completed", result: await videoResultFromUrl(config, aiApiUrl(config, `/videos/${task.id}/content`), options) };
         }
-        if (video.status === "failed" || video.status === "cancelled") return { status: "failed", error: readApiErrorMessage(video.error?.message) || apiText("videoGenerationFailed") };
+        if (isVideoFailureStatus(normalizeVideoStatus(video.status))) return { status: "failed", error: readApiErrorMessage(video.error) || apiText("videoGenerationFailed") };
         return { status: "pending" };
     } catch (error) {
-        throw new Error(readAxiosError(error, apiText("videoTaskQueryFailed")));
+        throw readAxiosError(error, apiText("videoTaskQueryFailed"));
     }
 }
 
@@ -189,24 +384,41 @@ async function createSeedanceTask(config: AiConfig, model: string, prompt: strin
     };
 
     try {
-        const created = unwrapSeedanceTask((await axios.post<ApiEnvelope<SeedanceTask>>(seedanceApiUrl(config), payload, { headers: aiHeaders(config, "application/json"), signal: options?.signal })).data);
+        const created = unwrapSeedanceTask(
+            (
+                await axios.post<ApiEnvelope<SeedanceTask>>(seedanceApiUrl(config), payload, {
+                    headers: aiHeaders(config, "application/json"),
+                    signal: options?.signal,
+                    timeout: 30_000,
+                })
+            ).data,
+        );
         if (!created.id) throw new Error(apiText("seedanceNoTaskId"));
         return { id: created.id, provider: "seedance", model };
     } catch (error) {
-        throw new Error(readAxiosError(error, apiText("seedanceTaskCreateFailed")));
+        throw readAxiosError(error, apiText("seedanceTaskCreateFailed"));
     }
 }
 
 async function pollSeedanceTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
     try {
-        const state = unwrapSeedanceTask((await axios.get<ApiEnvelope<SeedanceTask>>(seedanceApiUrl(config, task.id), { headers: aiHeaders(config), signal: options?.signal })).data);
+        const state = unwrapSeedanceTask(
+            (
+                await axios.get<ApiEnvelope<SeedanceTask>>(seedanceApiUrl(config, task.id), {
+                    headers: aiHeaders(config),
+                    signal: options?.signal,
+                    timeout: 30_000,
+                })
+            ).data,
+        );
         const url = videoResultUrl(state);
-        if (url) return { status: "completed", result: await videoResultFromUrl(url, options) };
-        if (state.status === "succeeded" || state.status === "completed") return { status: "failed", error: apiText("seedanceNoVideoUrl") };
-        if (state.status === "failed" || state.status === "cancelled" || state.status === "expired") return { status: "failed", error: readApiErrorMessage(state.error?.message) || apiText(state.status === "expired" ? "seedanceVideoTimeout" : "seedanceVideoFailed") };
+        if (url) return { status: "completed", result: await videoResultFromUrl(config, normalizeVideoResultUrl(config, url), options) };
+        const status = normalizeVideoStatus(state.status);
+        if (isVideoSuccessStatus(status)) return { status: "failed", error: apiText("seedanceNoVideoUrl") };
+        if (isVideoFailureStatus(status)) return { status: "failed", error: readApiErrorMessage(state.error) || apiText(status === "expired" ? "seedanceVideoTimeout" : "seedanceVideoFailed") };
         return { status: "pending" };
     } catch (error) {
-        throw new Error(readAxiosError(error, apiText("seedanceTaskQueryFailed")));
+        throw readAxiosError(error, apiText("seedanceTaskQueryFailed"));
     }
 }
 
@@ -264,7 +476,7 @@ async function resolveSeedanceVideoUrl(video: ReferenceVideo) {
     if (isPublicMediaUrl(video.url) || video.url.startsWith("asset://")) return video.url;
     let blob: Blob | null = null;
     if (video.storageKey) blob = await getMediaBlob(video.storageKey);
-    if (!blob && video.url?.startsWith("blob:")) blob = await (await fetch(video.url)).blob();
+    if (!blob && video.url?.startsWith("blob:")) blob = await (await fetchWithTimeout(video.url, 10 * 60_000)).blob();
     if (!blob) throw new Error(apiText("invalidReferenceVideo"));
     return blobToDataUrl(blob);
 }
@@ -273,19 +485,25 @@ async function resolveSeedanceAudioUrl(audio: ReferenceAudio) {
     if (isPublicMediaUrl(audio.url) || audio.url.startsWith("asset://")) return audio.url;
     let blob: Blob | null = null;
     if (audio.storageKey) blob = await getMediaBlob(audio.storageKey);
-    if (!blob && audio.url?.startsWith("blob:")) blob = await (await fetch(audio.url)).blob();
+    if (!blob && audio.url?.startsWith("blob:")) blob = await (await fetchWithTimeout(audio.url, 10 * 60_000)).blob();
     if (!blob) throw new Error(apiText("invalidReferenceAudio"));
     return blobToDataUrl(blob);
 }
 
-async function videoResultFromUrl(url: string, options?: RequestOptions): Promise<VideoGenerationResult> {
+async function videoResultFromUrl(config: AiConfig, url: string, options?: RequestOptions): Promise<VideoGenerationResult> {
+    if (!requiresAuthenticatedVideoDownload(config, url)) return { url, mimeType: "video/mp4" };
     try {
-        const response = await axios.get<Blob>(url, { responseType: "blob", signal: options?.signal });
+        const response = await axios.get<Blob>(url, {
+            headers: aiHeaders(config),
+            responseType: "blob",
+            signal: options?.signal,
+            timeout: 10 * 60_000,
+        });
         await assertVideoBlob(response.data);
-        return { blob: response.data };
+        return { blob: response.data, url, mimeType: response.data.type || "video/mp4" };
     } catch (error) {
         if (axios.isCancel(error) || options?.signal?.aborted) throw error;
-        return { url, mimeType: "video/mp4" };
+        throw readAxiosError(error, apiText("videoDownloadFailed"));
     }
 }
 
@@ -316,7 +534,9 @@ function normalizeVideoResolution(value: string) {
 }
 
 function unwrapVideoResponse(payload: ApiVideoResponse) {
-    return unwrapEnvelope(payload, apiText("noVideoTask"));
+    const value = unwrapEnvelope(payload, apiText("noVideoTask"));
+    if (!isRecord(value)) throw new Error(apiText("noVideoTask"));
+    return value;
 }
 
 function unwrapSeedanceTask(payload: ApiEnvelope<SeedanceTask>) {
@@ -333,8 +553,98 @@ function unwrapEnvelope<T>(payload: ApiEnvelope<T>, emptyMessage: string): T {
     return payload as T;
 }
 
-function videoResultUrl(payload: VideoResponse | SeedanceTask) {
-    return [payload.video_url, payload.result_url, payload.url, payload.content?.video_url, payload.content?.url].find((url) => typeof url === "string" && (isPublicMediaUrl(url) || /\.mp4(\?|#|$)/i.test(url)));
+function videoResultUrl(payload: unknown) {
+    const candidates: string[] = [];
+    const preferredKeys = new Set(["url", "video_url", "result_url", "download_url", "content_url", "metadata", "content", "video", "result", "output", "data"]);
+    const visit = (value: unknown, key = "") => {
+        if (typeof value === "string") {
+            if (preferredKeys.has(key) && isVideoResourceUrl(value)) candidates.push(value);
+            return;
+        }
+        if (Array.isArray(value)) {
+            value.forEach((item) => visit(item, key));
+            return;
+        }
+        if (!isRecord(value)) return;
+        const entries = Object.entries(value);
+        entries
+            .filter(([entryKey]) => preferredKeys.has(entryKey))
+            .forEach(([entryKey, entryValue]) => visit(entryValue, entryKey));
+        entries
+            .filter(([entryKey]) => !preferredKeys.has(entryKey))
+            .forEach(([entryKey, entryValue]) => visit(entryValue, entryKey));
+    };
+    visit(payload);
+    return candidates.find((url) => isVideoResourceUrl(url));
+}
+
+function normalizeVideoResultUrl(config: AiConfig, value: string) {
+    if (value.startsWith("/v1/")) return buildApiUrl(config.baseUrl, value.slice(3));
+    if (/^https?:\/\//i.test(value)) {
+        try {
+            const parsed = new URL(value);
+            if (parsed.pathname.startsWith("/v1/")) return buildApiUrl(config.baseUrl, `${parsed.pathname.slice(3)}${parsed.search}`);
+        } catch {}
+    }
+    return value;
+}
+
+function isVideoResourceUrl(value: string) {
+    return isPublicMediaUrl(value) || value.startsWith("/") || /\.mp4(\?|#|$)/i.test(value);
+}
+
+function videoTaskId(payload: unknown): string {
+    if (!isRecord(payload)) return "";
+    for (const key of ["video_id", "request_id", "task_id", "id"]) {
+        const value = payload[key];
+        if (typeof value === "string" && value.trim()) return value.trim();
+    }
+    for (const key of ["data", "result", "response"]) {
+        const nested = videoTaskId(payload[key]);
+        if (nested) return nested;
+    }
+    return "";
+}
+
+function normalizeVideoStatus(value: unknown) {
+    return String(value || "").trim().toLowerCase();
+}
+
+function isVideoSuccessStatus(value: string) {
+    return ["completed", "succeeded", "success", "done", "finished"].includes(value);
+}
+
+function isVideoFailureStatus(value: string) {
+    return ["failed", "failure", "cancelled", "canceled", "expired", "error"].includes(value);
+}
+
+function videoProviderLabel(provider: VideoGenerationProvider) {
+    if (provider === "seedance") return "Seedance ";
+    if (provider === "agnes") return "Agnes ";
+    if (provider === "grok") return "Grok ";
+    return "";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+const AGNES_FRAME_RATE = 24;
+
+function normalizeAgnesFrameCount(value: string) {
+    const seconds = Math.max(1, Math.min(18, Math.floor(Number(value) || 6)));
+    const target = Math.max(9, Math.round(seconds * AGNES_FRAME_RATE));
+    return Math.min(441, Math.floor((target - 1) / 8) * 8 + 1);
+}
+
+function normalizeGrokVideoSeconds(value: string) {
+    const seconds = Math.floor(Number(value) || 8);
+    return Math.max(1, Math.min(15, seconds));
+}
+
+function withSystemPrompt(config: AiConfig, prompt: string) {
+    const systemPrompt = config.systemPrompt.trim();
+    return systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt;
 }
 
 function readApiErrorMessage(value: unknown): string {
@@ -366,20 +676,45 @@ function readApiErrorMessage(value: unknown): string {
     );
 }
 
-function readAxiosError(error: unknown, fallback: string) {
-    if (axios.isCancel(error)) return apiText("requestCanceled");
+function readAxiosError(error: unknown, fallback: string): VideoRequestError {
+    if (axios.isCancel(error)) return new VideoRequestError(apiText("requestCanceled"), false);
     if (axios.isAxiosError<{ error?: { message?: string }; msg?: string; message?: string; code?: number | string }>(error)) {
         const responseData = error.response?.data;
-        return readApiErrorMessage(responseData) || statusMessage(error.response?.status, fallback);
+        const status = error.response?.status;
+        return new VideoRequestError(readApiErrorMessage(responseData) || statusMessage(status, fallback), isRetryableStatus(status));
     }
-    if (error instanceof DOMException && error.name === "AbortError") return apiText("requestCanceled");
-    return error instanceof Error ? readApiErrorMessage(error.message) || error.message : fallback;
+    if (error instanceof DOMException && error.name === "AbortError") return new VideoRequestError(apiText("requestCanceled"), false);
+    if (error instanceof VideoRequestError) return error;
+    if (error instanceof Error) return new VideoRequestError(readApiErrorMessage(error.message) || error.message, false);
+    return new VideoRequestError(fallback, false);
 }
 
 function statusMessage(status: number | undefined, fallback: string) {
     if (status === 401 || status === 403) return apiText("authenticationFailed");
     if (status === 429) return apiText("rateLimited");
     return status ? `${fallback}（${status}）` : fallback;
+}
+
+function isRetryableStatus(status: number | undefined) {
+    return status === undefined || status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+export function isRetryableVideoTaskError(error: unknown) {
+    return error instanceof VideoRequestError && error.retryable;
+}
+
+function requiresAuthenticatedVideoDownload(config: AiConfig, value: string) {
+    if (!value || value.startsWith("blob:") || value.startsWith("data:")) return false;
+    if (value.startsWith("/api/platform/gateway") || value.startsWith("/api/platform/asset-proxy") || value.startsWith("/api/storage/objects/")) return false;
+    if (value.startsWith("/v1/")) return true;
+    try {
+        const origin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+        const parsed = new URL(value, origin);
+        const base = new URL(config.baseUrl, origin);
+        return parsed.origin === base.origin && (parsed.pathname.startsWith("/v1/") || parsed.pathname.startsWith("/api/v3/") || parsed.pathname.startsWith("/api/plan/v3/"));
+    } catch {
+        return false;
+    }
 }
 
 async function assertVideoBlob(blob: Blob) {
@@ -396,6 +731,16 @@ async function assertVideoBlob(blob: Blob) {
 
 function isPublicMediaUrl(value: string) {
     return /^https?:\/\//i.test(value || "");
+}
+
+async function fetchWithTimeout(input: RequestInfo | URL, timeoutMs: number) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        return await fetch(input, { credentials: "same-origin", signal: controller.signal });
+    } finally {
+        window.clearTimeout(timer);
+    }
 }
 
 function delay(ms: number, signal?: AbortSignal) {

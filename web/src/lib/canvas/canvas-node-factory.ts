@@ -25,11 +25,34 @@ export function createCanvasNode(type: CanvasNodeTypeId, position: Position, met
 }
 
 export function imageMetadata(image: UploadedImage): CanvasNodeMetadata {
-    return { content: image.url, storageKey: image.storageKey, status: "success", naturalWidth: image.width, naturalHeight: image.height, bytes: image.bytes, mimeType: image.mimeType };
+    return {
+        content: image.url,
+        sourceUrl: image.sourceUrl,
+        storageKey: image.storageKey,
+        status: "success",
+        naturalWidth: image.width,
+        naturalHeight: image.height,
+        bytes: image.bytes,
+        mimeType: image.mimeType,
+        deliveryStatus: image.cloudStatus === "pending" ? "pending" : "stored",
+        deliveryError: image.cloudError,
+    };
 }
 
 export function videoMetadata(video: UploadedFile): CanvasNodeMetadata {
-    return { content: video.url, storageKey: video.storageKey, status: "success", naturalWidth: video.width, naturalHeight: video.height, bytes: video.bytes, mimeType: video.mimeType || "video/mp4", durationMs: video.durationMs };
+    return {
+        content: video.url,
+        sourceUrl: video.sourceUrl,
+        storageKey: video.storageKey,
+        status: "success",
+        naturalWidth: video.width,
+        naturalHeight: video.height,
+        bytes: video.bytes,
+        mimeType: video.mimeType || "video/mp4",
+        durationMs: video.durationMs,
+        deliveryStatus: video.cloudStatus === "pending" || !video.storageKey ? "pending" : "stored",
+        deliveryError: video.cloudError,
+    };
 }
 
 export function audioMetadata(audio: UploadedFile): CanvasNodeMetadata {

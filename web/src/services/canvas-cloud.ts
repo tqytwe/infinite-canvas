@@ -31,6 +31,8 @@ export type CloudUsage = {
 
 let sessionPromise: Promise<CanvasCloudSession> | null = null;
 let session: CanvasCloudSession | null = null;
+const CLOUD_STATE_TIMEOUT_MS = 60_000;
+const CLOUD_OBJECT_TIMEOUT_MS = 10 * 60_000;
 
 type CanvasSessionStore = {
     session: CanvasCloudSession | null;
@@ -145,7 +147,7 @@ export async function getCloudState(domain: string) {
     if (!CANVAS_MANAGED_MODE) return null;
     const value = await getCanvasSession();
     if (!value.authenticated) return null;
-    const response = await fetch(`/api/storage/state/${encodeURIComponent(domain)}`, { credentials: "same-origin", cache: "no-store" });
+    const response = await cloudFetch(`/api/storage/state/${encodeURIComponent(domain)}`, { credentials: "same-origin", cache: "no-store" }, CLOUD_STATE_TIMEOUT_MS);
     if (response.status === 401) return null;
     if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "CANVAS_STATE_READ_FAILED");
     const payload = (await response.json()) as { state?: string | null };
@@ -155,12 +157,12 @@ export async function getCloudState(domain: string) {
 export async function putCloudState(domain: string, state: string) {
     if (!CANVAS_MANAGED_MODE) return null;
     await requireCanvasWriteAccess();
-    const response = await fetch(`/api/storage/state/${encodeURIComponent(domain)}`, {
+    const response = await cloudFetch(`/api/storage/state/${encodeURIComponent(domain)}`, {
         method: "PUT",
         credentials: "same-origin",
         headers: { "content-type": "application/json" },
         body: state,
-    });
+    }, CLOUD_STATE_TIMEOUT_MS);
     if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "CANVAS_STATE_WRITE_FAILED");
     return response.json() as Promise<CloudUsage & { ok: boolean }>;
 }
@@ -168,19 +170,19 @@ export async function putCloudState(domain: string, state: string) {
 export async function putCloudObject(storageKey: string, blob: Blob) {
     if (!CANVAS_MANAGED_MODE) return;
     await requireCanvasWriteAccess();
-    const response = await fetch(`/api/storage/objects/${encodeURIComponent(storageKey)}`, {
+    const response = await cloudFetch(`/api/storage/objects/${encodeURIComponent(storageKey)}`, {
         method: "PUT",
         credentials: "same-origin",
         headers: { "content-type": blob.type || "application/octet-stream" },
         body: blob,
-    });
+    }, CLOUD_OBJECT_TIMEOUT_MS);
     if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "CANVAS_OBJECT_WRITE_FAILED");
 }
 
 export async function getCloudObject(storageKey: string) {
     if (!CANVAS_MANAGED_MODE) return null;
     if (!isCanvasAuthenticated()) return null;
-    const response = await fetch(`/api/storage/objects/${encodeURIComponent(storageKey)}`, { credentials: "same-origin", cache: "no-store" });
+    const response = await cloudFetch(`/api/storage/objects/${encodeURIComponent(storageKey)}`, { credentials: "same-origin", cache: "no-store" }, CLOUD_OBJECT_TIMEOUT_MS);
     if (!response.ok) return null;
     return response.blob();
 }
@@ -197,4 +199,17 @@ export async function getCloudUsage() {
     const response = await fetch("/api/storage/usage", { credentials: "same-origin", cache: "no-store" });
     if (!response.ok) return null;
     return (await response.json()) as CloudUsage & { ok: boolean };
+}
+
+async function cloudFetch(input: RequestInfo | URL, init: RequestInit, timeoutMs: number) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    const onAbort = () => controller.abort();
+    init.signal?.addEventListener("abort", onAbort, { once: true });
+    try {
+        return await fetch(input, { ...init, signal: controller.signal });
+    } finally {
+        window.clearTimeout(timer);
+        init.signal?.removeEventListener("abort", onAbort);
+    }
 }

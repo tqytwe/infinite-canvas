@@ -30,15 +30,19 @@ export type CanvasNodeImage = {
     status: CanvasNodeStatus;
     errorDetails?: string;
     content: string;
+    sourceUrl?: string;
     storageKey: string;
     naturalWidth: number;
     naturalHeight: number;
     bytes: number;
     mimeType: string;
+    deliveryStatus?: "stored" | "pending";
+    deliveryError?: string;
 };
 
 export type CanvasNodeMetadata = {
     content?: string;
+    sourceUrl?: string;
     composerContent?: string;
     prompt?: string;
     status?: CanvasNodeStatus;
@@ -70,6 +74,8 @@ export type CanvasNodeMetadata = {
     mimeType?: string;
     bytes?: number;
     durationMs?: number;
+    deliveryStatus?: "stored" | "pending";
+    deliveryError?: string;
     groupId?: string;
     interactive?: boolean; // Plugin node interaction/move state; see CanvasNodeDefinition.interactionToggle.
 };

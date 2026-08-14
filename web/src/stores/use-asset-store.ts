@@ -9,8 +9,8 @@ import { canCanvasWrite, getCloudState, isCanvasAuthenticated, isCanvasManagedMo
 
 export type AssetKind = "text" | "image" | "video";
 export type TextAsset = AssetBase<"text"> & { data: { content: string } };
-export type ImageAsset = AssetBase<"image"> & { data: { dataUrl: string; storageKey?: string; width: number; height: number; bytes: number; mimeType: string } };
-export type VideoAsset = AssetBase<"video"> & { data: { url: string; storageKey?: string; width: number; height: number; bytes: number; mimeType: string } };
+export type ImageAsset = AssetBase<"image"> & { data: { dataUrl: string; sourceUrl?: string; storageKey?: string; width: number; height: number; bytes: number; mimeType: string } };
+export type VideoAsset = AssetBase<"video"> & { data: { url: string; sourceUrl?: string; storageKey?: string; width: number; height: number; bytes: number; mimeType: string } };
 export type Asset = TextAsset | ImageAsset | VideoAsset;
 
 type AssetBase<T extends AssetKind> = {
@@ -68,13 +68,17 @@ const assetStorage: PersistStorage<AssetStore> = {
 async function hydrateAssets(assets: Asset[]) {
     return Promise.all(
         assets.map(async (asset) => {
-            if (asset.kind === "video" && asset.data.storageKey) return { ...asset, data: { ...asset.data, url: await resolveMediaUrl(asset.data.storageKey, asset.data.url) } };
+            if (asset.kind === "video" && asset.data.storageKey)
+                return {
+                    ...asset,
+                    data: { ...asset.data, url: await resolveMediaUrl(asset.data.storageKey, asset.data.url?.startsWith("blob:") ? asset.data.sourceUrl || asset.data.url : asset.data.url || asset.data.sourceUrl || "") },
+                };
             if (asset.kind !== "image") return asset;
             if (asset.data.storageKey)
                 return {
                     ...asset,
-                    coverUrl: asset.coverUrl.startsWith("blob:") ? await resolveImageUrl(asset.data.storageKey, asset.coverUrl) : asset.coverUrl,
-                    data: { ...asset.data, dataUrl: await resolveImageUrl(asset.data.storageKey, asset.data.dataUrl) },
+                    coverUrl: asset.coverUrl.startsWith("blob:") ? await resolveImageUrl(asset.data.storageKey, asset.data.dataUrl || asset.data.sourceUrl || asset.coverUrl) : asset.coverUrl,
+                    data: { ...asset.data, dataUrl: await resolveImageUrl(asset.data.storageKey, asset.data.dataUrl?.startsWith("blob:") ? asset.data.sourceUrl || asset.data.dataUrl : asset.data.dataUrl || asset.data.sourceUrl || "") },
                 };
             if (!asset.data.dataUrl.startsWith("data:image/")) return asset;
             const image = await uploadImage(asset.data.dataUrl);

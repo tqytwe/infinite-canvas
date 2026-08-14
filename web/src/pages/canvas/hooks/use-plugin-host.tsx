@@ -52,7 +52,12 @@ export function usePluginHost(params: PluginHostParams) {
         };
         return {
             generateImage: async (prompt, options) => {
-                const config = { ...buildGenerationConfig(effectiveConfig, undefined, "image"), count: String(options?.count || 1), ...(options?.model ? { model: options.model } : {}), ...(options?.size ? { size: options.size } : {}) };
+                const config = {
+                    ...buildGenerationConfig(effectiveConfig, undefined, "image"),
+                    count: String(options?.count || 1),
+                    ...(options?.model ? { model: options.model, imageModel: options.model } : {}),
+                    ...(options?.size ? { size: options.size } : {}),
+                };
                 ensureReady(config);
                 const references = toReferences(options?.references);
                 const items = references.length ? await requestEdit(config, prompt, references, undefined, { signal: options?.signal }) : await requestGeneration(config, prompt, { signal: options?.signal });
@@ -61,7 +66,7 @@ export function usePluginHost(params: PluginHostParams) {
             generateVideo: async (prompt, options) => {
                 const config = {
                     ...buildGenerationConfig(effectiveConfig, undefined, "video"),
-                    ...(options?.model ? { model: options.model } : {}),
+                    ...(options?.model ? { model: options.model, videoModel: options.model } : {}),
                     ...(options?.size ? { size: options.size } : {}),
                     ...(options?.seconds ? { videoSeconds: options.seconds } : {}),
                 };

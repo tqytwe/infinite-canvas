@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 
 import { requestEdit, requestGeneration, requestImageQuestion } from "@/services/api/image";
 import { requestAudioGeneration, storeGeneratedAudio } from "@/services/api/audio";
-import { requestVideoGeneration, storeGeneratedVideo } from "@/services/api/video";
+import { previewGeneratedVideo, requestVideoGeneration, storeGeneratedVideo } from "@/services/api/video";
 import { defaultConfig, useConfigStore, useEffectiveConfig } from "@/stores/use-config-store";
 import { uploadImage } from "@/services/image-storage";
 import { uploadMediaFile } from "@/services/file-storage";
@@ -1602,7 +1602,7 @@ function InfiniteCanvasPage() {
                     coverUrl: "",
                     tags: [],
                     source: "Canvas",
-                    data: { url: node.metadata.content, storageKey: node.metadata.storageKey, width: node.width, height: node.height, bytes: node.metadata.bytes || 0, mimeType: node.metadata.mimeType || "video/mp4" },
+                    data: { url: node.metadata.content, sourceUrl: node.metadata.sourceUrl, storageKey: node.metadata.storageKey, width: node.width, height: node.height, bytes: node.metadata.bytes || 0, mimeType: node.metadata.mimeType || "video/mp4" },
                     metadata: { source: "canvas", nodeId: node.id, prompt: node.metadata?.prompt },
                 });
                 message.success(t("common.addedToAssets"));
@@ -1618,6 +1618,7 @@ function InfiniteCanvasPage() {
                 source: "Canvas",
                 data: {
                     dataUrl,
+                    sourceUrl: node.metadata.sourceUrl,
                     storageKey: node.metadata.storageKey,
                     width: node.metadata.naturalWidth || node.width,
                     height: node.metadata.naturalHeight || node.height,
@@ -2236,7 +2237,7 @@ function InfiniteCanvasPage() {
                                     : await requestGeneration({ ...generationConfig, count: "1" }, effectivePrompt, { signal: controller.signal }).then((items) => items[0]);
                                 const uploaded = await uploadImage(image.dataUrl);
                                 const imageSize = fitNodeSize(uploaded.width, uploaded.height, imageConfig.width, imageConfig.height);
-                                const item: CanvasNodeImage = { id: imageId, status: NODE_STATUS_SUCCESS, content: uploaded.url, storageKey: uploaded.storageKey, naturalWidth: uploaded.width, naturalHeight: uploaded.height, bytes: uploaded.bytes, mimeType: uploaded.mimeType };
+                                const item: CanvasNodeImage = { id: imageId, status: NODE_STATUS_SUCCESS, content: uploaded.url, sourceUrl: uploaded.sourceUrl, storageKey: uploaded.storageKey, naturalWidth: uploaded.width, naturalHeight: uploaded.height, bytes: uploaded.bytes, mimeType: uploaded.mimeType, deliveryStatus: uploaded.cloudStatus === "pending" ? "pending" : "stored", deliveryError: uploaded.cloudError };
                                 setNodes((prev) =>
                                     prev.map((node) => {
                                         if (node.id !== rootId) return node;
@@ -2327,10 +2328,9 @@ function InfiniteCanvasPage() {
                     if (!isEmptyVideoNode) setConnections((prev) => [...prev, { id: nanoid(), fromNodeId: nodeId, toNodeId: videoId }]);
                     const controller = startGenerationRequest(videoId, nodeId, nodeId, runController);
                     try {
-                        const video = await storeGeneratedVideo(
-                            await requestVideoGeneration(generationConfig, effectivePrompt, generationContext.referenceImages, generationContext.referenceVideos, generationContext.referenceAudios, { signal: controller.signal }),
-                        );
-                        const videoSize = fitNodeSize(video.width || spec.width, video.height || spec.height, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
+                        const result = await requestVideoGeneration(generationConfig, effectivePrompt, generationContext.referenceImages, generationContext.referenceVideos, generationContext.referenceAudios, { signal: controller.signal });
+                        const previewVideo = previewGeneratedVideo(result);
+                        const videoSize = fitNodeSize(previewVideo.width || spec.width, previewVideo.height || spec.height, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
                         setNodes((prev) =>
                             prev.map((node) =>
                                 node.id === videoId
@@ -2341,7 +2341,7 @@ function InfiniteCanvasPage() {
                                           position: { x: node.position.x + node.width / 2 - videoSize.width / 2, y: node.position.y + node.height / 2 - videoSize.height / 2 },
                                           metadata: {
                                               ...node.metadata,
-                                              ...videoMetadata(video),
+                                              ...videoMetadata(previewVideo),
                                               prompt: effectivePrompt,
                                               model: generationConfig.model,
                                               size: generationConfig.size,
@@ -2355,6 +2355,38 @@ function InfiniteCanvasPage() {
                                     : node,
                             ),
                         );
+                        void storeGeneratedVideo(result)
+                            .then((video) => {
+                                const storedVideoSize = fitNodeSize(video.width || spec.width, video.height || spec.height, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
+                                setNodes((prev) =>
+                                    prev.map((node) =>
+                                        node.id === videoId
+                                            ? {
+                                                  ...node,
+                                                  width: storedVideoSize.width,
+                                                  height: storedVideoSize.height,
+                                                  position: { x: node.position.x + node.width / 2 - storedVideoSize.width / 2, y: node.position.y + node.height / 2 - storedVideoSize.height / 2 },
+                                                  metadata: {
+                                                      ...node.metadata,
+                                                      ...videoMetadata(video),
+                                                      prompt: effectivePrompt,
+                                                      model: generationConfig.model,
+                                                      size: generationConfig.size,
+                                                      seconds: generationConfig.videoSeconds,
+                                                      vquality: generationConfig.vquality,
+                                                      generateAudio: generationConfig.videoGenerateAudio,
+                                                      watermark: generationConfig.videoWatermark,
+                                                      references: generationReferenceUrls(generationContext),
+                                                  },
+                                              }
+                                            : node,
+                                    ),
+                                );
+                            })
+                            .catch((error) => {
+                                const deliveryError = error instanceof Error ? error.message : t("videoWorkbench.deliveryPending");
+                                setNodes((prev) => prev.map((node) => (node.id === videoId ? { ...node, metadata: { ...node.metadata, deliveryStatus: "pending", deliveryError } } : node)));
+                            });
                     } finally {
                         finishGenerationRequest(videoId, controller);
                     }
@@ -2534,8 +2566,9 @@ function InfiniteCanvasPage() {
                     return;
                 }
                 if (node.type === CanvasNodeType.Video) {
-                    const video = await storeGeneratedVideo(await requestVideoGeneration(generationConfig, prompt, retryImages, context?.referenceVideos || [], context?.referenceAudios || [], { signal: controller.signal }));
-                    const videoSize = fitNodeSize(video.width || node.width, video.height || node.height, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
+                    const result = await requestVideoGeneration(generationConfig, prompt, retryImages, context?.referenceVideos || [], context?.referenceAudios || [], { signal: controller.signal });
+                    const previewVideo = previewGeneratedVideo(result);
+                    const videoSize = fitNodeSize(previewVideo.width || node.width, previewVideo.height || node.height, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
                     setNodes((prev) =>
                         prev.map((item) =>
                             item.id === node.id
@@ -2546,7 +2579,7 @@ function InfiniteCanvasPage() {
                                       position: { x: item.position.x + item.width / 2 - videoSize.width / 2, y: item.position.y + item.height / 2 - videoSize.height / 2 },
                                       metadata: {
                                           ...item.metadata,
-                                          ...videoMetadata(video),
+                                          ...videoMetadata(previewVideo),
                                           prompt,
                                           model: generationConfig.model,
                                           size: generationConfig.size,
@@ -2559,6 +2592,37 @@ function InfiniteCanvasPage() {
                                 : item,
                         ),
                     );
+                    void storeGeneratedVideo(result)
+                        .then((video) => {
+                            const storedVideoSize = fitNodeSize(video.width || node.width, video.height || node.height, VIDEO_NODE_MAX_WIDTH, VIDEO_NODE_MAX_HEIGHT);
+                            setNodes((prev) =>
+                                prev.map((item) =>
+                                    item.id === node.id
+                                        ? {
+                                              ...item,
+                                              width: storedVideoSize.width,
+                                              height: storedVideoSize.height,
+                                              position: { x: item.position.x + item.width / 2 - storedVideoSize.width / 2, y: item.position.y + item.height / 2 - storedVideoSize.height / 2 },
+                                              metadata: {
+                                                  ...item.metadata,
+                                                  ...videoMetadata(video),
+                                                  prompt,
+                                                  model: generationConfig.model,
+                                                  size: generationConfig.size,
+                                                  seconds: generationConfig.videoSeconds,
+                                                  vquality: generationConfig.vquality,
+                                                  generateAudio: generationConfig.videoGenerateAudio,
+                                                  watermark: generationConfig.videoWatermark,
+                                              },
+                                          }
+                                        : item,
+                                ),
+                            );
+                        })
+                        .catch((error) => {
+                            const deliveryError = error instanceof Error ? error.message : t("videoWorkbench.deliveryPending");
+                            setNodes((prev) => prev.map((item) => (item.id === node.id ? { ...item, metadata: { ...item.metadata, deliveryStatus: "pending", deliveryError } } : item)));
+                        });
                     return;
                 }
                 if (node.type === CanvasNodeType.Audio) {
@@ -2576,11 +2640,14 @@ function InfiniteCanvasPage() {
                     id: imageId || node.metadata?.primaryImageId || nanoid(),
                     status: NODE_STATUS_SUCCESS,
                     content: uploadedImage.url,
+                    sourceUrl: uploadedImage.sourceUrl,
                     storageKey: uploadedImage.storageKey,
                     naturalWidth: uploadedImage.width,
                     naturalHeight: uploadedImage.height,
                     bytes: uploadedImage.bytes,
                     mimeType: uploadedImage.mimeType,
+                    deliveryStatus: uploadedImage.cloudStatus === "pending" ? "pending" : "stored",
+                    deliveryError: uploadedImage.cloudError,
                 };
                 const generationMetadata = savedImageMetadata?.generationType
                     ? {

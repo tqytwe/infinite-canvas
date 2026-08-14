@@ -7,28 +7,33 @@ import { canCanvasWrite, deleteCloudObject, getCloudObject, isCanvasAuthenticate
 
 export type UploadedImage = {
     url: string;
+    sourceUrl?: string;
     storageKey: string;
     width: number;
     height: number;
     bytes: number;
     mimeType: string;
+    cloudStatus?: "stored" | "pending";
+    cloudError?: string;
 };
 
 const store = localforage.createInstance({ name: "infinite-canvas", storeName: "image_files" });
 const imageLogStore = localforage.createInstance({ name: "infinite-canvas", storeName: "image_generation_logs" });
 const videoLogStore = localforage.createInstance({ name: "infinite-canvas", storeName: "video_generation_logs" });
 const objectUrls = new Map<string, string>();
+const CLOUD_SAVE_WAIT_MS = 3000;
 
 export async function uploadImage(input: string | Blob): Promise<UploadedImage> {
     if (isCanvasManagedMode()) await requireCanvasWriteAccess();
-    const blob = typeof input === "string" ? await (await fetch(input)).blob() : input;
+    const blob = typeof input === "string" ? await readBlobResponse(await fetchWithTimeout(input, 5 * 60_000)) : input;
     const storageKey = `image:${nanoid()}`;
     await store.setItem(storageKey, blob);
-    if (isCanvasManagedMode()) await putCloudObject(storageKey, blob);
+    const cloud = await putCloudObjectBestEffort(storageKey, blob);
     const url = URL.createObjectURL(blob);
     objectUrls.set(storageKey, url);
     const meta = await readImageMeta(url);
-    return { url, storageKey, width: meta.width, height: meta.height, bytes: blob.size, mimeType: blob.type || meta.mimeType };
+    const sourceUrl = typeof input === "string" && !input.startsWith("data:") && !input.startsWith("blob:") ? input : undefined;
+    return { url, sourceUrl, storageKey, width: meta.width, height: meta.height, bytes: blob.size, mimeType: blob.type || meta.mimeType, cloudStatus: cloud.cloudStatus, ...(cloud.cloudError ? { cloudError: cloud.cloudError } : {}) };
 }
 
 export async function resolveImageUrl(storageKey?: string, fallback = "") {
@@ -118,4 +123,37 @@ function blobToDataUrl(blob: Blob) {
         reader.onerror = () => reject(new Error(i18n.t("common.imageReadFailed")));
         reader.readAsDataURL(blob);
     });
+}
+
+async function fetchWithTimeout(input: RequestInfo | URL, timeoutMs: number) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        return await fetch(input, { credentials: "same-origin", signal: controller.signal });
+    } finally {
+        window.clearTimeout(timer);
+    }
+}
+
+async function readBlobResponse(response: Response) {
+    if (!response.ok) throw new Error(`MEDIA_FETCH_FAILED_${response.status}`);
+    return response.blob();
+}
+
+async function putCloudObjectBestEffort(storageKey: string, blob: Blob): Promise<Pick<UploadedImage, "cloudStatus" | "cloudError">> {
+    if (!isCanvasManagedMode()) return {};
+    const upload = putCloudObject(storageKey, blob)
+        .then(() => ({ cloudStatus: "stored" as const }))
+        .catch((error) => {
+            console.warn("[canvas-cloud] image upload pending", storageKey, error);
+            return { cloudStatus: "pending" as const, cloudError: error instanceof Error ? error.message : "CANVAS_OBJECT_WRITE_FAILED" };
+        });
+    const settled = await Promise.race([upload, delay(CLOUD_SAVE_WAIT_MS).then(() => null)]);
+    if (settled) return settled;
+    void upload;
+    return { cloudStatus: "pending" };
+}
+
+function delay(ms: number) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
 }

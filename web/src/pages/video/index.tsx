@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, BookOpen, CheckSquare, ClipboardPaste, Download, FolderPlus, History, LoaderCircle, Music2, Plus, SlidersHorizontal, Sparkles, Trash2, Upload, VideoIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, CheckSquare, ClipboardPaste, Download, FolderPlus, History, LoaderCircle, Music2, Plus, RefreshCw, SlidersHorizontal, Sparkles, Trash2, Upload, VideoIcon } from "lucide-react";
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import { App, Button, Checkbox, Drawer, Empty, Input, Modal, Tag, Typography } from "antd";
 import localforage from "localforage";
@@ -15,12 +15,12 @@ import { formatBytes, formatDuration } from "@/lib/image-utils";
 import { boolConfig, isSeedanceVideoConfig, normalizeSeedanceRatio, seedanceReferenceLabel, seedanceVideoReferenceError, seedanceVideoReferenceHint, SEEDANCE_REFERENCE_LIMITS, SEEDANCE_VIDEO_MIME_TYPES } from "@/lib/seedance-video";
 import { deleteStoredMedia, resolveMediaUrl, uploadMediaFile } from "@/services/file-storage";
 import { resolveImageUrl, uploadImage } from "@/services/image-storage";
-import { readCloudWorkbenchLogs, writeCloudWorkbenchLogs } from "@/services/workbench-cloud";
-import { isCanvasAuthenticated, isCanvasManagedMode, useCanvasCanWrite } from "@/services/canvas-cloud";
-import { createVideoGenerationTask, pollVideoGenerationTask, storeGeneratedVideo, type VideoGenerationTask } from "@/services/api/video";
+import { readCloudWorkbenchLogs, replaceCloudWorkbenchLogs, upsertCloudWorkbenchLog } from "@/services/workbench-cloud";
+import { isCanvasAuthenticated, isCanvasManagedMode, useCanvasCanWrite, useCanvasSessionStore } from "@/services/canvas-cloud";
+import { createVideoGenerationTask, isRetryableVideoTaskError, pollVideoGenerationTask, previewGeneratedVideo, storeGeneratedVideo, type VideoGenerationResult, type VideoGenerationTask } from "@/services/api/video";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useWorkbenchAgentStore } from "@/stores/use-workbench-agent-store";
-import { modelOptionLabel, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { modelMatchesCapability, modelOptionLabel, selectableModelsByCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
@@ -29,12 +29,14 @@ import i18n from "@/i18n";
 type GeneratedVideo = {
     id: string;
     url: string;
+    sourceUrl?: string;
     storageKey: string;
     durationMs: number;
     width: number;
     height: number;
     bytes: number;
     mimeType: string;
+    deliveryError?: string;
 };
 
 type GenerationResult = {
@@ -47,6 +49,7 @@ type GenerationResult = {
 type GenerationLog = {
     id: string;
     createdAt: number;
+    updatedAt?: number;
     title: string;
     prompt: string;
     time: string;
@@ -63,6 +66,8 @@ type GenerationLog = {
     task?: VideoGenerationTask;
     video?: GeneratedVideo;
     error?: string;
+    deliveryStatus?: "stored" | "pending";
+    deliveryError?: string;
 };
 
 type GenerationLogConfig = Pick<AiConfig, "model" | "videoModel" | "size" | "vquality" | "videoSeconds" | "videoGenerateAudio" | "videoWatermark">;
@@ -106,10 +111,13 @@ export default function VideoPage() {
     const clearVideoCommand = useWorkbenchAgentStore((state) => state.clearVideoCommand);
     const updateAgentTask = useWorkbenchAgentStore((state) => state.updateTask);
     const canWrite = useCanvasCanWrite();
+    const sessionAuthenticated = useCanvasSessionStore((state) => state.session?.authenticated);
     const processedCommandRef = useRef(0);
     const agentTaskIdRef = useRef<string | undefined>(undefined);
+    const currentLogIdRef = useRef<string | undefined>(undefined);
 
-    const model = effectiveConfig.videoModel || effectiveConfig.model;
+    const videoModelOptions = selectableModelsByCapability(effectiveConfig, "video");
+    const model = effectiveConfig.videoModel && modelMatchesCapability(effectiveConfig, effectiveConfig.videoModel, "video") ? effectiveConfig.videoModel : videoModelOptions[0] || "";
     const canGenerate = Boolean(prompt.trim());
 
     useEffect(() => {
@@ -120,7 +128,8 @@ export default function VideoPage() {
 
     useEffect(() => {
         void refreshLogs();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [sessionAuthenticated]);
 
     const addReferences = async (files?: FileList | null) => {
         const selectedFiles = Array.from(files || []);
@@ -215,7 +224,8 @@ export default function VideoPage() {
         setStartedAt(batchStartedAt);
         try {
             const task = await createVideoGenerationTask(snapshot.config, snapshot.text, snapshot.references, snapshot.videoReferences, snapshot.audioReferences);
-            const log = buildLog({ prompt: snapshot.text, model, config: snapshot.config, references: snapshot.references, videoReferences: snapshot.videoReferences, audioReferences: snapshot.audioReferences, durationMs: 0, status: "pending", task });
+            const log = buildLog({ prompt: snapshot.text, model: snapshot.config.videoModel || snapshot.config.model, config: snapshot.config, references: snapshot.references, videoReferences: snapshot.videoReferences, audioReferences: snapshot.audioReferences, durationMs: 0, status: "pending", task });
+            currentLogIdRef.current = log.id;
             await saveLog(log, false);
             void pollGenerationLog(log, snapshot.config, agentTaskId);
         } catch (error) {
@@ -234,10 +244,6 @@ export default function VideoPage() {
         processedCommandRef.current = videoCommand.nonce;
         clearVideoCommand();
         if (typeof videoCommand.prompt === "string") setPrompt(videoCommand.prompt);
-        if (videoCommand.run && running) {
-            if (videoCommand.taskId) updateAgentTask(videoCommand.taskId, { status: "failed", error: t("videoWorkbench.busy") });
-            return;
-        }
         if (videoCommand.run) {
             agentTaskIdRef.current = videoCommand.taskId;
             setAutoRunToken((value) => value + 1);
@@ -256,7 +262,7 @@ export default function VideoPage() {
             message.error(t("videoWorkbench.promptRequired"));
             return null;
         }
-        if (!isAiConfigReady(effectiveConfig, model)) {
+        if (!model || !modelMatchesCapability(effectiveConfig, model, "video") || !isAiConfigReady(effectiveConfig, model)) {
             message.warning(t("workbench.configFirst"));
             openConfigDialog(true);
             return null;
@@ -270,6 +276,11 @@ export default function VideoPage() {
     };
 
     const retryResult = () => {
+        const activeLog = previewLog || logs.find((item) => item.id === currentLogIdRef.current);
+        if (activeLog?.deliveryStatus === "pending") {
+            void retryDelivery(activeLog);
+            return;
+        }
         void generate();
     };
 
@@ -284,7 +295,7 @@ export default function VideoPage() {
             coverUrl: "",
             tags: [],
             source: t("videoWorkbench.source"),
-            data: { url: video.url, storageKey: video.storageKey, width: video.width, height: video.height, bytes: video.bytes, mimeType: video.mimeType },
+            data: { url: video.url, sourceUrl: video.sourceUrl, storageKey: video.storageKey, width: video.width, height: video.height, bytes: video.bytes, mimeType: video.mimeType },
             metadata: { source: "video-page", prompt },
         });
         message.success(t("common.addedToAssets"));
@@ -321,7 +332,7 @@ export default function VideoPage() {
             .filter((key): key is string => Boolean(key));
         const nextLogs = logs.filter((log) => !selectedLogIds.includes(log.id));
         await Promise.all([deleteStoredMedia(mediaKeys), ...selectedLogIds.map((id) => logStore.removeItem(id))]);
-        if (isCanvasManagedMode() && isCanvasAuthenticated()) await writeCloudWorkbenchLogs("video-workbench", nextLogs.map(serializeLog));
+        if (isCanvasManagedMode() && isCanvasAuthenticated()) await replaceCloudWorkbenchLogs("video-workbench", nextLogs.map(serializeLog));
         await refreshLogs();
         if (previewLog && selectedLogIds.includes(previewLog.id)) {
             setPreviewLog(null);
@@ -333,12 +344,23 @@ export default function VideoPage() {
 
     const saveLog = async (log: GenerationLog, resumePending = true) => {
         const serialized = serializeLog(log);
-        await logStore.setItem(log.id, serialized);
-        if (isCanvasManagedMode() && isCanvasAuthenticated()) {
-            const existing = (await readCloudWorkbenchLogs<GenerationLog>("video-workbench")) || logs;
-            await writeCloudWorkbenchLogs("video-workbench", [...existing.filter((item) => item.id !== log.id), serialized]);
+        try {
+            await logStore.setItem(log.id, serialized);
+        } catch (error) {
+            console.warn("[canvas-local] video workbench log save failed", log.id, error);
         }
-        await refreshLogs(resumePending);
+        if (isCanvasManagedMode() && isCanvasAuthenticated()) {
+            try {
+                await upsertCloudWorkbenchLog("video-workbench", serialized, logs.map(serializeLog));
+            } catch (error) {
+                console.warn("[canvas-cloud] video workbench log save pending", error);
+            }
+        }
+        try {
+            await refreshLogs(resumePending);
+        } catch (error) {
+            console.warn("[canvas-cloud] video workbench refresh failed", error);
+        }
     };
 
     const refreshLogs = async (resumePending = true) => {
@@ -346,13 +368,22 @@ export default function VideoPage() {
             setLogs([]);
             return [];
         }
-        const cloudLogs = await readCloudWorkbenchLogs<GenerationLog>("video-workbench");
-        const nextLogs = cloudLogs
-            ? (await Promise.all(cloudLogs.map(normalizeLog))).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-            : await readStoredLogs();
+        let cloudLogs: GenerationLog[] | null = null;
+        let cloudReadFailed = false;
+        try {
+            cloudLogs = await readCloudWorkbenchLogs<GenerationLog>("video-workbench");
+        } catch (error) {
+            cloudReadFailed = true;
+            console.warn("[canvas-cloud] video workbench log read failed", error);
+        }
+        const localLogs = await readStoredLogs();
+        const remoteLogs = cloudLogs ? await Promise.all(cloudLogs.map(normalizeLog)) : null;
+        const nextLogs = remoteLogs ? mergeLogs(remoteLogs, localLogs) : localLogs;
         setLogs(nextLogs);
-        if (!cloudLogs && isCanvasManagedMode() && isCanvasAuthenticated() && nextLogs.length) {
-            await writeCloudWorkbenchLogs("video-workbench", nextLogs.map(serializeLog));
+        if (cloudLogs && remoteLogs && !sameLogSet(remoteLogs, nextLogs) && isCanvasManagedMode() && isCanvasAuthenticated()) {
+            await replaceCloudWorkbenchLogs("video-workbench", nextLogs.map(serializeLog));
+        } else if (!cloudLogs && !cloudReadFailed && isCanvasManagedMode() && isCanvasAuthenticated() && nextLogs.length) {
+            await replaceCloudWorkbenchLogs("video-workbench", nextLogs.map(serializeLog));
         }
         if (resumePending) resumePendingLogs(nextLogs);
         return nextLogs;
@@ -369,38 +400,52 @@ export default function VideoPage() {
         activeLogIdsRef.current.add(log.id);
         setRunning(true);
         setStartedAt((value) => value || performance.now());
-        setResults((value) => (value.length ? value : [{ id: log.id, status: "pending" }]));
+        if (currentLogIdRef.current === log.id) setResults((value) => (value.length ? value : [{ id: log.id, status: "pending" }]));
         const taskConfig = buildVideoConfig({ ...effectiveConfig, ...log.config }, log.task.model || log.model);
+        let lastTransientError: Error | undefined;
         try {
             for (let attempt = 0; attempt < 120; attempt += 1) {
-                const state = await pollVideoGenerationTask(configOverride || taskConfig, log.task);
+                let state: Awaited<ReturnType<typeof pollVideoGenerationTask>>;
+                try {
+                    state = await pollVideoGenerationTask(configOverride || taskConfig, log.task);
+                    lastTransientError = undefined;
+                } catch (error) {
+                    if (!isRetryableVideoTaskError(error) || attempt === 119) throw error;
+                    lastTransientError = error instanceof Error ? error : new Error(t("videoWorkbench.timeout"));
+                    await delay(log.task.provider === "seedance" ? 5000 : 2500);
+                    continue;
+                }
                 if (state.status === "completed") {
-                    const stored = await storeGeneratedVideo(state.result);
-                    const nextVideo: GeneratedVideo = {
-                        id: nanoid(),
-                        url: stored.url,
-                        storageKey: stored.storageKey,
-                        durationMs: Date.now() - log.createdAt,
-                        width: stored.width || 1280,
-                        height: stored.height || 720,
-                        bytes: stored.bytes,
-                        mimeType: stored.mimeType,
-                    };
-                    setResults([{ id: nextVideo.id, status: "success", video: nextVideo }]);
+                    const preview = previewGeneratedVideo(state.result);
+                    const nextVideo = buildGeneratedVideo(preview, Date.now() - log.createdAt);
+                    if (!nextVideo.url) throw new Error(t("apiErrors.noPlayableVideo"));
+                    if (currentLogIdRef.current === log.id) setResults([{ id: nextVideo.id, status: "success", video: nextVideo }]);
                     if (agentTaskId) updateAgentTask(agentTaskId, { status: "succeeded", successCount: 1, failCount: 0, error: undefined });
-                    await saveLog({ ...log, status: "success", durationMs: nextVideo.durationMs, video: nextVideo, error: undefined });
+                    const nextLog: GenerationLog = {
+                        ...log,
+                        status: "success",
+                        durationMs: nextVideo.durationMs,
+                        video: nextVideo,
+                        deliveryStatus: nextVideo.storageKey ? "stored" : "pending",
+                        deliveryError: nextVideo.storageKey ? undefined : t("videoWorkbench.deliveryPending"),
+                        error: undefined,
+                    };
+                    await saveLog(nextLog, false);
                     message.success(t("videoWorkbench.generated"));
+                    void persistVideoDelivery(nextLog, state.result, nextVideo);
                     return;
                 }
-                if (state.status === "failed") throw new Error(state.error);
-                if (attempt === 119) throw new Error(t("videoWorkbench.timeout"));
+                if (state.status === "failed") {
+                    throw new Error(state.error);
+                }
+                if (attempt === 119) throw lastTransientError || new Error(t("videoWorkbench.timeout"));
                 await delay(log.task.provider === "seedance" ? 5000 : 2500);
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : t("workbench.generationFailed");
-            setResults([{ id: log.id, status: "failed", error: errorMessage }]);
+            if (currentLogIdRef.current === log.id) setResults([{ id: log.id, status: "failed", error: errorMessage }]);
             if (agentTaskId) updateAgentTask(agentTaskId, { status: "failed", successCount: 0, failCount: 1, error: errorMessage });
-            await saveLog({ ...log, status: "failed", durationMs: Date.now() - log.createdAt, error: errorMessage });
+            await saveLog({ ...log, status: "failed", durationMs: Date.now() - log.createdAt, error: errorMessage }, false);
             message.error(errorMessage);
         } finally {
             activeLogIdsRef.current.delete(log.id);
@@ -411,7 +456,43 @@ export default function VideoPage() {
         }
     };
 
+    const persistVideoDelivery = async (log: GenerationLog, result: VideoGenerationResult, previewVideo: GeneratedVideo) => {
+        try {
+            const stored = await storeGeneratedVideo(result);
+            const video = buildGeneratedVideo(stored, previewVideo.durationMs, previewVideo.id, previewVideo.sourceUrl);
+            const deliveryError = isCanvasManagedMode() && stored.cloudStatus === "pending" ? stored.cloudError || t("videoWorkbench.deliveryPending") : !stored.storageKey ? t("videoWorkbench.deliveryPending") : "";
+            const nextVideo = { ...video, deliveryError: deliveryError || undefined };
+            const nextLog: GenerationLog = {
+                ...log,
+                video: nextVideo,
+                deliveryStatus: deliveryError ? "pending" : "stored",
+                deliveryError: deliveryError || undefined,
+            };
+            await saveLog(nextLog, false);
+            if (currentLogIdRef.current === log.id) {
+                setPreviewLog(nextLog);
+                setResults([{ id: nextVideo.id, status: "success", video: nextVideo }]);
+            }
+            if (deliveryError) message.warning(t("videoWorkbench.deliveryPending"));
+        } catch (error) {
+            const deliveryError = error instanceof Error ? error.message : t("videoWorkbench.deliveryPending");
+            const nextLog: GenerationLog = {
+                ...log,
+                video: { ...previewVideo, deliveryError },
+                deliveryStatus: "pending",
+                deliveryError,
+            };
+            await saveLog(nextLog, false);
+            if (currentLogIdRef.current === log.id) {
+                setPreviewLog(nextLog);
+                setResults([{ id: previewVideo.id, status: "success", video: nextLog.video! }]);
+            }
+            message.warning(deliveryError);
+        }
+    };
+
     const previewGenerationLog = (log: GenerationLog) => {
+        currentLogIdRef.current = log.id;
         setPreviewLog(log);
         setLogsOpen(false);
         setPrompt(log.prompt);
@@ -425,6 +506,39 @@ export default function VideoPage() {
         if (log.config.videoGenerateAudio) updateConfig("videoGenerateAudio", log.config.videoGenerateAudio);
         if (log.config.videoWatermark) updateConfig("videoWatermark", log.config.videoWatermark);
         setResults(log.status === "pending" ? [{ id: log.id, status: "pending" }] : log.video ? [{ id: log.video.id, status: "success", video: log.video }] : [{ id: log.id, status: "failed", error: log.error || t("workbench.generationFailed") }]);
+    };
+
+    const retryDelivery = async (log: GenerationLog) => {
+        if (!log.video) return;
+        const sourceUrl = log.video.sourceUrl || log.video.url;
+        try {
+            const stored = await storeGeneratedVideo({ url: sourceUrl, mimeType: log.video.mimeType });
+            const video: GeneratedVideo = {
+                ...log.video,
+                url: stored.url || sourceUrl,
+                storageKey: stored.storageKey,
+                bytes: stored.bytes,
+                mimeType: stored.mimeType || log.video.mimeType,
+                width: stored.width || log.video.width,
+                height: stored.height || log.video.height,
+                deliveryError: isCanvasManagedMode() && stored.cloudStatus === "pending" ? stored.cloudError || t("videoWorkbench.deliveryPending") : !stored.storageKey ? t("videoWorkbench.deliveryPending") : undefined,
+            };
+            const failed = Boolean(video.deliveryError);
+            const nextLog: GenerationLog = {
+                ...log,
+                video,
+                deliveryStatus: failed ? "pending" : "stored",
+                deliveryError: failed ? t("videoWorkbench.deliveryPending") : undefined,
+            };
+            await saveLog(nextLog, false);
+            if (currentLogIdRef.current === log.id) {
+                setPreviewLog(nextLog);
+                setResults([{ id: video.id, status: "success", video }]);
+            }
+            failed ? message.warning(t("videoWorkbench.deliveryPending")) : message.success(t("videoWorkbench.deliveryRecovered"));
+        } catch (error) {
+            message.warning(error instanceof Error ? error.message : t("videoWorkbench.deliveryPending"));
+        }
     };
 
     return (
@@ -581,7 +695,7 @@ export default function VideoPage() {
                         </div>
 
                         <div className="mt-auto pt-6">
-                            <Button type="primary" size="large" block icon={<Sparkles className="size-4" />} loading={running} disabled={!canWrite || !canGenerate || running} onClick={() => void generate()}>
+                            <Button type="primary" size="large" block icon={<Sparkles className="size-4" />} disabled={!canWrite || !canGenerate} onClick={() => void generate()}>
                                 {t("workbench.generate")}
                             </Button>
                         </div>
@@ -594,7 +708,25 @@ export default function VideoPage() {
                         </div>
                         {results.length ? (
                             <div className="grid gap-4">
-                                {results.map((result) => (result.status === "success" && result.video ? <ResultVideoCard key={result.id} video={result.video} onDownload={downloadVideo} onSaveAsset={saveResultToAssets} /> : result.status === "failed" ? <FailedVideoCard key={result.id} error={result.error || t("workbench.generationFailed")} onRetry={retryResult} /> : <PendingVideoCard key={result.id} />))}
+                                {results.map((result) =>
+                                    result.status === "success" && result.video ? (
+                                        <ResultVideoCard
+                                            key={result.id}
+                                            video={result.video}
+                                            onDownload={downloadVideo}
+                                            onSaveAsset={saveResultToAssets}
+                                            onRetryDelivery={
+                                                (previewLog || logs.find((item) => item.id === currentLogIdRef.current))?.deliveryStatus === "pending"
+                                                    ? () => void retryDelivery(previewLog || logs.find((item) => item.id === currentLogIdRef.current)!)
+                                                    : undefined
+                                            }
+                                        />
+                                    ) : result.status === "failed" ? (
+                                        <FailedVideoCard key={result.id} error={result.error || t("workbench.generationFailed")} onRetry={retryResult} />
+                                    ) : (
+                                        <PendingVideoCard key={result.id} />
+                                    ),
+                                )}
                             </div>
                         ) : (
                             <div className="flex min-h-[320px] flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 text-center dark:border-stone-700 lg:min-h-[560px]">
@@ -650,7 +782,7 @@ function GenerationSettings({ config, model, updateConfig, openConfigDialog }: {
     );
 }
 
-function ResultVideoCard({ video, onDownload, onSaveAsset }: { video: GeneratedVideo; onDownload: (video: GeneratedVideo) => void; onSaveAsset: (video: GeneratedVideo) => void }) {
+function ResultVideoCard({ video, onDownload, onSaveAsset, onRetryDelivery }: { video: GeneratedVideo; onDownload: (video: GeneratedVideo) => void; onSaveAsset: (video: GeneratedVideo) => void; onRetryDelivery?: () => void }) {
     const { t } = useTranslation();
     return (
         <div className="overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800">
@@ -670,6 +802,11 @@ function ResultVideoCard({ video, onDownload, onSaveAsset }: { video: GeneratedV
                     <Button size="small" icon={<Download className="size-3.5" />} onClick={() => onDownload(video)}>
                         {t("common.download")}
                     </Button>
+                    {onRetryDelivery ? (
+                        <Button size="small" icon={<RefreshCw className="size-3.5" />} onClick={onRetryDelivery}>
+                            {t("videoWorkbench.retryDelivery")}
+                        </Button>
+                    ) : null}
                 </div>
             </div>
         </div>
@@ -796,7 +933,16 @@ async function readStoredLogs() {
 }
 
 async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog> {
-    const video = log.video?.storageKey ? { ...log.video, url: await resolveMediaUrl(log.video.storageKey, log.video.url) } : log.video;
+    const video = log.video
+        ? {
+              ...log.video,
+              url: log.video.storageKey
+                  ? await resolveMediaUrl(log.video.storageKey, log.video.url || log.video.sourceUrl || "")
+                  : log.video.url?.startsWith("blob:")
+                    ? log.video.sourceUrl || log.video.url
+                    : log.video.url || log.video.sourceUrl || "",
+          }
+        : undefined;
     const videoReferences = await Promise.all(
         (log.videoReferences || []).map(async (item) => ({
             ...item,
@@ -819,6 +965,7 @@ async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog>
     return {
         id: log.id || nanoid(),
         createdAt: log.createdAt || Date.now(),
+        updatedAt: log.updatedAt || log.createdAt || Date.now(),
         title: log.title || log.model || i18n.t("workbench.untitled"),
         prompt: log.prompt || "",
         time: log.time || new Date().toLocaleString(i18n.resolvedLanguage, { hour12: false }),
@@ -835,12 +982,15 @@ async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog>
         task: log.task,
         video,
         error: log.error,
+        deliveryStatus: log.deliveryStatus,
+        deliveryError: log.deliveryError,
     };
 }
 
 function serializeLog(log: GenerationLog): GenerationLog {
     return {
         ...log,
+        updatedAt: Date.now(),
         references: log.references.map((item) => ({ ...item, dataUrl: item.storageKey ? "" : item.dataUrl })),
         videoReferences: log.videoReferences.map((item) => (item.storageKey ? { ...item, url: "" } : item)),
         audioReferences: log.audioReferences.map((item) => (item.storageKey ? { ...item, url: "" } : item)),
@@ -915,6 +1065,7 @@ function buildLog({ prompt, model, config, references, videoReferences, audioRef
     return {
         id: nanoid(),
         createdAt: Date.now(),
+        updatedAt: Date.now(),
         title: prompt.slice(0, 12) || i18n.t("workbench.untitled"),
         prompt,
         time: new Date().toLocaleString(i18n.resolvedLanguage, { hour12: false }),
@@ -931,7 +1082,38 @@ function buildLog({ prompt, model, config, references, videoReferences, audioRef
         task,
         video,
         error,
+        deliveryStatus: video ? (video.deliveryError ? "pending" : video.storageKey ? "stored" : "pending") : undefined,
+        deliveryError: video?.deliveryError,
     };
+}
+
+function buildGeneratedVideo(video: { url: string; sourceUrl?: string; storageKey: string; bytes: number; mimeType: string; width?: number; height?: number }, durationMs: number, id = nanoid(), sourceUrl?: string): GeneratedVideo {
+    return {
+        id,
+        url: video.url,
+        sourceUrl: sourceUrl || video.sourceUrl || video.url,
+        storageKey: video.storageKey,
+        durationMs,
+        width: video.width || 1280,
+        height: video.height || 720,
+        bytes: video.bytes,
+        mimeType: video.mimeType || "video/mp4",
+    };
+}
+
+function mergeLogs(remote: GenerationLog[], local: GenerationLog[]) {
+    const merged = new Map(remote.map((log) => [log.id, log]));
+    for (const log of local) {
+        const current = merged.get(log.id);
+        if (!current || (log.updatedAt || log.createdAt) > (current.updatedAt || current.createdAt)) merged.set(log.id, log);
+    }
+    return Array.from(merged.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+function sameLogSet(first: GenerationLog[], second: GenerationLog[]) {
+    if (first.length !== second.length) return false;
+    const secondById = new Map(second.map((log) => [log.id, log]));
+    return first.every((log) => (log.updatedAt || log.createdAt) === (secondById.get(log.id)?.updatedAt || secondById.get(log.id)?.createdAt));
 }
 
 function buildVideoConfig(config: AiConfig, model: string): AiConfig {

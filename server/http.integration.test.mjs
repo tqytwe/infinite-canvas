@@ -317,6 +317,57 @@ test("HTTP platform gateway rewrites async image asset URLs to local proxies", a
     assert.equal(payload.result.data[0].url, "/api/platform/gateway/v1/images/task-assets/images/imgtask_1-0.png");
 });
 
+test("HTTP platform gateway rewrites video content URLs to the authenticated local gateway", async (t) => {
+    const dataDir = await mkdtemp(join(tmpdir(), "infinite-canvas-http-platform-video-"));
+    const platform = await startPlatformServer((req, res) => {
+        if (req.url === "/v1/videos/vtask_1") {
+            res.writeHead(200, { "content-type": "application/json" });
+            res.end(
+                JSON.stringify({
+                    id: "vtask_1",
+                    status: "completed",
+                    content: { url: "/v1/videos/vtask_1/content" },
+                }),
+            );
+            return;
+        }
+        res.writeHead(404, { "content-type": "application/json" });
+        res.end("{}");
+    });
+    const port = await freePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const child = spawn(process.execPath, ["index.mjs"], {
+        cwd: SERVER_DIR,
+        env: {
+            ...process.env,
+            NODE_ENV: "test",
+            PORT: String(port),
+            STATIC_DIR,
+            CANVAS_DATA_DIR: dataDir,
+            CANVAS_PLATFORM_API_BASE_URL: platform.baseUrl,
+            CANVAS_PLATFORM_WEB_URL: "http://platform.test",
+            CANVAS_EXCHANGE_SECRET: "secret",
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    t.after(async () => {
+        child.kill("SIGTERM");
+        await new Promise((resolvePromise) => child.once("exit", resolvePromise));
+        await new Promise((resolvePromise) => platform.server.close(resolvePromise));
+        await rm(dataDir, { recursive: true, force: true });
+    });
+
+    await waitForHealth(baseUrl);
+    const token = await createSession(dataDir, 107, "platform-video");
+    const response = await fetch(`${baseUrl}/api/platform/gateway/v1/videos/vtask_1`, {
+        headers: { cookie: cookie(token), accept: "application/json" },
+    });
+    assert.equal(response.status, 200);
+    const payload = await responseJson(response);
+    assert.equal(payload.content.url, "/api/platform/gateway/v1/videos/vtask_1/content");
+});
+
 test("HTTP platform gateway signs external async image asset URLs for same-origin proxying", async (t) => {
     const dataDir = await mkdtemp(join(tmpdir(), "infinite-canvas-http-platform-signed-assets-"));
     let assetOrigin = "";
@@ -391,6 +442,9 @@ test("HTTP platform gateway signs external async image asset URLs for same-origi
 test("HTTP platform gateway uses scoped image session for image APIs", async (t) => {
     const dataDir = await mkdtemp(join(tmpdir(), "infinite-canvas-http-platform-image-session-"));
     let imageAuth = "";
+    let videoAuth = "";
+    let videoBody = "";
+    let agnesAuth = "";
     const platform = await startPlatformServer((req, res) => {
         if (req.method === "GET" && req.url === "/api/v1/nextchat/bootstrap") {
             const apiKeyId = String(req.headers["x-nextchat-api-key-id"] || "");
@@ -404,6 +458,23 @@ test("HTTP platform gateway uses scoped image session for image APIs", async (t)
             imageAuth = req.headers.authorization || "";
             res.writeHead(200, { "content-type": "application/json" });
             res.end(JSON.stringify({ task_id: "imgtask_scoped" }));
+            return;
+        }
+        if (req.method === "POST" && req.url === "/v1/videos") {
+            videoAuth = req.headers.authorization || "";
+            req.on("data", (chunk) => {
+                videoBody += chunk;
+            });
+            req.on("end", () => {
+                res.writeHead(200, { "content-type": "application/json" });
+                res.end(JSON.stringify({ id: "videotask_scoped" }));
+            });
+            return;
+        }
+        if (req.method === "GET" && req.url === "/v1/agnesapi?video_id=videotask_scoped") {
+            agnesAuth = req.headers.authorization || "";
+            res.writeHead(200, { "content-type": "application/json" });
+            res.end(JSON.stringify({ status: "processing" }));
             return;
         }
         res.writeHead(404, { "content-type": "application/json" });
@@ -452,6 +523,21 @@ test("HTTP platform gateway uses scoped image session for image APIs", async (t)
     });
     assert.equal(response.status, 200);
     assert.equal(imageAuth, "Bearer image-key");
+
+    const videoResponse = await fetch(`${baseUrl}/api/platform/gateway/v1/videos`, {
+        method: "POST",
+        headers: { cookie: cookie(token), "content-type": "application/json" },
+        body: JSON.stringify({ model: "agnes-video-v2.0", prompt: "test" }),
+    });
+    assert.equal(videoResponse.status, 200);
+    assert.equal(videoAuth, "Bearer image-key");
+    assert.equal(JSON.parse(videoBody).model, "agnes-video-v2.0");
+
+    const agnesResponse = await fetch(`${baseUrl}/api/platform/gateway/v1/agnesapi?video_id=videotask_scoped`, {
+        headers: { cookie: cookie(token) },
+    });
+    assert.equal(agnesResponse.status, 200);
+    assert.equal(agnesAuth, "Bearer image-key");
 });
 
 test("HTTP managed prompt handoff requires a Canvas session and uses the platform BFF", async (t) => {
