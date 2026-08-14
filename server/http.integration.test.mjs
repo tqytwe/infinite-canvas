@@ -317,6 +317,72 @@ test("HTTP platform gateway rewrites async image asset URLs to local proxies", a
     assert.equal(payload.result.data[0].url, "/api/platform/gateway/v1/images/task-assets/images/imgtask_1-0.png");
 });
 
+test("HTTP platform gateway uses scoped image session for image APIs", async (t) => {
+    const dataDir = await mkdtemp(join(tmpdir(), "infinite-canvas-http-platform-image-session-"));
+    let imageAuth = "";
+    const platform = await startPlatformServer((req, res) => {
+        if (req.method === "GET" && req.url === "/api/v1/nextchat/bootstrap") {
+            const apiKeyId = String(req.headers["x-nextchat-api-key-id"] || "");
+            const model = apiKeyId === "209" ? "gpt-image-2" : "gpt-5.5";
+            const useCase = apiKeyId === "209" ? "image_studio" : "text";
+            res.writeHead(200, { "content-type": "application/json" });
+            res.end(JSON.stringify({ code: 0, data: { user: { id: 109 }, models: { source: "/v1/models", groups: [{ id: Number(apiKeyId), name: `group-${apiKeyId}`, models: [{ name: model, use_case: useCase }] }] } } }));
+            return;
+        }
+        if (req.method === "POST" && req.url === "/v1/images/generations/async") {
+            imageAuth = req.headers.authorization || "";
+            res.writeHead(200, { "content-type": "application/json" });
+            res.end(JSON.stringify({ task_id: "imgtask_scoped" }));
+            return;
+        }
+        res.writeHead(404, { "content-type": "application/json" });
+        res.end("{}");
+    });
+    const port = await freePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const child = spawn(process.execPath, ["index.mjs"], {
+        cwd: SERVER_DIR,
+        env: {
+            ...process.env,
+            NODE_ENV: "test",
+            PORT: String(port),
+            STATIC_DIR,
+            CANVAS_DATA_DIR: dataDir,
+            CANVAS_PLATFORM_API_BASE_URL: platform.baseUrl,
+            CANVAS_PLATFORM_WEB_URL: "http://platform.test",
+            CANVAS_EXCHANGE_SECRET: "secret",
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    t.after(async () => {
+        child.kill("SIGTERM");
+        await new Promise((resolvePromise) => child.once("exit", resolvePromise));
+        await new Promise((resolvePromise) => platform.server.close(resolvePromise));
+        await rm(dataDir, { recursive: true, force: true });
+    });
+
+    await waitForHealth(baseUrl);
+    const token = await createSession(dataDir, 109, "platform-image-session", {
+        sessions: {
+            chat: { apiKey: "chat-key", apiKeyId: 109, purpose: "chat" },
+            image: { apiKey: "image-key", apiKeyId: 209, purpose: "image" },
+        },
+    });
+    const session = await fetch(`${baseUrl}/api/auth/session`, { headers: { cookie: cookie(token) } });
+    const sessionPayload = await responseJson(session);
+    const modelNames = sessionPayload.models.groups.flatMap((group) => group.models.map((model) => model.name));
+    assert.deepEqual(modelNames.sort(), ["gpt-5.5", "gpt-image-2"]);
+
+    const response = await fetch(`${baseUrl}/api/platform/gateway/v1/images/generations/async`, {
+        method: "POST",
+        headers: { cookie: cookie(token), "content-type": "application/json" },
+        body: JSON.stringify({ model: "gpt-image-2", prompt: "test" }),
+    });
+    assert.equal(response.status, 200);
+    assert.equal(imageAuth, "Bearer image-key");
+});
+
 test("HTTP managed prompt handoff requires a Canvas session and uses the platform BFF", async (t) => {
     const dataDir = await mkdtemp(join(tmpdir(), "infinite-canvas-http-prompt-handoff-"));
     let receivedHeaders;

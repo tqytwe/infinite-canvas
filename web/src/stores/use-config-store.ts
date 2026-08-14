@@ -4,7 +4,7 @@ import { persist } from "zustand/middleware";
 import { nanoid } from "nanoid";
 
 import i18n from "@/i18n";
-import { isCanvasAuthenticated, isCanvasManagedMode } from "@/services/canvas-cloud";
+import { isCanvasAuthenticated, isCanvasManagedMode, useCanvasSessionStore } from "@/services/canvas-cloud";
 
 export type ApiCallFormat = "openai" | "gemini" | "ark";
 export type ModelCapability = "image" | "video" | "text" | "audio";
@@ -263,7 +263,24 @@ export const useConfigStore = create<ConfigStore>()(
 
 export function useEffectiveConfig() {
     const config = useConfigStore((state) => state.config);
-    return useMemo(() => ({ ...config, channelMode: "local" as const }), [config]);
+    const session = useCanvasSessionStore((state) => state.session);
+    return useMemo(() => {
+        if (!isCanvasManagedMode()) return { ...config, channelMode: "local" as const };
+        if (session?.authenticated && session.models) return { ...config, ...managedWorkspaceConfig(session.models), channelMode: "remote" as const };
+        return {
+            ...config,
+            channelMode: "remote" as const,
+            baseUrl: "",
+            apiKey: "",
+            channels: [],
+            models: [],
+            model: "",
+            imageModel: "",
+            videoModel: "",
+            textModel: "",
+            audioModel: "",
+        };
+    }, [config, session?.authenticated, session?.models]);
 }
 
 /** Normalize a mixed list of raw model names or model objects into deduped ChannelModel entries. */
@@ -439,7 +456,7 @@ export function managedWorkspaceConfig(models: unknown): Partial<AiConfig> {
     const options = managedModels.map((model) => encodeChannelModel(channel.id, model.name));
     const modelFor = (capability: ModelCapability) => {
         const model = managedModels.find((item) => item.capability === capability);
-        return model ? encodeChannelModel(channel.id, model.name) : options[0] || "";
+        return model ? encodeChannelModel(channel.id, model.name) : "";
     };
     return {
         channelMode: "remote",
@@ -448,7 +465,7 @@ export function managedWorkspaceConfig(models: unknown): Partial<AiConfig> {
         apiFormat: channel.apiFormat,
         channels: [channel],
         models: options,
-        model: modelFor("image"),
+        model: modelFor("text") || modelFor("image") || modelFor("video") || modelFor("audio") || options[0] || "",
         imageModel: modelFor("image"),
         videoModel: modelFor("video"),
         textModel: modelFor("text"),
@@ -488,12 +505,24 @@ function collectManagedModels(value: unknown): ChannelModel[] {
 }
 
 function managedModelCapability(model: { name: string; useCase: string; imageCapabilities?: Record<string, unknown> | boolean }): ModelCapability {
-    if (model.imageCapabilities) return "image";
+    if (hasImageStudioOperation(model.imageCapabilities, "create")) return "image";
     if (["image", "image_studio", "image-studio", "vision-image"].includes(model.useCase)) return "image";
     if (["video", "video_generation", "video-generation"].includes(model.useCase)) return "video";
     if (["audio", "audio_generation", "audio-generation", "tts", "speech"].includes(model.useCase)) return "audio";
     if (["text", "chat", "code", "reasoning", "general"].includes(model.useCase)) return "text";
     return guessCapability(model.name);
+}
+
+function hasImageStudioOperation(imageCapabilities: Record<string, unknown> | boolean | undefined, operation: "create" | "edit") {
+    if (imageCapabilities === true) return operation === "create";
+    if (!imageCapabilities || typeof imageCapabilities !== "object") return false;
+    const operations = Array.isArray(imageCapabilities.operations) ? imageCapabilities.operations : [];
+    return operations.some((item) => {
+        const value = String(item || "")
+            .trim()
+            .toLowerCase();
+        return value === operation || (operation === "create" && value === "generate");
+    });
 }
 
 function normalizeArkPlanBaseUrl(baseUrl: string) {

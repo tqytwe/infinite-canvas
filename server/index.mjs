@@ -188,9 +188,12 @@ async function handleExchange(req, res) {
     });
     const payload = await safeJson(upstream);
     const data = payload?.data || payload;
-    const userId = Number(data?.user_id);
-    const apiKeyId = Number(data?.api_key_id || data?.key_id || 0);
-    if (!upstream.ok || !data?.api_key || !Number.isSafeInteger(userId) || userId <= 0 || !Number.isSafeInteger(apiKeyId) || apiKeyId <= 0) {
+    const chatData = data?.sessions?.chat && typeof data.sessions.chat === "object" ? data.sessions.chat : data;
+    const imageData = data?.sessions?.image && typeof data.sessions.image === "object" ? data.sessions.image : null;
+    const userId = Number(chatData?.user_id || data?.user_id);
+    const chatSession = parsePlatformGatewaySession(chatData, "chat");
+    const imageSession = parsePlatformGatewaySession(imageData, "image");
+    if (!upstream.ok || !chatSession || !Number.isSafeInteger(userId) || userId <= 0) {
         sendJson(res, upstream.status || 502, { ok: false, error: payload?.message || payload?.msg || "PLATFORM_AUTH_EXCHANGE_FAILED" });
         return;
     }
@@ -201,8 +204,12 @@ async function handleExchange(req, res) {
     const session = {
         token,
         userId,
-        apiKey: String(data.api_key),
-        apiKeyId,
+        apiKey: chatSession.apiKey,
+        apiKeyId: chatSession.apiKeyId,
+        sessions: {
+            chat: chatSession,
+            ...(imageSession ? { image: imageSession } : {}),
+        },
         isAdmin: isAdminPayload(data?.user) || isAdminPayload(data) || ADMIN_USER_IDS.has(userId),
         createdAt: now.toISOString(),
         expiresAt: expiresAt.toISOString(),
@@ -224,12 +231,14 @@ async function handleSession(req, res) {
         return;
     }
     const bootstrap = await fetchPlatformBootstrap(session);
+    const imageSession = gatewaySessionForPurpose(session, "image");
+    const imageBootstrap = imageSession !== session ? await fetchPlatformBootstrap(session, imageSession) : null;
     const user = bootstrap?.user || { id: session.userId };
     sendJson(res, 200, {
         ok: true,
         authenticated: true,
         user: { ...user, ...(session.isAdmin ? { is_admin: true, role: "admin" } : {}) },
-        models: bootstrap?.models || null,
+        models: mergeWorkspaceModels(bootstrap?.models, imageBootstrap?.models),
         api_key_id: session.apiKeyId,
         expires_at: session.expiresAt,
     });
@@ -263,8 +272,9 @@ async function proxyPlatformGateway(req, res, url) {
         return;
     }
     const suffix = url.pathname.replace(/^\/api\/platform\/gateway/, "") || "/";
+    const gatewaySession = gatewaySessionForPath(session, suffix);
     await proxyRequest(req, res, `${PLATFORM_API_BASE_URL}${suffix}${url.search}`, {
-        authorization: `Bearer ${session.apiKey}`,
+        authorization: `Bearer ${gatewaySession.apiKey}`,
     }, { rewriteJson: true });
 }
 
@@ -279,11 +289,12 @@ async function proxyPlatformImageStudio(req, res, url) {
         return;
     }
     const suffix = url.pathname.replace(/^\/api\/platform\/image-studio/, "") || "/";
+    const imageSession = gatewaySessionForPurpose(session, "image");
     await proxyRequest(req, res, `${PLATFORM_API_BASE_URL}/api/v1/nextchat/image-studio${suffix}${url.search}`, {
         "x-nextchat-secret": EXCHANGE_SECRET,
         "x-nextchat-user-id": String(session.userId),
-        "x-nextchat-api-key-id": String(session.apiKeyId),
-        authorization: `Bearer ${session.apiKey}`,
+        "x-nextchat-api-key-id": String(imageSession.apiKeyId),
+        authorization: `Bearer ${imageSession.apiKey}`,
     }, { rewriteJson: true });
 }
 
@@ -647,16 +658,16 @@ async function getUsage(userId) {
     };
 }
 
-async function fetchPlatformBootstrap(session) {
-    if (!PLATFORM_API_BASE_URL || !EXCHANGE_SECRET || !session.apiKeyId) return null;
+async function fetchPlatformBootstrap(session, gatewaySession = session) {
+    if (!PLATFORM_API_BASE_URL || !EXCHANGE_SECRET || !gatewaySession.apiKeyId) return null;
     try {
         const response = await fetch(`${PLATFORM_API_BASE_URL}/api/v1/nextchat/bootstrap`, {
             headers: {
                 accept: "application/json",
-                authorization: `Bearer ${session.apiKey}`,
+                authorization: `Bearer ${gatewaySession.apiKey}`,
                 "x-nextchat-secret": EXCHANGE_SECRET,
                 "x-nextchat-user-id": String(session.userId),
-                "x-nextchat-api-key-id": String(session.apiKeyId),
+                "x-nextchat-api-key-id": String(gatewaySession.apiKeyId),
             },
             signal: AbortSignal.timeout(15_000),
         });
@@ -1008,6 +1019,63 @@ function parseIdSet(value) {
             .map((item) => Number(item.trim()))
             .filter((item) => Number.isSafeInteger(item) && item > 0),
     );
+}
+
+function parsePlatformGatewaySession(value, purpose) {
+    if (!value || typeof value !== "object") return null;
+    const apiKey = typeof value.api_key === "string" ? value.api_key.trim() : "";
+    const apiKeyId = Number(value.api_key_id || value.key_id || 0);
+    if (!apiKey || !Number.isSafeInteger(apiKeyId) || apiKeyId <= 0) return null;
+    return { apiKey, apiKeyId, purpose };
+}
+
+function gatewaySessionForPurpose(session, purpose) {
+    const scoped = session.sessions?.[purpose];
+    if (scoped?.apiKey && Number.isSafeInteger(Number(scoped.apiKeyId)) && Number(scoped.apiKeyId) > 0) {
+        return { ...scoped, apiKeyId: Number(scoped.apiKeyId) };
+    }
+    return session;
+}
+
+function gatewaySessionForPath(session, suffix) {
+    const path = String(suffix || "").toLowerCase();
+    if (path.startsWith("/v1/images/")) return gatewaySessionForPurpose(session, "image");
+    return gatewaySessionForPurpose(session, "chat");
+}
+
+function mergeWorkspaceModels(primary, secondary) {
+    const primaryGroups = Array.isArray(primary?.groups) ? primary.groups : [];
+    const secondaryGroups = Array.isArray(secondary?.groups) ? secondary.groups : [];
+    if (!primaryGroups.length) return secondary || primary || null;
+    if (!secondaryGroups.length) return primary;
+    const groups = new Map();
+    for (const sourceGroups of [primaryGroups, secondaryGroups]) {
+        for (const group of sourceGroups) {
+            const key = `${group?.id ?? ""}:${group?.name ?? ""}:${group?.platform ?? ""}`;
+            const existing = groups.get(key);
+            if (!existing) {
+                groups.set(key, { ...group, models: [...(group?.models || [])] });
+                continue;
+            }
+            const seen = new Set((existing.models || []).map(workspaceModelKey));
+            for (const model of group?.models || []) {
+                const modelKey = workspaceModelKey(model);
+                if (!seen.has(modelKey)) {
+                    existing.models.push(model);
+                    seen.add(modelKey);
+                }
+            }
+        }
+    }
+    return {
+        ...primary,
+        image_capabilities_version: primary.image_capabilities_version || secondary.image_capabilities_version,
+        groups: Array.from(groups.values()),
+    };
+}
+
+function workspaceModelKey(model) {
+    return String(model?.id || model?.name || model?.display_name || JSON.stringify(model));
 }
 
 function isAdminPayload(value) {
