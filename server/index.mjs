@@ -342,8 +342,12 @@ async function handleAdminDocs(req, res) {
         sendJson(res, 401, { ok: false, error: "AUTH_REQUIRED", login_url: buildAuthUrl(PLATFORM_LOGIN_PATH) });
         return;
     }
+    if (session.isAdmin || ADMIN_USER_IDS.has(Number(session.userId))) {
+        sendJson(res, 200, { ok: true, ...adminDocsPayload() });
+        return;
+    }
     const bootstrap = await fetchPlatformBootstrap(session);
-    if (!session.isAdmin && !ADMIN_USER_IDS.has(Number(session.userId)) && !isAdminPayload(bootstrap?.user)) {
+    if (!isAdminPayload(bootstrap?.user)) {
         sendJson(res, 403, { ok: false, error: "ADMIN_REQUIRED" });
         return;
     }

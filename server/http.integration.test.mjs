@@ -372,8 +372,9 @@ test("HTTP admin documentation requires an authenticated administrator", async (
     const platform = await startPlatformServer((req, res) => {
         if (req.method === "GET" && req.url === "/api/v1/nextchat/bootstrap") {
             const userId = String(req.headers["x-nextchat-user-id"] || "");
+            const isAdmin = userId === "108";
             res.writeHead(200, { "content-type": "application/json" });
-            res.end(JSON.stringify({ code: 0, data: { user: { id: Number(userId), role: userId === "108" ? "admin" : "user" } } }));
+            res.end(JSON.stringify({ code: 0, data: { user: { id: Number(userId), role: isAdmin ? "admin" : "user", is_admin: isAdmin } } }));
             return;
         }
         res.writeHead(404, { "content-type": "application/json" });
@@ -404,10 +405,18 @@ test("HTTP admin documentation requires an authenticated administrator", async (
     });
 
     await waitForHealth(baseUrl);
-    assert.equal((await fetch(`${baseUrl}/api/admin/docs`)).status, 401);
+    const anonymous = await fetch(`${baseUrl}/api/admin/docs`);
+    const anonymousBody = await anonymous.text();
+    assert.equal(anonymous.status, 401);
+    assert.equal(JSON.parse(anonymousBody).error, "AUTH_REQUIRED");
+    assert.equal(anonymousBody.includes("CANVAS_DATA_DIR"), false);
 
     const userToken = await createSession(dataDir, 107, "admin-docs-user");
-    assert.equal((await fetch(`${baseUrl}/api/admin/docs`, { headers: { cookie: cookie(userToken) } })).status, 403);
+    const forbidden = await fetch(`${baseUrl}/api/admin/docs`, { headers: { cookie: cookie(userToken) } });
+    const forbiddenBody = await forbidden.text();
+    assert.equal(forbidden.status, 403);
+    assert.equal(JSON.parse(forbiddenBody).error, "ADMIN_REQUIRED");
+    assert.equal(forbiddenBody.includes("CANVAS_DATA_DIR"), false);
 
     const adminToken = await createSession(dataDir, 108, "admin-docs-admin");
     const response = await fetch(`${baseUrl}/api/admin/docs`, { headers: { cookie: cookie(adminToken) } });
@@ -415,4 +424,6 @@ test("HTTP admin documentation requires an authenticated administrator", async (
     const payload = await responseJson(response);
     assert.equal(payload.title, "管理员与部署文档");
     assert.equal(payload.metrics[0].value, "全站共 30GB");
+    assert.equal(payload.sections.some((section) => section.title === "部署配置"), true);
+    assert.equal(JSON.stringify(payload).includes("CANVAS_DATA_DIR"), true);
 });
