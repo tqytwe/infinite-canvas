@@ -422,7 +422,7 @@ export default function ImagePage() {
         const nextLogs = remoteLogs ? mergeLogs(remoteLogs, localLogs) : localLogs;
         if (refreshId !== logsRefreshIdRef.current) return nextLogs;
         setLogs(nextLogs);
-        void hydrateLogs(nextLogs, refreshId);
+        void hydrateLogs(nextLogs);
         if (cloudLogs && remoteLogs && !sameLogSet(remoteLogs, nextLogs) && isCanvasManagedMode() && isCanvasAuthenticated()) {
             await replaceCloudWorkbenchLogs("image-workbench", nextLogs.map(serializeLog));
         } else if (!cloudLogs && !cloudReadFailed && isCanvasManagedMode() && isCanvasAuthenticated() && nextLogs.length) {
@@ -432,13 +432,16 @@ export default function ImagePage() {
         return nextLogs;
     };
 
-    const hydrateLogs = async (items: GenerationLog[], refreshId: number) => {
+    const hydrateLogs = async (items: GenerationLog[]) => {
         await Promise.all(
             items.map(async (item) => {
                 try {
                     const hydrated = await normalizeLog(item, true);
-                    if (refreshId !== logsRefreshIdRef.current) return;
-                    setLogs((current) => current.map((log) => (log.id === hydrated.id ? hydrated : log)));
+                    setLogs((current) =>
+                        current.map((log) =>
+                            log.id === hydrated.id && (log.updatedAt || log.createdAt) <= (hydrated.updatedAt || hydrated.createdAt) ? hydrated : log,
+                        ),
+                    );
                     if (currentLogIdRef.current === hydrated.id) {
                         setPreviewLog(hydrated);
                         if (!activeLogIdsRef.current.has(hydrated.id)) setResults(resultsForLog(hydrated));
