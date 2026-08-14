@@ -63,7 +63,7 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
             try {
                 const nextSession = await getCanvasSession();
                 if (cancelled) return;
-                setCanvasSession(false).catch(() => undefined);
+                await setCanvasSession(false).catch(() => undefined);
                 if (nextSession.authenticated && nextSession.models) {
                     const managed = applyManagedWorkspaceConfig(useConfigStore.getState().config, nextSession.models);
                     (Object.keys(managed) as Array<keyof typeof managed>).forEach((key) => {

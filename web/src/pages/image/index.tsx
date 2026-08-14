@@ -106,6 +106,7 @@ export default function ImagePage() {
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [isReferenceDragActive, setIsReferenceDragActive] = useState(false);
     const [autoRunToken, setAutoRunToken] = useState(0);
+    const logsRefreshIdRef = useRef(0);
     const imageCommand = useWorkbenchAgentStore((state) => state.imageCommand);
     const clearImageCommand = useWorkbenchAgentStore((state) => state.clearImageCommand);
     const updateAgentTask = useWorkbenchAgentStore((state) => state.updateTask);
@@ -394,8 +395,10 @@ export default function ImagePage() {
     };
 
     const refreshLogs = async (resumePending = true) => {
+        const refreshId = ++logsRefreshIdRef.current;
         const managedSession = isCanvasManagedMode() ? await getCanvasSession() : null;
         if (isCanvasManagedMode() && !managedSession?.authenticated) {
+            if (refreshId !== logsRefreshIdRef.current) return [];
             setLogs([]);
             return [];
         }
@@ -407,10 +410,12 @@ export default function ImagePage() {
             cloudReadFailed = true;
             console.warn("[canvas-cloud] image workbench log read failed", error);
         }
-        const localLogs = await readStoredLogs();
-        const remoteLogs = cloudLogs ? await Promise.all(cloudLogs.map(normalizeLog)) : null;
+        const localLogs = await readStoredLogs(false);
+        const remoteLogs = cloudLogs ? await Promise.all(cloudLogs.map((log) => normalizeLog(log, false))) : null;
         const nextLogs = remoteLogs ? mergeLogs(remoteLogs, localLogs) : localLogs;
+        if (refreshId !== logsRefreshIdRef.current) return nextLogs;
         setLogs(nextLogs);
+        void hydrateLogs(nextLogs, refreshId);
         if (cloudLogs && remoteLogs && !sameLogSet(remoteLogs, nextLogs) && isCanvasManagedMode() && isCanvasAuthenticated()) {
             await replaceCloudWorkbenchLogs("image-workbench", nextLogs.map(serializeLog));
         } else if (!cloudLogs && !cloudReadFailed && isCanvasManagedMode() && isCanvasAuthenticated() && nextLogs.length) {
@@ -418,6 +423,17 @@ export default function ImagePage() {
         }
         if (resumePending) resumePendingLogs(nextLogs);
         return nextLogs;
+    };
+
+    const hydrateLogs = async (items: GenerationLog[], refreshId: number) => {
+        try {
+            const hydrated = await Promise.all(items.map((log) => normalizeLog(log, true)));
+            if (refreshId !== logsRefreshIdRef.current) return;
+            const hydratedById = new Map(hydrated.map((log) => [log.id, log]));
+            setLogs((current) => current.map((log) => hydratedById.get(log.id) || log));
+        } catch (error) {
+            console.warn("[canvas-cloud] image workbench preview hydration failed", error);
+        }
     };
 
     const resumePendingLogs = (items: GenerationLog[]) => {
@@ -1086,14 +1102,14 @@ function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: Ge
     );
 }
 
-async function readStoredLogs() {
+async function readStoredLogs(hydrateImages = true) {
     if (typeof window === "undefined") return [];
     try {
         const values: GenerationLog[] = [];
         await logStore.iterate<GenerationLog, void>((value) => {
             values.push(value);
         });
-        const logs = await Promise.all(values.map(normalizeLog));
+        const logs = await Promise.all(values.map((value) => normalizeLog(value, hydrateImages)));
         return logs.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     } catch {
         return [];
@@ -1132,19 +1148,23 @@ async function deliverImageResults(images: GeneratedImage[]) {
     );
 }
 
-async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog> {
-    const references = await Promise.all(
-        (log.references || []).map(async (item) => ({
-            ...item,
-            dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl),
-        })),
-    );
-    const images = await Promise.all(
-        (log.images || []).map(async (item) => ({
-            ...item,
-            dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl?.startsWith("blob:") ? item.sourceUrl || item.dataUrl : item.dataUrl || item.sourceUrl || ""),
-        })),
-    );
+async function normalizeLog(log: Partial<GenerationLog>, hydrateImages = true): Promise<GenerationLog> {
+    const references = hydrateImages
+        ? await Promise.all(
+              (log.references || []).map(async (item) => ({
+                  ...item,
+                  dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl),
+              })),
+          )
+        : [...(log.references || [])];
+    const images = hydrateImages
+        ? await Promise.all(
+              (log.images || []).map(async (item) => ({
+                  ...item,
+                  dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl?.startsWith("blob:") ? item.sourceUrl || item.dataUrl : item.dataUrl || item.sourceUrl || ""),
+              })),
+          )
+        : [...(log.images || [])];
     const config = normalizeLogConfig(log);
     return {
         id: log.id || nanoid(),
@@ -1168,7 +1188,7 @@ async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog>
         deliveryStatus: log.deliveryStatus,
         deliveryError: log.deliveryError,
         images,
-        thumbnails: images.map((image) => image.dataUrl).filter(Boolean),
+        thumbnails: (hydrateImages ? images.map((image) => image.dataUrl) : log.thumbnails || images.map((image) => image.dataUrl)).filter(Boolean),
     };
 }
 

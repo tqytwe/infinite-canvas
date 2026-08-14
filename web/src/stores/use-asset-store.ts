@@ -5,7 +5,7 @@ import { nanoid } from "nanoid";
 import { localForageStorage } from "@/lib/localforage-storage";
 import { cleanupUnusedImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { cleanupUnusedMedia, resolveMediaUrl } from "@/services/file-storage";
-import { canCanvasWrite, getCanvasSession, getCloudState, isCanvasManagedMode, putCloudState } from "@/services/canvas-cloud";
+import { canCanvasWrite, getCanvasSession, getCloudState, isCanvasAuthenticated, isCanvasManagedMode, putCloudState } from "@/services/canvas-cloud";
 
 export type AssetKind = "text" | "image" | "video";
 export type TextAsset = AssetBase<"text"> & { data: { content: string } };
@@ -37,6 +37,7 @@ type AssetStore = {
 };
 
 const ASSET_STORE_KEY = "infinite-canvas:asset_store";
+let managedAssetStorageReady = !isCanvasManagedMode();
 
 const assetStorage: PersistStorage<AssetStore> = {
     getItem: async (name) => {
@@ -48,8 +49,10 @@ const assetStorage: PersistStorage<AssetStore> = {
                 await localForageStorage.setItem(name, cloudValue);
                 const parsed = JSON.parse(cloudValue) as StorageValue<AssetStore>;
                 parsed.state.assets = await hydrateAssets(parsed.state.assets);
+                managedAssetStorageReady = true;
                 return parsed;
             }
+            managedAssetStorageReady = true;
             return null;
         }
         const value = await localForageStorage.getItem(name);
@@ -59,6 +62,7 @@ const assetStorage: PersistStorage<AssetStore> = {
         return parsed;
     },
     setItem: async (name, value) => {
+        if (isCanvasManagedMode() && (!managedAssetStorageReady || !isCanvasAuthenticated())) return;
         const serialized = JSON.stringify(value);
         await localForageStorage.setItem(name, serialized);
         if (isCanvasManagedMode()) void putCloudState("assets", serialized).catch((error) => console.warn("[canvas-cloud] asset save failed", error));

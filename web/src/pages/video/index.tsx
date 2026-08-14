@@ -107,6 +107,7 @@ export default function VideoPage() {
     const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
     const [referenceDragTarget, setReferenceDragTarget] = useState<"image" | "video" | "audio" | null>(null);
     const [autoRunToken, setAutoRunToken] = useState(0);
+    const logsRefreshIdRef = useRef(0);
     const videoCommand = useWorkbenchAgentStore((state) => state.videoCommand);
     const clearVideoCommand = useWorkbenchAgentStore((state) => state.clearVideoCommand);
     const updateAgentTask = useWorkbenchAgentStore((state) => state.updateTask);
@@ -364,8 +365,10 @@ export default function VideoPage() {
     };
 
     const refreshLogs = async (resumePending = true) => {
+        const refreshId = ++logsRefreshIdRef.current;
         const managedSession = isCanvasManagedMode() ? await getCanvasSession() : null;
         if (isCanvasManagedMode() && !managedSession?.authenticated) {
+            if (refreshId !== logsRefreshIdRef.current) return [];
             setLogs([]);
             return [];
         }
@@ -377,10 +380,12 @@ export default function VideoPage() {
             cloudReadFailed = true;
             console.warn("[canvas-cloud] video workbench log read failed", error);
         }
-        const localLogs = await readStoredLogs();
-        const remoteLogs = cloudLogs ? await Promise.all(cloudLogs.map(normalizeLog)) : null;
+        const localLogs = await readStoredLogs(false);
+        const remoteLogs = cloudLogs ? await Promise.all(cloudLogs.map((log) => normalizeLog(log, false))) : null;
         const nextLogs = remoteLogs ? mergeLogs(remoteLogs, localLogs) : localLogs;
+        if (refreshId !== logsRefreshIdRef.current) return nextLogs;
         setLogs(nextLogs);
+        void hydrateLogs(nextLogs, refreshId);
         if (cloudLogs && remoteLogs && !sameLogSet(remoteLogs, nextLogs) && isCanvasManagedMode() && isCanvasAuthenticated()) {
             await replaceCloudWorkbenchLogs("video-workbench", nextLogs.map(serializeLog));
         } else if (!cloudLogs && !cloudReadFailed && isCanvasManagedMode() && isCanvasAuthenticated() && nextLogs.length) {
@@ -388,6 +393,18 @@ export default function VideoPage() {
         }
         if (resumePending) resumePendingLogs(nextLogs);
         return nextLogs;
+    };
+
+    const hydrateLogs = async (items: GenerationLog[], refreshId: number) => {
+        try {
+            const hydrated = await Promise.all(items.map((log) => normalizeLog(log, true)));
+            if (refreshId !== logsRefreshIdRef.current) return;
+            const hydratedById = new Map(hydrated.map((log) => [log.id, log]));
+            setLogs((current) => current.map((log) => hydratedById.get(log.id) || log));
+            setPreviewLog((current) => (current ? hydratedById.get(current.id) || current : current));
+        } catch (error) {
+            console.warn("[canvas-cloud] video workbench preview hydration failed", error);
+        }
     };
 
     const resumePendingLogs = (items: GenerationLog[]) => {
@@ -920,48 +937,56 @@ function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: Ge
     );
 }
 
-async function readStoredLogs() {
+async function readStoredLogs(hydrateMedia = true) {
     if (typeof window === "undefined") return [];
     try {
         const logs: GenerationLog[] = [];
         await logStore.iterate<GenerationLog, void>((value) => {
             logs.push(value);
         });
-        return (await Promise.all(logs.map(normalizeLog))).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        return (await Promise.all(logs.map((log) => normalizeLog(log, hydrateMedia)))).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     } catch {
         return [];
     }
 }
 
-async function normalizeLog(log: Partial<GenerationLog>): Promise<GenerationLog> {
+async function normalizeLog(log: Partial<GenerationLog>, hydrateMedia = true): Promise<GenerationLog> {
     const video = log.video
-        ? {
-              ...log.video,
-              url: log.video.storageKey
-                  ? await resolveMediaUrl(log.video.storageKey, log.video.url || log.video.sourceUrl || "")
-                  : log.video.url?.startsWith("blob:")
-                    ? log.video.sourceUrl || log.video.url
-                    : log.video.url || log.video.sourceUrl || "",
-          }
+        ? hydrateMedia
+            ? {
+                  ...log.video,
+                  url: log.video.storageKey
+                      ? await resolveMediaUrl(log.video.storageKey, log.video.url || log.video.sourceUrl || "")
+                      : log.video.url?.startsWith("blob:")
+                        ? log.video.sourceUrl || log.video.url
+                        : log.video.url || log.video.sourceUrl || "",
+              }
+            : { ...log.video }
         : undefined;
-    const videoReferences = await Promise.all(
-        (log.videoReferences || []).map(async (item) => ({
-            ...item,
-            url: item.storageKey ? await resolveMediaUrl(item.storageKey, item.url) : item.url,
-        })),
-    );
-    const audioReferences = await Promise.all(
-        (log.audioReferences || []).map(async (item) => ({
-            ...item,
-            url: item.storageKey ? await resolveMediaUrl(item.storageKey, item.url) : item.url,
-        })),
-    );
-    const references = await Promise.all(
-        (log.references || []).map(async (item) => ({
-            ...item,
-            dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl),
-        })),
-    );
+    const videoReferences = hydrateMedia
+        ? await Promise.all(
+              (log.videoReferences || []).map(async (item) => ({
+                  ...item,
+                  url: item.storageKey ? await resolveMediaUrl(item.storageKey, item.url) : item.url,
+              })),
+          )
+        : [...(log.videoReferences || [])];
+    const audioReferences = hydrateMedia
+        ? await Promise.all(
+              (log.audioReferences || []).map(async (item) => ({
+                  ...item,
+                  url: item.storageKey ? await resolveMediaUrl(item.storageKey, item.url) : item.url,
+              })),
+          )
+        : [...(log.audioReferences || [])];
+    const references = hydrateMedia
+        ? await Promise.all(
+              (log.references || []).map(async (item) => ({
+                  ...item,
+                  dataUrl: await resolveImageUrl(item.storageKey, item.dataUrl),
+              })),
+          )
+        : [...(log.references || [])];
     const config = normalizeLogConfig(log);
     return {
         id: log.id || nanoid(),
