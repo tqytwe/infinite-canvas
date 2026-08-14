@@ -385,7 +385,6 @@ export default function VideoPage() {
         const nextLogs = remoteLogs ? mergeLogs(remoteLogs, localLogs) : localLogs;
         if (refreshId !== logsRefreshIdRef.current) return nextLogs;
         setLogs(nextLogs);
-        void hydrateLogs(nextLogs, refreshId);
         if (cloudLogs && remoteLogs && !sameLogSet(remoteLogs, nextLogs) && isCanvasManagedMode() && isCanvasAuthenticated()) {
             await replaceCloudWorkbenchLogs("video-workbench", nextLogs.map(serializeLog));
         } else if (!cloudLogs && !cloudReadFailed && isCanvasManagedMode() && isCanvasAuthenticated() && nextLogs.length) {
@@ -393,21 +392,6 @@ export default function VideoPage() {
         }
         if (resumePending) resumePendingLogs(nextLogs);
         return nextLogs;
-    };
-
-    const hydrateLogs = async (items: GenerationLog[], refreshId: number) => {
-        await Promise.all(
-            items.map(async (item) => {
-                try {
-                    const hydrated = await normalizeLog(item, true);
-                    if (refreshId !== logsRefreshIdRef.current) return;
-                    setLogs((current) => current.map((log) => (log.id === hydrated.id ? hydrated : log)));
-                    setPreviewLog((current) => (current?.id === hydrated.id ? hydrated : current));
-                } catch (error) {
-                    console.warn("[canvas-cloud] video workbench preview hydration failed", item.id, error);
-                }
-            }),
-        );
     };
 
     const resumePendingLogs = (items: GenerationLog[]) => {
@@ -512,7 +496,7 @@ export default function VideoPage() {
         }
     };
 
-    const previewGenerationLog = (log: GenerationLog) => {
+    const previewGenerationLog = async (log: GenerationLog) => {
         currentLogIdRef.current = log.id;
         setPreviewLog(log);
         setLogsOpen(false);
@@ -526,7 +510,19 @@ export default function VideoPage() {
         if (log.config.videoSeconds) updateConfig("videoSeconds", log.config.videoSeconds);
         if (log.config.videoGenerateAudio) updateConfig("videoGenerateAudio", log.config.videoGenerateAudio);
         if (log.config.videoWatermark) updateConfig("videoWatermark", log.config.videoWatermark);
-        setResults(log.status === "pending" ? [{ id: log.id, status: "pending" }] : log.video ? [{ id: log.video.id, status: "success", video: log.video }] : [{ id: log.id, status: "failed", error: log.error || t("workbench.generationFailed") }]);
+        setResults(resultsForLog(log));
+        if (log.status === "pending" || !needsMediaHydration(log)) return;
+        try {
+            const hydrated = await normalizeLog(log, true);
+            if (currentLogIdRef.current !== hydrated.id) return;
+            setPreviewLog(hydrated);
+            setReferences(hydrated.references);
+            setVideoReferences(hydrated.videoReferences);
+            setAudioReferences(hydrated.audioReferences);
+            setResults(resultsForLog(hydrated));
+        } catch (error) {
+            console.warn("[canvas-cloud] selected video preview hydration failed", log.id, error);
+        }
     };
 
     const retryDelivery = async (log: GenerationLog) => {
@@ -937,6 +933,22 @@ function LogCard({ log, selected, active, onSelectedChange, onClick }: { log: Ge
                 </div>
             </div>
         </button>
+    );
+}
+
+function resultsForLog(log: GenerationLog): GenerationResult[] {
+    if (log.status === "pending") return [{ id: log.id, status: "pending" }];
+    if (log.video && (log.video.url || !log.video.storageKey)) return [{ id: log.video.id, status: "success", video: log.video }];
+    if (log.video?.storageKey) return [{ id: log.video.id, status: "pending" }];
+    return [{ id: log.id, status: "failed", error: log.error || i18n.t("workbench.generationFailed") }];
+}
+
+function needsMediaHydration(log: GenerationLog) {
+    return Boolean(
+        (log.video?.storageKey && !log.video.url) ||
+            log.references.some((item) => item.storageKey && !item.dataUrl) ||
+            log.videoReferences.some((item) => item.storageKey && !item.url) ||
+            log.audioReferences.some((item) => item.storageKey && !item.url),
     );
 }
 

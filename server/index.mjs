@@ -33,6 +33,8 @@ const compressGzip = promisify(gzip);
 const staticCompressionCache = new Map();
 let staticCompressionCacheBytes = 0;
 const STATIC_COMPRESSION_CACHE_LIMIT = 64 * 1024 * 1024;
+const SMALL_OBJECT_BUFFER_BYTES = 8 * 1024 * 1024;
+const OBJECT_STREAM_HIGH_WATER_MARK = 1024 * 1024;
 const userLocks = new Map();
 let storageLock = Promise.resolve();
 
@@ -565,6 +567,11 @@ async function serveObject(req, res, storageKey, userId, method) {
             etag: `"${sha256(`${storageKey}:${info.size}:${info.mtimeMs}`)}"`,
             "accept-ranges": "bytes",
         };
+        if (!req.headers.range && req.headers["if-none-match"] === headers.etag) {
+            res.writeHead(304, { etag: headers.etag, "cache-control": headers["cache-control"] });
+            res.end();
+            return;
+        }
         if (method === "HEAD") {
             res.writeHead(200, headers);
             res.end();
@@ -572,8 +579,14 @@ async function serveObject(req, res, storageKey, userId, method) {
         }
         const range = parseRangeHeader(String(req.headers.range || ""), info.size);
         if (!range) {
+            if (info.size <= SMALL_OBJECT_BUFFER_BYTES) {
+                const body = await readFile(filePath);
+                res.writeHead(200, { ...headers, "content-length": String(body.length) });
+                res.end(body);
+                return;
+            }
             res.writeHead(200, headers);
-            createReadStream(filePath).pipe(res);
+            createReadStream(filePath, { highWaterMark: OBJECT_STREAM_HIGH_WATER_MARK }).pipe(res);
             return;
         }
         const length = range.end - range.start + 1;
@@ -582,7 +595,7 @@ async function serveObject(req, res, storageKey, userId, method) {
             "content-length": String(length),
             "content-range": `bytes ${range.start}-${range.end}/${info.size}`,
         });
-        createReadStream(filePath, { start: range.start, end: range.end }).pipe(res);
+        createReadStream(filePath, { start: range.start, end: range.end, highWaterMark: OBJECT_STREAM_HIGH_WATER_MARK }).pipe(res);
     } catch {
         sendJson(res, 404, { ok: false, error: "OBJECT_NOT_FOUND" });
     }

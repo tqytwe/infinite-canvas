@@ -196,7 +196,7 @@ export async function putCloudObject(storageKey: string, blob: Blob) {
 export async function getCloudObject(storageKey: string) {
     if (!CANVAS_MANAGED_MODE) return null;
     if (!isCanvasAuthenticated()) return null;
-    const response = await cloudFetch(`/api/storage/objects/${encodeURIComponent(storageKey)}`, { credentials: "same-origin", cache: "no-store" }, CLOUD_OBJECT_TIMEOUT_MS);
+    const response = await cloudFetch(`/api/storage/objects/${encodeURIComponent(storageKey)}`, { credentials: "same-origin", cache: "default" }, CLOUD_OBJECT_TIMEOUT_MS);
     if (!response.ok) return null;
     return response.blob();
 }

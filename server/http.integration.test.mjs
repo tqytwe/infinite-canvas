@@ -126,7 +126,14 @@ test("HTTP storage enforces auth, persistence, range reads, quota, LRU, and pinn
     assert.equal(smallUpload.status, 200);
     assert.equal((await responseJson(smallUpload)).used_bytes, 4);
 
-    const ranged = await fetch(`${baseUrl}/api/storage/objects/${encodeURIComponent("image:range")}`, {
+    const objectUrl = `${baseUrl}/api/storage/objects/${encodeURIComponent("image:range")}`;
+    const full = await fetch(objectUrl, { headers: { cookie: cookie(userToken) } });
+    assert.equal(full.status, 200);
+    assert.equal(await full.text(), "abcd");
+    const cached = await fetch(objectUrl, { headers: { cookie: cookie(userToken), "if-none-match": full.headers.get("etag") } });
+    assert.equal(cached.status, 304);
+
+    const ranged = await fetch(objectUrl, {
         headers: { cookie: cookie(userToken), range: "bytes=1-2" },
     });
     assert.equal(ranged.status, 206);

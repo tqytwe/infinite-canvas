@@ -78,7 +78,9 @@ function resultsForLog(log: GenerationLog): GenerationResult[] {
     if (log.status === "pending" && log.task) {
         return Array.from({ length: Math.max(1, Number(log.config.count) || log.imageCount || 1) }, () => ({ id: nanoid(), status: "pending" }));
     }
-    return log.images.map((image) => ({ id: image.id, status: "success" as const, image }));
+    return log.images.map((image) =>
+        image.dataUrl || !image.storageKey ? { id: image.id, status: "success" as const, image } : { id: image.id, status: "pending" as const },
+    );
 }
 
 const LOG_STORE_KEY = "infinite-canvas:image_generation_logs";
@@ -422,7 +424,6 @@ export default function ImagePage() {
         const nextLogs = remoteLogs ? mergeLogs(remoteLogs, localLogs) : localLogs;
         if (refreshId !== logsRefreshIdRef.current) return nextLogs;
         setLogs(nextLogs);
-        void hydrateLogs(nextLogs);
         if (cloudLogs && remoteLogs && !sameLogSet(remoteLogs, nextLogs) && isCanvasManagedMode() && isCanvasAuthenticated()) {
             await replaceCloudWorkbenchLogs("image-workbench", nextLogs.map(serializeLog));
         } else if (!cloudLogs && !cloudReadFailed && isCanvasManagedMode() && isCanvasAuthenticated() && nextLogs.length) {
@@ -430,27 +431,6 @@ export default function ImagePage() {
         }
         if (resumePending) resumePendingLogs(nextLogs);
         return nextLogs;
-    };
-
-    const hydrateLogs = async (items: GenerationLog[]) => {
-        await Promise.all(
-            items.map(async (item) => {
-                try {
-                    const hydrated = await normalizeLog(item, true);
-                    setLogs((current) =>
-                        current.map((log) =>
-                            log.id === hydrated.id && (log.updatedAt || log.createdAt) <= (hydrated.updatedAt || hydrated.createdAt) ? hydrated : log,
-                        ),
-                    );
-                    if (currentLogIdRef.current === hydrated.id) {
-                        setPreviewLog(hydrated);
-                        if (!activeLogIdsRef.current.has(hydrated.id)) setResults(resultsForLog(hydrated));
-                    }
-                } catch (error) {
-                    console.warn("[canvas-cloud] image workbench preview hydration failed", item.id, error);
-                }
-            }),
-        );
     };
 
     const resumePendingLogs = (items: GenerationLog[]) => {
