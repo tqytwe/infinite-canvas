@@ -595,6 +595,15 @@ export default function ImagePage() {
         if (log.config.size) updateConfig("size", log.config.size);
         if (log.config.count) updateConfig("count", log.config.count);
         setResults(resultsForLog(log));
+        if (log.status === "pending" || !log.images.some((image) => image.storageKey && !image.dataUrl)) return;
+        try {
+            const hydrated = await normalizeLog(log, true);
+            if (currentLogIdRef.current !== hydrated.id || activeLogIdsRef.current.has(hydrated.id)) return;
+            setPreviewLog(hydrated);
+            setResults(resultsForLog(hydrated));
+        } catch (error) {
+            console.warn("[canvas-cloud] selected image preview hydration failed", log.id, error);
+        }
     };
 
     const retryDelivery = async (log: GenerationLog) => {
