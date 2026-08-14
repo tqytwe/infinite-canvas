@@ -38,6 +38,7 @@ type AssetStore = {
 
 const ASSET_STORE_KEY = "infinite-canvas:asset_store";
 let managedAssetStorageReady = !isCanvasManagedMode();
+let managedAssetStateDirty = !isCanvasManagedMode();
 
 const assetStorage: PersistStorage<AssetStore> = {
     getItem: async (name) => {
@@ -65,7 +66,10 @@ const assetStorage: PersistStorage<AssetStore> = {
         if (isCanvasManagedMode() && (!managedAssetStorageReady || !isCanvasAuthenticated())) return;
         const serialized = JSON.stringify(value);
         await localForageStorage.setItem(name, serialized);
-        if (isCanvasManagedMode()) void putCloudState("assets", serialized).catch((error) => console.warn("[canvas-cloud] asset save failed", error));
+        if (isCanvasManagedMode() && managedAssetStateDirty) {
+            managedAssetStateDirty = false;
+            void putCloudState("assets", serialized).catch((error) => console.warn("[canvas-cloud] asset save failed", error));
+        }
     },
     removeItem: (name) => localForageStorage.removeItem(name),
 };
@@ -99,6 +103,7 @@ export const useAssetStore = create<AssetStore>()(
             assets: [],
             addAsset: (asset) => {
                 if (!canCanvasWrite()) return "";
+                managedAssetStateDirty = true;
                 const now = new Date().toISOString();
                 const id = nanoid();
                 set((state) => ({ assets: [{ ...asset, id, createdAt: now, updatedAt: now } as Asset, ...state.assets] }));
@@ -106,17 +111,19 @@ export const useAssetStore = create<AssetStore>()(
             },
             updateAsset: (id, patch) =>
                 canCanvasWrite() &&
+                ((managedAssetStateDirty = true),
                 set((state) => ({
                     assets: state.assets.map((asset) => (asset.id === id ? ({ ...asset, ...patch, updatedAt: new Date().toISOString() } as Asset) : asset)),
-                })),
+                }))),
             removeAsset: (id) =>
                 canCanvasWrite() &&
+                ((managedAssetStateDirty = true),
                 set((state) => {
                     const assets = state.assets.filter((asset) => asset.id !== id);
                     get().cleanupImages({ assets });
                     return { assets };
-                }),
-            replaceAssets: (assets) => canCanvasWrite() && set({ assets }),
+                })),
+            replaceAssets: (assets) => canCanvasWrite() && ((managedAssetStateDirty = true), set({ assets })),
             cleanupImages: (extra) => {
                 window.setTimeout(async () => {
                     const { useCanvasStore } = await import("@/stores/canvas/use-canvas-store");

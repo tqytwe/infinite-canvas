@@ -396,15 +396,18 @@ export default function VideoPage() {
     };
 
     const hydrateLogs = async (items: GenerationLog[], refreshId: number) => {
-        try {
-            const hydrated = await Promise.all(items.map((log) => normalizeLog(log, true)));
-            if (refreshId !== logsRefreshIdRef.current) return;
-            const hydratedById = new Map(hydrated.map((log) => [log.id, log]));
-            setLogs((current) => current.map((log) => hydratedById.get(log.id) || log));
-            setPreviewLog((current) => (current ? hydratedById.get(current.id) || current : current));
-        } catch (error) {
-            console.warn("[canvas-cloud] video workbench preview hydration failed", error);
-        }
+        await Promise.all(
+            items.map(async (item) => {
+                try {
+                    const hydrated = await normalizeLog(item, true);
+                    if (refreshId !== logsRefreshIdRef.current) return;
+                    setLogs((current) => current.map((log) => (log.id === hydrated.id ? hydrated : log)));
+                    setPreviewLog((current) => (current?.id === hydrated.id ? hydrated : current));
+                } catch (error) {
+                    console.warn("[canvas-cloud] video workbench preview hydration failed", item.id, error);
+                }
+            }),
+        );
     };
 
     const resumePendingLogs = (items: GenerationLog[]) => {
