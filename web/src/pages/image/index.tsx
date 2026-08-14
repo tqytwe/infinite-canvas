@@ -18,7 +18,7 @@ import { formatBytes, formatDuration } from "@/lib/image-utils";
 import { createManagedImageGenerationTask, isRetryableManagedImageTaskError, pollManagedImageGenerationTask, requestEdit, requestGeneration, type ManagedImageGenerationTask } from "@/services/api/image";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { readCloudWorkbenchLogs, replaceCloudWorkbenchLogs, upsertCloudWorkbenchLog } from "@/services/workbench-cloud";
-import { isCanvasAuthenticated, isCanvasManagedMode, useCanvasCanWrite, useCanvasSessionStore } from "@/services/canvas-cloud";
+import { getCanvasSession, isCanvasAuthenticated, isCanvasManagedMode, useCanvasCanWrite, useCanvasSessionStore } from "@/services/canvas-cloud";
 import { takeImagePromptHandoff } from "@/services/creation-intent";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useWorkbenchAgentStore } from "@/stores/use-workbench-agent-store";
@@ -394,7 +394,8 @@ export default function ImagePage() {
     };
 
     const refreshLogs = async (resumePending = true) => {
-        if (isCanvasManagedMode() && !isCanvasAuthenticated()) {
+        const managedSession = isCanvasManagedMode() ? await getCanvasSession() : null;
+        if (isCanvasManagedMode() && !managedSession?.authenticated) {
             setLogs([]);
             return [];
         }

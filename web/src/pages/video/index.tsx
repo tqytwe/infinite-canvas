@@ -16,7 +16,7 @@ import { boolConfig, isSeedanceVideoConfig, normalizeSeedanceRatio, seedanceRefe
 import { deleteStoredMedia, resolveMediaUrl, uploadMediaFile } from "@/services/file-storage";
 import { resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { readCloudWorkbenchLogs, replaceCloudWorkbenchLogs, upsertCloudWorkbenchLog } from "@/services/workbench-cloud";
-import { isCanvasAuthenticated, isCanvasManagedMode, useCanvasCanWrite, useCanvasSessionStore } from "@/services/canvas-cloud";
+import { getCanvasSession, isCanvasAuthenticated, isCanvasManagedMode, useCanvasCanWrite, useCanvasSessionStore } from "@/services/canvas-cloud";
 import { createVideoGenerationTask, isRetryableVideoTaskError, pollVideoGenerationTask, previewGeneratedVideo, storeGeneratedVideo, type VideoGenerationResult, type VideoGenerationTask } from "@/services/api/video";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useWorkbenchAgentStore } from "@/stores/use-workbench-agent-store";
@@ -364,7 +364,8 @@ export default function VideoPage() {
     };
 
     const refreshLogs = async (resumePending = true) => {
-        if (isCanvasManagedMode() && !isCanvasAuthenticated()) {
+        const managedSession = isCanvasManagedMode() ? await getCanvasSession() : null;
+        if (isCanvasManagedMode() && !managedSession?.authenticated) {
             setLogs([]);
             return [];
         }

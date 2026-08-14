@@ -1,4 +1,4 @@
-import { getCloudState, isCanvasAuthenticated, isCanvasManagedMode, putCloudState } from "@/services/canvas-cloud";
+import { getCanvasSession, getCloudState, isCanvasManagedMode, putCloudState } from "@/services/canvas-cloud";
 
 type WorkbenchState<T> = {
     version: 1;
@@ -9,7 +9,9 @@ type WorkbenchLog = { id?: string };
 const writeQueues = new Map<string, Promise<void>>();
 
 export async function readCloudWorkbenchLogs<T>(domain: "image-workbench" | "video-workbench") {
-    if (!isCanvasManagedMode() || !isCanvasAuthenticated()) return null;
+    if (!isCanvasManagedMode()) return null;
+    const session = await getCanvasSession();
+    if (!session.authenticated) return null;
     const value = await getCloudState(domain);
     if (!value) return null;
     try {
@@ -21,13 +23,17 @@ export async function readCloudWorkbenchLogs<T>(domain: "image-workbench" | "vid
 }
 
 export async function writeCloudWorkbenchLogs<T>(domain: "image-workbench" | "video-workbench", items: T[]) {
-    if (!isCanvasManagedMode() || !isCanvasAuthenticated()) return;
+    if (!isCanvasManagedMode()) return;
+    const session = await getCanvasSession();
+    if (!session.authenticated) return;
     const state: WorkbenchState<T> = { version: 1, items };
     await putCloudState(domain, JSON.stringify(state));
 }
 
 export async function upsertCloudWorkbenchLog<T extends WorkbenchLog>(domain: "image-workbench" | "video-workbench", log: T, fallback: T[] = []) {
-    if (!isCanvasManagedMode() || !isCanvasAuthenticated()) return;
+    if (!isCanvasManagedMode()) return;
+    const session = await getCanvasSession();
+    if (!session.authenticated) return;
     await enqueueWorkbenchWrite(domain, async () => {
         const existing = (await readCloudWorkbenchLogs<T>(domain)) || fallback;
         await writeCloudWorkbenchLogs(domain, [...existing.filter((item) => item.id !== log.id), log]);
@@ -35,7 +41,9 @@ export async function upsertCloudWorkbenchLog<T extends WorkbenchLog>(domain: "i
 }
 
 export async function replaceCloudWorkbenchLogs<T>(domain: "image-workbench" | "video-workbench", items: T[]) {
-    if (!isCanvasManagedMode() || !isCanvasAuthenticated()) return;
+    if (!isCanvasManagedMode()) return;
+    const session = await getCanvasSession();
+    if (!session.authenticated) return;
     await enqueueWorkbenchWrite(domain, () => writeCloudWorkbenchLogs(domain, items));
 }
 
