@@ -5,7 +5,7 @@ import { nanoid } from "nanoid";
 import { localForageStorage } from "@/lib/localforage-storage";
 import { cleanupUnusedImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { cleanupUnusedMedia, resolveMediaUrl } from "@/services/file-storage";
-import { canCanvasWrite, getCloudState, isCanvasAuthenticated, isCanvasManagedMode, putCloudState } from "@/services/canvas-cloud";
+import { canCanvasWrite, getCanvasSession, getCloudState, isCanvasManagedMode, putCloudState } from "@/services/canvas-cloud";
 
 export type AssetKind = "text" | "image" | "video";
 export type TextAsset = AssetBase<"text"> & { data: { content: string } };
@@ -41,7 +41,8 @@ const ASSET_STORE_KEY = "infinite-canvas:asset_store";
 const assetStorage: PersistStorage<AssetStore> = {
     getItem: async (name) => {
         if (isCanvasManagedMode()) {
-            if (!isCanvasAuthenticated()) return null;
+            const session = await getCanvasSession();
+            if (!session.authenticated) return null;
             const cloudValue = await getCloudState("assets");
             if (cloudValue) {
                 await localForageStorage.setItem(name, cloudValue);
