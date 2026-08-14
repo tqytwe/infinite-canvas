@@ -31,6 +31,7 @@ export type CloudUsage = {
 
 let sessionPromise: Promise<CanvasCloudSession> | null = null;
 let session: CanvasCloudSession | null = null;
+let sessionRequestId = 0;
 const CLOUD_STATE_TIMEOUT_MS = 60_000;
 const CLOUD_OBJECT_TIMEOUT_MS = 10 * 60_000;
 
@@ -91,18 +92,29 @@ export async function getCanvasSession(force = false): Promise<CanvasCloudSessio
     if (!CANVAS_MANAGED_MODE) return { authenticated: true };
     if (session && !force) return session;
     if (sessionPromise && !force) return sessionPromise;
-    sessionPromise = fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store" })
+    const requestId = ++sessionRequestId;
+    let request: Promise<CanvasCloudSession>;
+    request = fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store" })
         .then(async (response) => {
             const value = (await response.json().catch(() => ({}))) as CanvasCloudSession;
             if (!response.ok) throw new Error("CANVAS_SESSION_FAILED");
+            // A launch-token exchange can supersede an anonymous request that
+            // was already in flight during the initial render. Let that
+            // request observe the current result instead of restoring stale
+            // anonymous state after authentication succeeds.
+            if (requestId !== sessionRequestId) {
+                if (sessionPromise && sessionPromise !== request) return sessionPromise;
+                return session || value;
+            }
             session = value;
             useCanvasSessionStore.setState({ session: value });
             return value;
         })
         .finally(() => {
-            sessionPromise = null;
+            if (sessionPromise === request) sessionPromise = null;
         });
-    return sessionPromise;
+    sessionPromise = request;
+    return request;
 }
 
 export function currentCanvasSession() {
@@ -118,6 +130,7 @@ export async function exchangeCanvasLaunchToken(token: string) {
     });
     const value = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(value.error || "CANVAS_AUTH_EXCHANGE_FAILED");
+    sessionRequestId += 1;
     session = null;
     useCanvasSessionStore.setState({ session: null, loading: true });
     return getCanvasSession(true);
