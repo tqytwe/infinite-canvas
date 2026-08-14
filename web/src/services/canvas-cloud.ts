@@ -69,7 +69,8 @@ export function isCanvasManagedMode() {
 }
 
 export function isCanvasAuthenticated() {
-    return !CANVAS_MANAGED_MODE || session?.authenticated === true;
+    if (!CANVAS_MANAGED_MODE) return true;
+    return session?.authenticated === true || useCanvasSessionStore.getState().session?.authenticated === true;
 }
 
 export function canCanvasWrite() {
