@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { App } from "antd";
 import { useTranslation } from "react-i18next";
 
-import { createModelChannel, managedWorkspaceConfig, useConfigStore } from "@/stores/use-config-store";
+import { applyManagedWorkspaceConfig, createModelChannel, useConfigStore } from "@/stores/use-config-store";
 import { usePromptSourceScheduler } from "@/hooks/use-prompt-source-scheduler";
 import { CANVAS_MANAGED_MODE } from "@/constant/runtime-config";
 import { exchangeCanvasLaunchToken, getCanvasSession, useCanvasSessionStore } from "@/services/canvas-cloud";
@@ -64,8 +64,8 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
                 const nextSession = await getCanvasSession();
                 if (cancelled) return;
                 setCanvasSession(false).catch(() => undefined);
-                const managed = managedWorkspaceConfig(nextSession.models);
                 if (nextSession.authenticated && nextSession.models) {
+                    const managed = applyManagedWorkspaceConfig(useConfigStore.getState().config, nextSession.models);
                     (Object.keys(managed) as Array<keyof typeof managed>).forEach((key) => {
                         const value = managed[key];
                         if (value !== undefined) updateConfig(key, value as never);

@@ -155,7 +155,7 @@ export function guessCapability(name: string): ModelCapability {
 function findChannelModel(config: AiConfig, value: string): { channel: ModelChannel; model: ChannelModel } | null {
     const decoded = decodeChannelModel(value);
     const name = decoded?.model || value;
-    const channel = decoded ? config.channels.find((item) => item.id === decoded.channelId) : config.channels.find((item) => item.models.some((model) => model.name === name));
+    const channel = decoded ? config.channels.find((item) => item.id === decoded.channelId) || config.channels.find((item) => item.models.some((model) => model.name === name)) : config.channels.find((item) => item.models.some((model) => model.name === name));
     const model = channel?.models.find((item) => item.name === name);
     return channel && model ? { channel, model } : null;
 }
@@ -172,9 +172,11 @@ export function modelMatchesCapability(config: AiConfig, value: string, capabili
 export function resolveModelForCapability(config: AiConfig, currentModel: string | undefined, capability: ModelCapability) {
     const defaultModel = capability === "image" ? config.imageModel : capability === "video" ? config.videoModel : capability === "audio" ? config.audioModel : config.textModel;
     const fallbackModel = capability === "image" ? defaultConfig.imageModel : capability === "video" ? defaultConfig.videoModel : capability === "audio" ? defaultConfig.audioModel : defaultConfig.textModel;
-    if (currentModel && modelMatchesCapability(config, currentModel, capability)) return currentModel;
-    if (defaultModel && modelMatchesCapability(config, defaultModel, capability)) return defaultModel;
-    return fallbackModel;
+    const normalizedCurrent = normalizeModelOptionValue(currentModel, config.channels);
+    const normalizedDefault = normalizeModelOptionValue(defaultModel, config.channels);
+    if (normalizedCurrent && modelMatchesCapability(config, normalizedCurrent, capability)) return normalizedCurrent;
+    if (normalizedDefault && modelMatchesCapability(config, normalizedDefault, capability)) return normalizedDefault;
+    return selectableModelsByCapability(config, capability)[0] || fallbackModel;
 }
 
 export function selectableModelsByCapability(config: AiConfig, capability?: ModelCapability) {
@@ -266,7 +268,7 @@ export function useEffectiveConfig() {
     const session = useCanvasSessionStore((state) => state.session);
     return useMemo(() => {
         if (!isCanvasManagedMode()) return { ...config, channelMode: "local" as const };
-        if (session?.authenticated && session.models) return { ...config, ...managedWorkspaceConfig(session.models), channelMode: "remote" as const };
+        if (session?.authenticated && session.models) return applyManagedWorkspaceConfig(config, session.models);
         return {
             ...config,
             channelMode: "remote" as const,
@@ -363,7 +365,8 @@ export function normalizeModelOptionValue(value: string | undefined, channels: M
     const decoded = decodeChannelModel(model);
     if (decoded) {
         const channel = channels.find((item) => item.id === decoded.channelId);
-        return channel && channel.models.some((item) => item.name === decoded.model) ? model : "";
+        if (channel && channel.models.some((item) => item.name === decoded.model)) return model;
+        return normalizeModelOptionValue(decoded.model, channels);
     }
     const channel = channels.find((item) => item.models.some((entry) => entry.name === model)) || channels[0];
     return channel && channel.models.some((item) => item.name === model) ? encodeChannelModel(channel.id, model) : model;
@@ -471,6 +474,34 @@ export function managedWorkspaceConfig(models: unknown): Partial<AiConfig> {
         textModel: modelFor("text"),
         audioModel: modelFor("audio"),
     };
+}
+
+export function applyManagedWorkspaceConfig(config: AiConfig, models: unknown): AiConfig {
+    const managed = managedWorkspaceConfig(models);
+    const next = { ...config, ...managed, channelMode: "remote" as const } as AiConfig;
+    const imageModel = pickManagedCapabilityModel(next, config.imageModel || config.model, "image", managed.imageModel);
+    const videoModel = pickManagedCapabilityModel(next, config.videoModel || config.model, "video", managed.videoModel);
+    const textModel = pickManagedCapabilityModel(next, config.textModel || config.model, "text", managed.textModel);
+    const audioModel = pickManagedCapabilityModel(next, config.audioModel || config.model, "audio", managed.audioModel);
+    const model = pickManagedModel(next.models, config.model, managed.model) || textModel || imageModel || videoModel || audioModel;
+    return { ...next, model, imageModel, videoModel, textModel, audioModel };
+}
+
+function pickManagedCapabilityModel(config: AiConfig, current: string | undefined, capability: ModelCapability, fallback: string | undefined) {
+    const options = selectableModelsByCapability(config, capability);
+    return pickManagedModel(options, current, fallback) || "";
+}
+
+function pickManagedModel(options: string[], current: string | undefined, fallback: string | undefined) {
+    return matchingModelOption(options, current) || matchingModelOption(options, fallback) || options[0] || "";
+}
+
+function matchingModelOption(options: string[], value: string | undefined) {
+    const model = (value || "").trim();
+    if (!model) return "";
+    if (options.includes(model)) return model;
+    const name = modelOptionName(model);
+    return options.find((option) => modelOptionName(option) === name) || "";
 }
 
 function collectManagedModels(value: unknown): ChannelModel[] {
