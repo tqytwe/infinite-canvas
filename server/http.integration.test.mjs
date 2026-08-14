@@ -317,6 +317,77 @@ test("HTTP platform gateway rewrites async image asset URLs to local proxies", a
     assert.equal(payload.result.data[0].url, "/api/platform/gateway/v1/images/task-assets/images/imgtask_1-0.png");
 });
 
+test("HTTP platform gateway signs external async image asset URLs for same-origin proxying", async (t) => {
+    const dataDir = await mkdtemp(join(tmpdir(), "infinite-canvas-http-platform-signed-assets-"));
+    let assetOrigin = "";
+    const assetServer = createServer((req, res) => {
+        if (req.url === "/image-task-results/images/imgtask_2-0.png") {
+            res.writeHead(200, { "content-type": "image/png" });
+            res.end("png-bytes");
+            return;
+        }
+        res.writeHead(404).end();
+    });
+    await new Promise((resolvePromise) => assetServer.listen(0, "127.0.0.1", resolvePromise));
+    const assetAddress = assetServer.address();
+    assetOrigin = `http://127.0.0.1:${typeof assetAddress === "object" && assetAddress ? assetAddress.port : 0}`;
+
+    const platform = await startPlatformServer((req, res) => {
+        if (req.url === "/v1/images/tasks/imgtask_2") {
+            res.writeHead(200, { "content-type": "application/json" });
+            res.end(
+                JSON.stringify({
+                    task_id: "imgtask_2",
+                    status: "completed",
+                    result: { data: [{ url: `${assetOrigin}/image-task-results/images/imgtask_2-0.png` }] },
+                }),
+            );
+            return;
+        }
+        res.writeHead(404, { "content-type": "application/json" });
+        res.end("{}");
+    });
+    const port = await freePort();
+    const baseUrl = `http://127.0.0.1:${port}`;
+    const child = spawn(process.execPath, ["index.mjs"], {
+        cwd: SERVER_DIR,
+        env: {
+            ...process.env,
+            NODE_ENV: "test",
+            PORT: String(port),
+            STATIC_DIR,
+            CANVAS_DATA_DIR: dataDir,
+            CANVAS_PLATFORM_API_BASE_URL: platform.baseUrl,
+            CANVAS_PLATFORM_WEB_URL: "http://platform.test",
+            CANVAS_EXCHANGE_SECRET: "secret",
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    t.after(async () => {
+        child.kill("SIGTERM");
+        await new Promise((resolvePromise) => child.once("exit", resolvePromise));
+        await new Promise((resolvePromise) => platform.server.close(resolvePromise));
+        await new Promise((resolvePromise) => assetServer.close(resolvePromise));
+        await rm(dataDir, { recursive: true, force: true });
+    });
+
+    await waitForHealth(baseUrl);
+    const token = await createSession(dataDir, 106, "platform-signed");
+    const response = await fetch(`${baseUrl}/api/platform/gateway/v1/images/tasks/imgtask_2`, {
+        headers: { cookie: cookie(token), accept: "application/json" },
+    });
+    assert.equal(response.status, 200);
+    const payload = await responseJson(response);
+    const proxied = payload.result.data[0].url;
+    assert.match(proxied, /^\/api\/platform\/asset-proxy\?url=/);
+    assert.match(proxied, /&expires=\d+&sig=/);
+
+    const asset = await fetch(`${baseUrl}${proxied}`, { headers: { cookie: cookie(token) } });
+    assert.equal(asset.status, 200);
+    assert.equal(await asset.text(), "png-bytes");
+});
+
 test("HTTP platform gateway uses scoped image session for image APIs", async (t) => {
     const dataDir = await mkdtemp(join(tmpdir(), "infinite-canvas-http-platform-image-session-"));
     let imageAuth = "";

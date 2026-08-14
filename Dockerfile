@@ -24,4 +24,6 @@ ENV STATIC_DIR=/app/web-dist \
     CANVAS_DATA_DIR=/data/infinite-canvas \
     CANVAS_MAX_STORAGE_BYTES=30GB
 
+VOLUME ["/data/infinite-canvas"]
+
 CMD ["node", "/app/server/index.mjs"]

@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { mkdir, readFile, readdir, rename, rm, stat, statfs, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
@@ -15,6 +15,7 @@ const MAX_STORAGE_BYTES = parseBytes(process.env.CANVAS_MAX_STORAGE_BYTES, 30 * 
 const MAX_UPLOAD_BYTES = parseBytes(process.env.CANVAS_MAX_UPLOAD_BYTES, 1024 * 1024 * 1024);
 const MAX_STATE_BYTES = parseBytes(process.env.CANVAS_MAX_STATE_BYTES, 256 * 1024 * 1024);
 const MIN_FREE_BYTES = parseBytes(process.env.CANVAS_MIN_FREE_BYTES, 512 * 1024 * 1024);
+const ASSET_PROXY_TTL_SECONDS = Number.parseInt(process.env.CANVAS_ASSET_PROXY_TTL_SECONDS || "86400", 10);
 const SESSION_TTL_SECONDS = Number.parseInt(process.env.CANVAS_SESSION_TTL_SECONDS || "604800", 10);
 const PLATFORM_API_BASE_URL = normalizeOrigin(process.env.CANVAS_PLATFORM_API_BASE_URL || process.env.PLATFORM_API_BASE_URL || "https://api.jisudeng.com");
 const PLATFORM_WEB_URL = normalizeOrigin(process.env.CANVAS_PLATFORM_WEB_URL || process.env.PLATFORM_WEB_URL || "https://www.jisudeng.com");
@@ -323,7 +324,7 @@ async function handlePlatformAssetProxy(req, res, url, method) {
         return;
     }
     const target = url.searchParams.get("url") || "";
-    const parsed = parseProxyableAssetUrl(target);
+    const parsed = parseProxyableAssetUrl(target, verifyAssetProxyRequest(target, url.searchParams));
     if (!parsed) {
         sendJson(res, 400, { ok: false, error: "INVALID_ASSET_PROXY_URL" });
         return;
@@ -389,7 +390,8 @@ function adminDocsPayload() {
                 title: "部署配置",
                 icon: "database",
                 body: [
-                    "容器必须挂载持久卷，并设置 CANVAS_DATA_DIR。当前生产约定为 /data/infinite-canvas，用户文件按 users/<userId> 分目录存放。",
+                    "Zeabur 必须在 infinite-canvas 服务的「硬盘」页挂载持久卷；硬盘 ID 建议使用 data，挂载目录必须设置为 /data/infinite-canvas。不要只依赖容器临时层，否则每次重建都会丢失画布、素材和工作台历史。",
+                    "容器环境变量保持 CANVAS_DATA_DIR=/data/infinite-canvas。用户文件按 users/<userId> 分目录存放，生成结果保存后会写入该目录下的 objects，不以主平台旧图像工作室对象存储作为最终记录。",
                     "CANVAS_MAX_STORAGE_BYTES=30GB 表示全站共享空间上限；健康检查中的 storage.scope=global、storage.max_bytes 表示当前全站容量池。PORT 使用 8080，对外域名为当前 Canvas 域名。",
                 ],
             },
@@ -939,20 +941,20 @@ function rewritePlatformJsonText(text) {
     }
 }
 
-function rewritePlatformJsonValue(value) {
-    if (typeof value === "string") return rewritePlatformUrl(value);
-    if (Array.isArray(value)) return value.map(rewritePlatformJsonValue);
+function rewritePlatformJsonValue(value, key = "") {
+    if (typeof value === "string") return rewritePlatformUrl(value, key);
+    if (Array.isArray(value)) return value.map((item) => rewritePlatformJsonValue(item, key));
     if (!value || typeof value !== "object") return value;
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, rewritePlatformJsonValue(item)]));
+    return Object.fromEntries(Object.entries(value).map(([itemKey, item]) => [itemKey, rewritePlatformJsonValue(item, itemKey)]));
 }
 
-function rewritePlatformUrl(value) {
+function rewritePlatformUrl(value, key = "") {
     if (isPlatformGatewayPath(value)) return `/api/platform/gateway${value}`;
     if (isPlatformImageStudioPath(value)) return value.replace(/^\/api\/v1\/nextchat\/image-studio\//, "/api/platform/image-studio/");
     const platformPath = platformApiPath(value);
     if (platformPath && isPlatformGatewayPath(platformPath)) return `/api/platform/gateway${platformPath}`;
     if (platformPath && isPlatformImageStudioPath(platformPath)) return platformPath.replace(/^\/api\/v1\/nextchat\/image-studio\//, "/api/platform/image-studio/");
-    if (isProxyableAbsoluteAssetUrl(value)) return `/api/platform/asset-proxy?url=${encodeURIComponent(value)}`;
+    if (isProxyableAbsoluteAssetUrl(value) || isLikelyPlatformAssetField(key, value)) return signedAssetProxyUrl(value);
     return value;
 }
 
@@ -981,7 +983,7 @@ function isProxyableAbsoluteAssetUrl(value) {
     return Boolean(parseProxyableAssetUrl(value));
 }
 
-function parseProxyableAssetUrl(value) {
+function parseProxyableAssetUrl(value, allowSigned = false) {
     if (typeof value !== "string" || !/^https?:\/\//i.test(value)) return null;
     let parsed;
     try {
@@ -989,9 +991,60 @@ function parseProxyableAssetUrl(value) {
     } catch {
         return null;
     }
-    if (!PLATFORM_ASSET_PROXY_ORIGINS.has(parsed.origin)) return null;
-    if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && parsed.hostname === "127.0.0.1")) return null;
+    if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && parsed.hostname === "127.0.0.1" && !IS_PRODUCTION)) return null;
+    if (allowSigned && IS_PRODUCTION && isPrivateAssetProxyHost(parsed.hostname)) return null;
+    if (!allowSigned && !PLATFORM_ASSET_PROXY_ORIGINS.has(parsed.origin)) return null;
     return parsed;
+}
+
+function isLikelyPlatformAssetField(key, value) {
+    const field = String(key || "").toLowerCase();
+    if (!["url", "image_url", "thumbnail_url", "download_url", "content_url", "file_url", "uri"].some((name) => field === name || field.endsWith(`_${name}`))) return false;
+    return isLikelyFetchableAssetUrl(value);
+}
+
+function isLikelyFetchableAssetUrl(value) {
+    if (typeof value !== "string") return false;
+    if (!/^https:\/\//i.test(value) && !(!IS_PRODUCTION && /^http:\/\/127\.0\.0\.1(?::\d+)?\//i.test(value))) return false;
+    try {
+        const parsed = new URL(value);
+        const path = parsed.pathname.toLowerCase();
+        return /\.(png|jpe?g|webp|gif|avif|bmp|mp4|mov|webm|mp3|wav|m4a|ogg)$/i.test(path) || path.includes("image-task-results/") || path.includes("image-studio/") || path.includes("/task-assets/") || path.includes("/images/");
+    } catch {
+        return false;
+    }
+}
+
+function signedAssetProxyUrl(value) {
+    const expires = Math.floor(Date.now() / 1000) + Math.max(60, ASSET_PROXY_TTL_SECONDS);
+    return `/api/platform/asset-proxy?url=${encodeURIComponent(value)}&expires=${expires}&sig=${assetProxySignature(value, expires)}`;
+}
+
+function verifyAssetProxyRequest(value, searchParams) {
+    const expires = Number(searchParams.get("expires") || 0);
+    const sig = searchParams.get("sig") || "";
+    if (!Number.isSafeInteger(expires) || expires < Math.floor(Date.now() / 1000)) return false;
+    if (!sig || !EXCHANGE_SECRET) return false;
+    const expected = assetProxySignature(value, expires);
+    try {
+        return timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+    } catch {
+        return false;
+    }
+}
+
+function assetProxySignature(value, expires) {
+    return createHmac("sha256", EXCHANGE_SECRET).update(`${expires}\n${value}`).digest("base64url");
+}
+
+function isPrivateAssetProxyHost(hostname) {
+    const value = String(hostname || "").toLowerCase();
+    if (!value || value === "localhost" || value.endsWith(".local")) return true;
+    if (value === "::1" || value.startsWith("fc") || value.startsWith("fd") || value.startsWith("fe80:")) return true;
+    const match = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(value);
+    if (!match) return false;
+    const [a, b] = match.slice(1).map(Number);
+    return a === 0 || a === 10 || a === 127 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
 }
 
 function parseAllowedOrigins(value, defaults) {

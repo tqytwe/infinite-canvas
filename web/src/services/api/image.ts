@@ -73,9 +73,12 @@ type ResponseStreamState = { buffer: string; text: string; payload?: ResponseApi
 
 type ImageApiResponse = {
     data?: Array<Record<string, unknown>>;
+    images?: Array<Record<string, unknown>>;
+    results?: Array<Record<string, unknown>>;
     error?: { message?: string };
     code?: number;
     msg?: string;
+    [key: string]: unknown;
 };
 type ManagedImageTaskResponse = {
     id?: string;
@@ -86,11 +89,20 @@ type ManagedImageTaskResponse = {
     error?: { message?: string } | string;
     msg?: string;
     message?: string;
-    result?: ImageApiResponse;
+    result?: unknown;
     data?: Array<Record<string, unknown>>;
     image_url?: string;
     http_status?: number;
 };
+export type ManagedImageGenerationTask = {
+    id: string;
+    pollUrl?: string;
+    model: string;
+};
+export type ManagedImageGenerationTaskState =
+    | { status: "pending" }
+    | { status: "completed"; images: Array<{ id: string; dataUrl: string }> }
+    | { status: "failed"; error: string };
 type GeminiPart = {
     text?: string;
     inlineData?: { mimeType?: string; data?: string };
@@ -258,15 +270,13 @@ function resolveImageDataUrl(item: Record<string, unknown>) {
     return null;
 }
 
-function parseImagePayload(payload: ImageApiResponse) {
+function parseImagePayload(value: unknown) {
+    const payload = unwrapImagePayload(value);
     if (typeof payload.code === "number" && payload.code !== 0) {
         throw new Error(payload.msg || apiText("requestFailed"));
     }
     // Support data, images, and results response fields used by different APIs.
-    const imageList = payload.data
-        || (payload as Record<string, unknown>).images as Array<Record<string, unknown>> | undefined
-        || (payload as Record<string, unknown>).results as Array<Record<string, unknown>> | undefined
-        || [];
+    const imageList = payload.data || payload.images || payload.results || [];
     const images =
         imageList
             .map(resolveImageDataUrl)
@@ -282,6 +292,20 @@ function parseImagePayload(payload: ImageApiResponse) {
     }
 
     return images;
+}
+
+function unwrapImagePayload(value: unknown): ImageApiResponse {
+    if (Array.isArray(value)) return { data: value as Array<Record<string, unknown>> };
+    if (!value || typeof value !== "object") return {};
+    const record = value as Record<string, unknown>;
+    if (Array.isArray(record.data) || Array.isArray(record.images) || Array.isArray(record.results)) return record as ImageApiResponse;
+    for (const key of ["result", "output", "response", "payload", "data"]) {
+        const nested = record[key];
+        if (!nested || typeof nested !== "object") continue;
+        const payload = unwrapImagePayload(nested);
+        if (payload.data?.length || payload.images?.length || payload.results?.length) return payload;
+    }
+    return record as ImageApiResponse;
 }
 
 function readApiErrorMessage(value: unknown): string {
@@ -729,6 +753,12 @@ function parseGeminiImagePayload(payload: GeminiPayload) {
 }
 
 async function requestManagedImageGeneration(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions) {
+    const task = await createManagedImageGenerationTask(config, prompt, references, options);
+    if (!task) return null;
+    return pollManagedImageTask(resolveModelRequestConfig(config, task.model), task, options);
+}
+
+export async function createManagedImageGenerationTask(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions): Promise<ManagedImageGenerationTask | null> {
     if (!isCanvasManagedMode() || !isCanvasAuthenticated()) return null;
     const requestConfig = resolveModelRequestConfig(config, config.model || config.imageModel);
     if (resolveModelScript(config, config.model || config.imageModel) || requestConfig.apiFormat !== "openai") return null;
@@ -743,7 +773,11 @@ async function requestManagedImageGeneration(config: AiConfig, prompt: string, r
     const response = references.length
         ? await submitManagedImageEdit(url, requestConfig, requestPrompt, references, { quality, requestSize, background, n, idempotencyKey, signal: options?.signal })
         : await submitManagedImageGeneration(url, requestConfig, requestPrompt, { quality, requestSize, background, n, idempotencyKey, signal: options?.signal });
-    return pollManagedImageTask(requestConfig, response, options);
+    return {
+        id: response.task_id || response.id || "",
+        pollUrl: response.poll_url,
+        model: requestConfig.model,
+    };
 }
 
 async function submitManagedImageGeneration(
@@ -809,24 +843,35 @@ async function readManagedTaskResponse(response: Response) {
     return payload;
 }
 
-async function pollManagedImageTask(config: AiConfig, task: ManagedImageTaskResponse, options?: RequestOptions) {
-    const pollPath = task.poll_url || `/v1/images/tasks/${encodeURIComponent(task.task_id || task.id || "")}`;
-    const pollUrl = managedGatewayUrl(config, pollPath);
+async function pollManagedImageTask(config: AiConfig, task: ManagedImageGenerationTask, options?: RequestOptions) {
     for (let attempt = 0; attempt < 160; attempt += 1) {
-        if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
-        const response = await fetch(pollUrl, {
-            headers: { ...aiHeaders(config), Accept: "application/json" },
-            signal: options?.signal,
-        });
-        const state = (await response.json().catch(() => ({}))) as ManagedImageTaskResponse;
-        if (!response.ok) throw new Error(readApiErrorMessage(state) || readStatusError(response.status, apiText("requestFailed")));
-        const status = String(state.status || "").toLowerCase();
-        if (status === "completed" || status === "succeeded" || state.result || state.data || state.image_url) return parseManagedImageResult(state);
-        if (status === "failed" || status === "cancelled" || status === "expired") throw new Error(readApiErrorMessage(state) || apiText("requestFailed"));
-        const retryAfter = Number(response.headers.get("retry-after") || state.retry_after || 0);
-        await delay(Math.min(8000, Math.max(1500, Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 3000)), options?.signal);
+        const state = await pollManagedImageGenerationTask(config, task, options);
+        if (state.status === "completed") return state.images;
+        if (state.status === "failed") throw new Error(state.error);
+        if (attempt === 159) break;
+        await delay(3000, options?.signal);
     }
     throw new Error(apiText("requestFailed"));
+}
+
+export async function pollManagedImageGenerationTask(config: AiConfig, task: ManagedImageGenerationTask, options?: RequestOptions): Promise<ManagedImageGenerationTaskState> {
+    const pollPath = task.pollUrl || `/v1/images/tasks/${encodeURIComponent(task.id)}`;
+    const pollUrl = managedGatewayUrl(config, pollPath);
+    if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const response = await fetch(pollUrl, {
+        headers: { ...aiHeaders(config), Accept: "application/json" },
+        signal: options?.signal,
+    });
+    const state = (await response.json().catch(() => ({}))) as ManagedImageTaskResponse;
+    if (!response.ok) throw new Error(readApiErrorMessage(state) || readStatusError(response.status, apiText("requestFailed")));
+    const status = String(state.status || "").toLowerCase();
+    if (status === "completed" || status === "succeeded" || state.result || state.data || state.image_url) {
+        return { status: "completed", images: parseManagedImageResult(state, config) };
+    }
+    if (status === "failed" || status === "cancelled" || status === "expired") {
+        return { status: "failed", error: readApiErrorMessage(state) || apiText("requestFailed") };
+    }
+    return { status: "pending" };
 }
 
 function managedGatewayUrl(config: AiConfig, value: string) {
@@ -842,9 +887,17 @@ function managedGatewayUrl(config: AiConfig, value: string) {
     return buildApiUrl(config.baseUrl, value.replace(/^\/v1/, ""));
 }
 
-function parseManagedImageResult(state: ManagedImageTaskResponse) {
+function parseManagedImageResult(state: ManagedImageTaskResponse, config: AiConfig) {
     const payload = state.result || { data: state.data || (state.image_url ? [{ url: state.image_url }] : []) };
-    return parseImagePayload(payload);
+    return parseImagePayload(payload).map((image) => ({
+        ...image,
+        dataUrl: normalizeManagedImageUrl(config, image.dataUrl),
+    }));
+}
+
+function normalizeManagedImageUrl(config: AiConfig, value: string) {
+    if (value.startsWith("data:") || value.startsWith("/api/platform/")) return value;
+    return managedGatewayUrl(config, value);
 }
 
 function delay(ms: number, signal?: AbortSignal) {
