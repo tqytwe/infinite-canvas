@@ -74,6 +74,13 @@ type GenerationLogConfig = Pick<AiConfig, "model" | "imageModel" | "quality" | "
 
 type UpdateAiConfig = <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
 
+function resultsForLog(log: GenerationLog): GenerationResult[] {
+    if (log.status === "pending" && log.task) {
+        return Array.from({ length: Math.max(1, Number(log.config.count) || log.imageCount || 1) }, () => ({ id: nanoid(), status: "pending" }));
+    }
+    return log.images.map((image) => ({ id: image.id, status: "success" as const, image }));
+}
+
 const LOG_STORE_KEY = "infinite-canvas:image_generation_logs";
 const RESULT_ACTION_BUTTON_CLASS = "min-w-0 px-1.5 [&_.ant-btn-icon]:shrink-0 [&>span:last-child]:min-w-0 [&>span:last-child]:truncate";
 const logStore = localforage.createInstance({ name: "infinite-canvas", storeName: "image_generation_logs" });
@@ -432,7 +439,10 @@ export default function ImagePage() {
                     const hydrated = await normalizeLog(item, true);
                     if (refreshId !== logsRefreshIdRef.current) return;
                     setLogs((current) => current.map((log) => (log.id === hydrated.id ? hydrated : log)));
-                    setPreviewLog((current) => (current?.id === hydrated.id ? hydrated : current));
+                    if (currentLogIdRef.current === hydrated.id) {
+                        setPreviewLog(hydrated);
+                        if (!activeLogIdsRef.current.has(hydrated.id)) setResults(resultsForLog(hydrated));
+                    }
                 } catch (error) {
                     console.warn("[canvas-cloud] image workbench preview hydration failed", item.id, error);
                 }
@@ -584,11 +594,7 @@ export default function ImagePage() {
         if (log.config.quality) updateConfig("quality", log.config.quality);
         if (log.config.size) updateConfig("size", log.config.size);
         if (log.config.count) updateConfig("count", log.config.count);
-        setResults(
-            log.status === "pending" && log.task
-                ? Array.from({ length: Math.max(1, Number(log.config.count) || log.imageCount || 1) }, () => ({ id: nanoid(), status: "pending" }))
-                : log.images.map((image) => ({ id: image.id, status: "success", image })),
-        );
+        setResults(resultsForLog(log));
     };
 
     const retryDelivery = async (log: GenerationLog) => {
