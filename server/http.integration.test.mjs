@@ -273,6 +273,7 @@ test("HTTP platform gateway rewrites async image asset URLs to local proxies", a
                 JSON.stringify({
                     task_id: "imgtask_1",
                     status: "completed",
+                    poll_url: "/v1/images/tasks/imgtask_1",
                     image_url: "/v1/images/task-assets/images/imgtask_1-0.png",
                     result: { data: [{ url: "/v1/images/task-assets/images/imgtask_1-0.png" }] },
                 }),
@@ -313,6 +314,7 @@ test("HTTP platform gateway rewrites async image asset URLs to local proxies", a
     });
     assert.equal(response.status, 200);
     const payload = await responseJson(response);
+    assert.equal(payload.poll_url, "/api/platform/gateway/v1/images/tasks/imgtask_1");
     assert.equal(payload.image_url, "/api/platform/gateway/v1/images/task-assets/images/imgtask_1-0.png");
     assert.equal(payload.result.data[0].url, "/api/platform/gateway/v1/images/task-assets/images/imgtask_1-0.png");
 });

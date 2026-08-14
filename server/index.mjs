@@ -974,7 +974,7 @@ function platformApiPath(value) {
 function isPlatformGatewayPath(value) {
     return (
         typeof value === "string" &&
-        (/^\/v1\/images\/task-assets\/[A-Za-z0-9._~!$&'()*+,;=:@/%-]+$/.test(value) ||
+        (/^\/v1\/images\/(?:tasks|task-assets)\/[A-Za-z0-9._~!$&'()*+,;=:@/%-]+$/.test(value) ||
             /^\/v1\/videos\/[A-Za-z0-9._~!$&'()*+,;=:@/%-]+\/(?:content|download)(?:[/?#].*)?$/.test(value) ||
             /^\/v1\/contents\/generations\/tasks\/[A-Za-z0-9._~!$&'()*+,;=:@/%-]+\/(?:content|download)(?:[/?#].*)?$/.test(value))
     );
