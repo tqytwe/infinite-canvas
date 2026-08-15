@@ -715,6 +715,10 @@ async function proxyRequest(req, res, target, extraHeaders, options = {}) {
     const headers = { ...req.headers, ...extraHeaders };
     delete headers.host;
     delete headers.cookie;
+    // Node's fetch does not decode every browser-advertised encoding (notably
+    // zstd). Keep gateway JSON parseable instead of forwarding a compressed
+    // upstream body after stripping its content-encoding header.
+    headers["accept-encoding"] = "identity";
     const upstream = await fetch(target, {
         method: req.method,
         headers,

@@ -273,8 +273,10 @@ test("HTTP storage preserves state-referenced objects during LRU cleanup", async
 
 test("HTTP platform gateway rewrites async image asset URLs to local proxies", async (t) => {
     const dataDir = await mkdtemp(join(tmpdir(), "infinite-canvas-http-platform-"));
+    let platformAcceptEncoding = "";
     const platform = await startPlatformServer((req, res) => {
         if (req.url === "/v1/images/tasks/imgtask_1") {
+            platformAcceptEncoding = String(req.headers["accept-encoding"] || "");
             res.writeHead(200, { "content-type": "application/json" });
             res.end(
                 JSON.stringify({
@@ -321,6 +323,7 @@ test("HTTP platform gateway rewrites async image asset URLs to local proxies", a
     });
     assert.equal(response.status, 200);
     const payload = await responseJson(response);
+    assert.equal(platformAcceptEncoding, "identity");
     assert.equal(payload.poll_url, "/api/platform/gateway/v1/images/tasks/imgtask_1");
     assert.equal(payload.image_url, "/api/platform/gateway/v1/images/task-assets/images/imgtask_1-0.png");
     assert.equal(payload.result.data[0].url, "/api/platform/gateway/v1/images/task-assets/images/imgtask_1-0.png");
