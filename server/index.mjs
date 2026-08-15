@@ -137,6 +137,10 @@ async function handleApi(req, res, url, method) {
         return;
     }
 
+    if (url.pathname === "/api/storage/ingest" && method === "POST") {
+        await handleStorageIngest(req, res, session);
+        return;
+    }
     const objectMatch = url.pathname.match(/^\/api\/storage\/objects\/([^/]+)$/);
     if (objectMatch) {
         await handleObject(req, res, decodeURIComponent(objectMatch[1]), method, session);
@@ -536,6 +540,93 @@ function adminDocsPayload() {
             },
         ],
     };
+}
+
+/** Server-side image ingest: fetch a CDN/platform URL on the server (intranet speed)
+ *  and persist it directly to user storage. This replaces the previous pattern of
+ *  having the browser fetch → upload, which was slow and subject to tab-close timeouts. */
+async function handleStorageIngest(req, res, session) {
+    const body = await readJson(req, 4 * 1024);
+    const rawUrl = String(body?.url || "").trim();
+    if (!rawUrl) { sendJson(res, 400, { ok: false, error: "URL_REQUIRED" }); return; }
+
+    // Support both a raw CDN URL and a signed proxy URL (/api/platform/asset-proxy?url=...)
+    let cdnUrl = rawUrl;
+    if (rawUrl.startsWith("/api/platform/asset-proxy?") || rawUrl.includes("/api/platform/asset-proxy?")) {
+        try {
+            const qmark = rawUrl.indexOf("?");
+            const params = new URLSearchParams(qmark >= 0 ? rawUrl.slice(qmark + 1) : "");
+            cdnUrl = params.get("url") || "";
+        } catch { cdnUrl = ""; }
+    }
+    const parsed = cdnUrl ? parseProxyableAssetUrl(cdnUrl) : null;
+    if (!parsed) { sendJson(res, 400, { ok: false, error: "INVALID_INGEST_URL" }); return; }
+
+    const storageKey = String(body?.storageKey || `image:${randomBytes(16).toString("hex")}`).trim();
+    try { validateStorageKey(storageKey); } catch { sendJson(res, 400, { ok: false, error: "INVALID_STORAGE_KEY" }); return; }
+
+    // Fetch from platform CDN server-side (intranet — fast and reliable)
+    let upstream;
+    try {
+        upstream = await fetch(parsed.toString(), {
+            headers: { accept: "image/*,*/*" },
+            signal: AbortSignal.timeout(10 * 60_000),
+        });
+    } catch (err) {
+        sendJson(res, 502, { ok: false, error: "INGEST_FETCH_FAILED", detail: String(err) }); return;
+    }
+    if (!upstream.ok) {
+        sendJson(res, 502, { ok: false, error: `INGEST_UPSTREAM_${upstream.status}` }); return;
+    }
+    const contentType = sanitizeMimeType(upstream.headers.get("content-type") || "image/png");
+
+    // Buffer the body (images are typically 1–10 MB, fine for memory)
+    const chunks = [];
+    let totalBytes = 0;
+    try {
+        for await (const chunk of upstream.body) {
+            const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+            chunks.push(buf);
+            totalBytes += buf.length;
+            if (totalBytes > MAX_UPLOAD_BYTES) {
+                sendJson(res, 413, { ok: false, error: "UPLOAD_TOO_LARGE" }); return;
+            }
+        }
+    } catch (err) {
+        sendJson(res, 502, { ok: false, error: "INGEST_STREAM_FAILED", detail: String(err) }); return;
+    }
+    const data = Buffer.concat(chunks);
+    const userId = session.userId;
+
+    await withStorageLock(async () => {
+        const tempName = `.ingest-${randomBytes(12).toString("hex")}`;
+        const tempPath = join(userDir(userId), tempName);
+        try {
+            await mkdir(userDir(userId), { recursive: true, mode: 0o700 });
+            await writeFile(tempPath, data, { mode: 0o600 });
+            const metadata = await readMetadata(userId);
+            const existing = metadata.objects[storageKey];
+            const fileName = existing?.path || join("objects", `${sha256(storageKey)}${extensionForMime(contentType)}`);
+            const delta = data.length - (existing?.bytes || 0);
+            await ensureCapacity(userId, metadata, delta, storageKey);
+            await mkdir(join(userDir(userId), "objects"), { recursive: true, mode: 0o700 });
+            await rename(tempPath, join(userDir(userId), fileName));
+            metadata.objects[storageKey] = {
+                storageKey,
+                path: fileName,
+                kind: "file",
+                bytes: data.length,
+                mimeType: contentType,
+                createdAt: existing?.createdAt || new Date().toISOString(),
+                lastAccessedAt: new Date().toISOString(),
+                pinned: false,
+            };
+            await writeMetadata(userId, metadata);
+            sendJson(res, 200, { ok: true, storage_key: storageKey, bytes: data.length, mime_type: contentType, ...(await getUsage(userId)) });
+        } finally {
+            await rm(tempPath, { force: true });
+        }
+    });
 }
 
 async function handleObject(req, res, storageKey, method, session) {
