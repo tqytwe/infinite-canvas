@@ -610,6 +610,12 @@ export default function ImagePage() {
             if (currentLogIdRef.current !== hydrated.id || activeLogIdsRef.current.has(hydrated.id)) return;
             setPreviewLog(hydrated);
             setResults(resultsForLog(hydrated));
+            // Auto-retry cloud upload in background if a previous upload timed out.
+            if (log.deliveryStatus === "pending" && !activeLogIdsRef.current.has(hydrated.id)) {
+                retryDelivery(hydrated).catch((e) =>
+                    console.warn("[canvas-cloud] auto-retry delivery failed", hydrated.id, e),
+                );
+            }
         } catch (error) {
             console.warn("[canvas-cloud] selected image preview hydration failed", log.id, error);
         }

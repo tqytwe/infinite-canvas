@@ -21,7 +21,7 @@ const store = localforage.createInstance({ name: "infinite-canvas", storeName: "
 const imageLogStore = localforage.createInstance({ name: "infinite-canvas", storeName: "image_generation_logs" });
 const videoLogStore = localforage.createInstance({ name: "infinite-canvas", storeName: "video_generation_logs" });
 const objectUrls = new Map<string, string>();
-const CLOUD_SAVE_WAIT_MS = 3000;
+const CLOUD_SAVE_WAIT_MS = 30_000; // large images (2-10 MB) need > 3 s to upload
 
 export async function uploadImage(input: string | Blob): Promise<UploadedImage> {
     if (isCanvasManagedMode()) await requireCanvasWriteAccess();
