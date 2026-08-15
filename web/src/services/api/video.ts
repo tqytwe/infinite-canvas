@@ -2,7 +2,6 @@ import axios from "axios";
 import { nanoid } from "nanoid";
 
 import i18n from "@/i18n";
-import { dataUrlToFile } from "@/lib/image-utils";
 import { getMediaBlob, uploadMediaFile, type UploadedFile } from "@/services/file-storage";
 import { imageToDataUrl } from "@/services/image-storage";
 import { boolConfig, buildSeedancePromptText, isSeedanceVideoConfig, normalizeSeedanceDuration, normalizeSeedanceRatio, normalizeSeedanceResolution, seedanceVideoReferenceError, SEEDANCE_REFERENCE_LIMITS } from "@/lib/seedance-video";
@@ -40,7 +39,7 @@ type RequestOptions = { signal?: AbortSignal };
 const apiText = (key: string, options?: Record<string, unknown>) => i18n.t(`apiErrors.${key}`, options);
 
 export type VideoGenerationResult = { blob?: Blob; url?: string; mimeType?: string };
-export type VideoGenerationProvider = "openai" | "agnes" | "grok" | "seedance" | "plugin";
+export type VideoGenerationProvider = "openai" | "agnes" | "grok" | "seedance" | "seedance-openai" | "plugin";
 export type VideoGenerationTask = { id: string; provider: VideoGenerationProvider; model: string };
 export type VideoGenerationTaskState = { status: "pending" } | { status: "completed"; result: VideoGenerationResult } | { status: "failed"; error: string };
 
@@ -91,10 +90,11 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
     if (isSeedanceVideoConfig(requestConfig)) {
         return createSeedanceTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
     }
+    const provider = videoProviderForModel(selectedModel, requestConfig.apiFormat);
+    if (provider === "seedance-openai") return createSeedanceOpenAIVideoTask(requestConfig, selectedModel, prompt, references, videoReferences, audioReferences, options);
     if (videoReferences.length || audioReferences.length) {
         throw new Error(apiText("videoReferencesUnsupported"));
     }
-    const provider = videoProviderForModel(selectedModel, requestConfig.apiFormat);
     if (provider === "agnes") return createAgnesVideoTask(requestConfig, selectedModel, prompt, references, options);
     if (provider === "grok") return createGrokVideoTask(requestConfig, selectedModel, prompt, references, options);
     return createOpenAIVideoTask(requestConfig, selectedModel, prompt, references, options);
@@ -107,6 +107,7 @@ export function selectVideoModel(config: Pick<AiConfig, "model" | "videoModel">)
 export function videoProviderForModel(model: string, apiFormat: AiConfig["apiFormat"] = "openai"): Exclude<VideoGenerationProvider, "plugin"> {
     if (apiFormat === "ark") return "seedance";
     const normalized = modelOptionName(model).trim().toLowerCase();
+    if (isSeedanceOpenAIModel(normalized)) return "seedance-openai";
     if (normalized.startsWith("agnes-") || normalized === "agnes") return "agnes";
     if (normalized.startsWith("grok-") || normalized === "grok") return "grok";
     return "openai";
@@ -120,6 +121,7 @@ export async function pollVideoGenerationTask(config: AiConfig, task: VideoGener
     const requestConfig = resolveModelRequestConfig(config, task.model);
     assertVideoConfig(requestConfig, requestConfig.model);
     if (task.provider === "seedance") return pollSeedanceTask(requestConfig, task, options);
+    if (task.provider === "seedance-openai") return pollOpenAIVideoTask(requestConfig, task, options);
     if (task.provider === "agnes") return pollAgnesVideoTask(requestConfig, task, options);
     if (task.provider === "grok") return pollGrokVideoTask(requestConfig, task, options);
     return pollOpenAIVideoTask(requestConfig, task, options);
@@ -292,6 +294,40 @@ async function createGrokVideoTask(config: AiConfig, model: string, prompt: stri
     }
 }
 
+async function createSeedanceOpenAIVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[], options?: RequestOptions): Promise<VideoGenerationTask> {
+    if (audioReferences.length && !references.length && !videoReferences.length) {
+        throw new Error(apiText("seedanceAudioRequiresVisual"));
+    }
+    assertSeedanceVideoReferences(videoReferences);
+    assertSeedanceAudioReferences(audioReferences);
+    const content = await buildOpenAISeedanceContent(config, prompt, references, videoReferences, audioReferences);
+    if (!content.prompt && !content.content?.length) throw new Error(apiText("videoPromptRequired"));
+    const payload = {
+        model: modelOptionName(model),
+        size: normalizeVideoSize(config.size) || "1280x720",
+        seconds: String(normalizeOpenAISeedanceSeconds(config.videoSeconds)),
+        resolution: normalizeOpenAISeedanceResolution(config.vquality),
+        generate_audio: boolConfig(config.videoGenerateAudio, true),
+        ...(content.content?.length ? { content: content.content } : { prompt: content.prompt }),
+    };
+    try {
+        const created = unwrapVideoResponse(
+            (
+                await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), payload, {
+                    headers: aiHeaders(config, "application/json"),
+                    signal: options?.signal,
+                    timeout: 30_000,
+                })
+            ).data,
+        );
+        const id = videoTaskId(created);
+        if (!id) throw new Error(apiText("noVideoTaskId"));
+        return { id, provider: "seedance-openai", model };
+    } catch (error) {
+        throw readAxiosError(error, apiText("seedanceTaskCreateFailed"));
+    }
+}
+
 async function pollGrokVideoTask(config: AiConfig, task: VideoGenerationTask, options?: RequestOptions): Promise<VideoGenerationTaskState> {
     try {
         const response = await axios.get<ApiVideoResponse>(aiApiUrl(config, `/videos/${encodeURIComponent(task.id)}`), {
@@ -315,20 +351,19 @@ async function pollGrokVideoTask(config: AiConfig, task: VideoGenerationTask, op
 }
 
 async function createOpenAIVideoTask(config: AiConfig, model: string, prompt: string, references: ReferenceImage[], options?: RequestOptions): Promise<VideoGenerationTask> {
-    const body = new FormData();
-    body.append("model", modelOptionName(model));
-    body.append("prompt", prompt);
-    body.append("seconds", normalizeVideoSeconds(config.videoSeconds));
-    if (normalizeVideoSize(config.size)) body.append("size", normalizeVideoSize(config.size)!);
-    body.append("resolution_name", normalizeVideoResolution(config.vquality));
-    body.append("preset", "normal");
-    const files = await Promise.all(references.slice(0, 7).map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
-    files.forEach((file) => body.append("input_reference[]", file));
+    const images = await Promise.all(references.slice(0, 2).map((image) => imageToDataUrl(image)));
+    const payload = {
+        model: modelOptionName(model),
+        prompt: withSystemPrompt(config, prompt),
+        duration: normalizeOpenAIVideoDuration(config.videoSeconds),
+        ...(normalizeVideoSize(config.size) ? { size: normalizeVideoSize(config.size)! } : {}),
+        ...(images.length ? { images } : {}),
+    };
     try {
         const created = unwrapVideoResponse(
             (
-                await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), body, {
-                    headers: aiHeaders(config),
+                await axios.post<ApiVideoResponse>(aiApiUrl(config, "/videos"), payload, {
+                    headers: aiHeaders(config, "application/json"),
                     signal: options?.signal,
                     timeout: 30_000,
                 })
@@ -464,6 +499,25 @@ async function buildSeedanceContent(config: AiConfig, prompt: string, references
     return content;
 }
 
+async function buildOpenAISeedanceContent(config: AiConfig, prompt: string, references: ReferenceImage[], videoReferences: ReferenceVideo[], audioReferences: ReferenceAudio[]) {
+    if (!references.length && !videoReferences.length && !audioReferences.length) {
+        return { prompt: withSystemPrompt(config, prompt) };
+    }
+    const content: Array<Record<string, unknown>> = [];
+    const text = buildSeedancePromptText(withSystemPrompt(config, prompt), references, videoReferences, audioReferences);
+    if (text) content.push({ type: "text", text });
+    for (const image of references.slice(0, 30)) {
+        content.push({ type: "image_url", image_url: { url: await resolveSeedanceImageUrl(config, image) } });
+    }
+    for (const video of videoReferences.slice(0, 10)) {
+        content.push({ type: "video_url", video_url: { url: await resolveSeedanceVideoUrl(video) } });
+    }
+    for (const audio of audioReferences.slice(0, 10)) {
+        content.push({ type: "audio_url", audio_url: { url: await resolveSeedanceAudioUrl(audio) } });
+    }
+    return { content };
+}
+
 async function resolveSeedanceImageUrl(config: AiConfig, image: ReferenceImage) {
     const directUrl = image.url || image.dataUrl;
     if (isPublicMediaUrl(directUrl) || directUrl.startsWith("asset://")) return directUrl;
@@ -517,6 +571,21 @@ function assertVideoConfig(config: AiConfig, model: string) {
 function normalizeVideoSeconds(value: string) {
     const seconds = Math.floor(Number(value) || 6);
     return String(Math.max(1, Math.min(20, seconds)));
+}
+
+function normalizeOpenAIVideoDuration(value: string) {
+    const seconds = Math.floor(Number(value) || 8);
+    return [4, 6, 8].reduce((best, option) => (Math.abs(option - seconds) < Math.abs(best - seconds) ? option : best), 8);
+}
+
+function normalizeOpenAISeedanceSeconds(value: string) {
+    const seconds = Math.floor(Number(value) || 4);
+    return Math.max(4, Math.min(30, seconds));
+}
+
+function normalizeOpenAISeedanceResolution(value: string) {
+    const resolution = normalizeVideoResolution(value);
+    return resolution === "480p" ? "480p" : "720p";
 }
 
 function normalizeVideoSize(value: string) {
@@ -619,10 +688,14 @@ function isVideoFailureStatus(value: string) {
 }
 
 function videoProviderLabel(provider: VideoGenerationProvider) {
-    if (provider === "seedance") return "Seedance ";
+    if (provider === "seedance" || provider === "seedance-openai") return "Seedance ";
     if (provider === "agnes") return "Agnes ";
     if (provider === "grok") return "Grok ";
     return "";
+}
+
+function isSeedanceOpenAIModel(model: string) {
+    return /^seedance[-_ ]?2(?:\.|_)?5(?:$|[-_ :])/.test(model) || model === "seedance2.5";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
