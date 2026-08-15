@@ -215,9 +215,11 @@ async function handleExchange(req, res) {
     const data = payload?.data || payload;
     const chatData = data?.sessions?.chat && typeof data.sessions.chat === "object" ? data.sessions.chat : data;
     const imageData = data?.sessions?.image && typeof data.sessions.image === "object" ? data.sessions.image : null;
+    const videoData = data?.sessions?.video && typeof data.sessions.video === "object" ? data.sessions.video : null;
     const userId = Number(chatData?.user_id || data?.user_id);
     const chatSession = parsePlatformGatewaySession(chatData, "chat");
     const imageSession = parsePlatformGatewaySession(imageData, "image");
+    const videoSession = parsePlatformGatewaySession(videoData, "video");
     if (!upstream.ok || !chatSession || !Number.isSafeInteger(userId) || userId <= 0) {
         sendJson(res, upstream.status || 502, { ok: false, error: payload?.message || payload?.msg || "PLATFORM_AUTH_EXCHANGE_FAILED" });
         return;
@@ -234,6 +236,7 @@ async function handleExchange(req, res) {
         sessions: {
             chat: chatSession,
             ...(imageSession ? { image: imageSession } : {}),
+            ...(videoSession ? { video: videoSession } : {}),
         },
         isAdmin: isAdminPayload(data?.user) || isAdminPayload(data) || ADMIN_USER_IDS.has(userId),
         createdAt: now.toISOString(),
@@ -1282,7 +1285,10 @@ function gatewaySessionForPurpose(session, purpose) {
 
 function gatewaySessionForPath(session, suffix) {
     const path = String(suffix || "").toLowerCase();
-    if (path.startsWith("/v1/images/") || path === "/v1/videos" || path.startsWith("/v1/videos/") || path === "/v1/agnesapi" || path.startsWith("/v1/contents/generations/")) return gatewaySessionForPurpose(session, "image");
+    if (path.startsWith("/v1/images/") || path.startsWith("/v1/contents/generations/")) return gatewaySessionForPurpose(session, "image");
+    // Video paths use a dedicated video session if available; fall back to the main (chat)
+    // session — NOT the image session, which may not have video models configured.
+    if (path === "/v1/videos" || path.startsWith("/v1/videos/") || path === "/v1/agnesapi") return gatewaySessionForPurpose(session, "video");
     return gatewaySessionForPurpose(session, "chat");
 }
 
