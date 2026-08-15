@@ -1379,7 +1379,7 @@ function gatewaySessionForPath(session, suffix) {
     if (path.startsWith("/v1/images/") || path.startsWith("/v1/contents/generations/")) return gatewaySessionForPurpose(session, "image");
     // Video paths use a dedicated video session if available; fall back to the main (chat)
     // session — NOT the image session, which may not have video models configured.
-    if (path === "/v1/videos" || path.startsWith("/v1/videos/") || path === "/v1/agnesapi") return gatewaySessionForPurpose(session, "video");
+    if (path === "/v1/videos" || path.startsWith("/v1/videos/") || path === "/v1/agnesapi" || path.startsWith("/v1/contents/")) return gatewaySessionForPurpose(session, "video");
     return gatewaySessionForPurpose(session, "chat");
 }
 
