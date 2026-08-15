@@ -210,6 +210,7 @@ export default {
         resultTitle: "生成视频",
         source: "视频创作台",
         empty: "还没有生成视频",
+        accountGroup: "账号分组",
     },
     canvas: {
         defaultTitle: "AI创作空间 {{count}}",

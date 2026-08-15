@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowRight, BookOpen, CheckSquare, ClipboardPaste, Download, FolderPlus, History, LoaderCircle, Music2, Plus, RefreshCw, SlidersHorizontal, Sparkles, Trash2, Upload, VideoIcon } from "lucide-react";
 import { useEffect, useRef, useState, type DragEvent } from "react";
-import { App, Button, Checkbox, Drawer, Empty, Input, Modal, Tag, Typography } from "antd";
+import { App, Button, Checkbox, Drawer, Empty, Input, Modal, Select, Tag, Typography } from "antd";
 import localforage from "localforage";
 import { nanoid } from "nanoid";
 import { saveAs } from "file-saver";
@@ -20,7 +20,7 @@ import { getCanvasSession, isCanvasAuthenticated, isCanvasManagedMode, useCanvas
 import { createVideoGenerationTask, isRetryableVideoTaskError, pollVideoGenerationTask, previewGeneratedVideo, storeGeneratedVideo, type VideoGenerationResult, type VideoGenerationTask } from "@/services/api/video";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useWorkbenchAgentStore } from "@/stores/use-workbench-agent-store";
-import { modelMatchesCapability, modelOptionLabel, selectableModelsByCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { decodeChannelModel, encodeChannelModel, modelMatchesCapability, modelOptionLabel, selectableModelsByCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
@@ -786,8 +786,29 @@ function GenerationSettings({ config, model, updateConfig, openConfigDialog }: {
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const { t } = useTranslation();
 
+    const videoChannels = config.channels.filter((ch) => ch.models.some((m) => m.capability === "video"));
+    const decoded = decodeChannelModel(model);
+    const currentChannelId = decoded?.channelId ?? (videoChannels[0]?.id || "");
+
+    const handleChannelChange = (channelId: string) => {
+        const channel = config.channels.find((ch) => ch.id === channelId);
+        const firstVideoModel = channel?.models.find((m) => m.capability === "video");
+        if (firstVideoModel) updateConfig("videoModel", encodeChannelModel(channelId, firstVideoModel.name));
+    };
+
     return (
         <>
+            {videoChannels.length > 0 && (
+                <label className="col-span-2 block min-w-0 sm:col-span-1">
+                    <span className="mb-1.5 block text-sm font-semibold sm:mb-2 sm:text-base">{t("videoWorkbench.accountGroup")}</span>
+                    <Select
+                        value={currentChannelId}
+                        onChange={handleChannelChange}
+                        className="w-full"
+                        options={videoChannels.map((ch) => ({ value: ch.id, label: ch.name }))}
+                    />
+                </label>
+            )}
             <label className="col-span-2 block min-w-0 sm:col-span-1">
                 <span className="mb-1.5 block text-sm font-semibold sm:mb-2 sm:text-base">{t("workbench.model")}</span>
                 <ModelPicker config={config} value={model} onChange={(value) => updateConfig("videoModel", value)} capability="video" fullWidth onMissingConfig={() => openConfigDialog(false)} />

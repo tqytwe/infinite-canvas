@@ -210,6 +210,7 @@ export default {
         resultTitle: "Generated video",
         source: "Video Studio",
         empty: "No video generated yet",
+        accountGroup: "Account group",
     },
     canvas: {
         defaultTitle: "AI Creation Space {{count}}",
