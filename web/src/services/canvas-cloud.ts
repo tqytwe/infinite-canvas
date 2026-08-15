@@ -193,12 +193,24 @@ export async function putCloudObject(storageKey: string, blob: Blob) {
     if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "CANVAS_OBJECT_WRITE_FAILED");
 }
 
+/** Deduplicates concurrent fetches for the same storage key so a canvas with
+ *  many images does not fan out N identical HTTP requests at load time. */
+const getObjectInflight = new Map<string, Promise<Blob | null>>();
+
 export async function getCloudObject(storageKey: string) {
     if (!CANVAS_MANAGED_MODE) return null;
     if (!isCanvasAuthenticated()) return null;
-    const response = await cloudFetch(`/api/storage/objects/${encodeURIComponent(storageKey)}`, { credentials: "same-origin", cache: "default" }, CLOUD_OBJECT_TIMEOUT_MS);
-    if (!response.ok) return null;
-    return response.blob();
+    const existing = getObjectInflight.get(storageKey);
+    if (existing) return existing;
+    const promise = cloudFetch(
+        `/api/storage/objects/${encodeURIComponent(storageKey)}`,
+        { credentials: "same-origin", cache: "default" },
+        CLOUD_OBJECT_TIMEOUT_MS,
+    )
+        .then((r) => (r.ok ? r.blob() : null))
+        .finally(() => getObjectInflight.delete(storageKey));
+    getObjectInflight.set(storageKey, promise);
+    return promise;
 }
 
 export async function deleteCloudObject(storageKey: string) {

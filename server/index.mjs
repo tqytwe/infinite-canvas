@@ -18,6 +18,8 @@ const MAX_UPLOAD_BYTES = parseBytes(process.env.CANVAS_MAX_UPLOAD_BYTES, 1024 * 
 const MAX_STATE_BYTES = parseBytes(process.env.CANVAS_MAX_STATE_BYTES, 256 * 1024 * 1024);
 const MIN_FREE_BYTES = parseBytes(process.env.CANVAS_MIN_FREE_BYTES, 512 * 1024 * 1024);
 const ASSET_PROXY_TTL_SECONDS = Number.parseInt(process.env.CANVAS_ASSET_PROXY_TTL_SECONDS || "86400", 10);
+const ASSET_CACHE_DIR = join(DATA_DIR, "asset-cache");
+const ASSET_CACHE_MAX_BYTES = parseBytes(process.env.CANVAS_ASSET_CACHE_MAX_BYTES, 512 * 1024 * 1024);
 const SESSION_TTL_SECONDS = Number.parseInt(process.env.CANVAS_SESSION_TTL_SECONDS || "604800", 10);
 const PLATFORM_API_BASE_URL = normalizeOrigin(process.env.CANVAS_PLATFORM_API_BASE_URL || process.env.PLATFORM_API_BASE_URL || "https://api.jisudeng.com");
 const PLATFORM_WEB_URL = normalizeOrigin(process.env.CANVAS_PLATFORM_WEB_URL || process.env.PLATFORM_WEB_URL || "https://www.jisudeng.com");
@@ -40,6 +42,7 @@ let storageLock = Promise.resolve();
 
 await mkdir(USERS_DIR, { recursive: true, mode: 0o700 });
 await mkdir(SESSIONS_DIR, { recursive: true, mode: 0o700 });
+await mkdir(ASSET_CACHE_DIR, { recursive: true, mode: 0o700 });
 
 const server = createServer(async (req, res) => {
     try {
@@ -57,6 +60,10 @@ server.listen(PORT, "0.0.0.0", () => {
     console.log(`[canvas-server] data directory: ${DATA_DIR}`);
     console.log(`[canvas-server] global storage limit: ${formatBytes(MAX_STORAGE_BYTES)}`);
 });
+// Keep TCP connections alive past typical load-balancer idle timeouts (60 s).
+// headersTimeout must exceed keepAliveTimeout to prevent a response/close race.
+server.keepAliveTimeout = 65_000;
+server.headersTimeout = 66_000;
 
 async function handleRequest(req, res) {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
@@ -336,6 +343,69 @@ async function proxyPlatformImagePromptUse(req, res, promptId) {
     }, { rewriteJson: true });
 }
 
+// ---------------------------------------------------------------------------
+// Asset proxy disk cache — avoids hitting upstream CDN on every canvas load.
+// ---------------------------------------------------------------------------
+async function readAssetCache(urlHash) {
+    try {
+        const metaPath = join(ASSET_CACHE_DIR, `${urlHash}.meta.json`);
+        const meta = JSON.parse(await readFile(metaPath, "utf8"));
+        if (Date.now() > meta.expiresAt) {
+            void rm(metaPath, { force: true });
+            void rm(join(ASSET_CACHE_DIR, `${urlHash}.bin`), { force: true });
+            return null;
+        }
+        return { dataPath: join(ASSET_CACHE_DIR, `${urlHash}.bin`), mimeType: meta.mimeType };
+    } catch {
+        return null;
+    }
+}
+
+async function writeAssetCache(urlHash, mimeType, data) {
+    try {
+        await writeFile(join(ASSET_CACHE_DIR, `${urlHash}.bin`), data, { mode: 0o600 });
+        await writeFile(
+            join(ASSET_CACHE_DIR, `${urlHash}.meta.json`),
+            JSON.stringify({
+                mimeType,
+                size: data.length,
+                cachedAt: Date.now(),
+                expiresAt: Date.now() + ASSET_PROXY_TTL_SECONDS * 1000,
+            }),
+            { encoding: "utf8", mode: 0o600 },
+        );
+        void evictAssetCacheIfNeeded();
+    } catch (err) {
+        console.warn("[asset-cache] write failed", err.message);
+    }
+}
+
+async function evictAssetCacheIfNeeded() {
+    try {
+        const entries = await readdir(ASSET_CACHE_DIR).catch(() => []);
+        const metaFiles = entries.filter((f) => f.endsWith(".meta.json"));
+        let total = 0;
+        const items = [];
+        for (const f of metaFiles) {
+            try {
+                const raw = JSON.parse(await readFile(join(ASSET_CACHE_DIR, f), "utf8"));
+                total += raw.size || 0;
+                items.push({ key: f.slice(0, -".meta.json".length), cachedAt: raw.cachedAt || 0, size: raw.size || 0 });
+            } catch { /* skip corrupt entries */ }
+        }
+        if (total <= ASSET_CACHE_MAX_BYTES) return;
+        items.sort((a, b) => a.cachedAt - b.cachedAt);
+        for (const item of items) {
+            if (total <= ASSET_CACHE_MAX_BYTES * 0.75) break;
+            void rm(join(ASSET_CACHE_DIR, `${item.key}.meta.json`), { force: true });
+            void rm(join(ASSET_CACHE_DIR, `${item.key}.bin`), { force: true });
+            total -= item.size;
+        }
+    } catch (err) {
+        console.warn("[asset-cache] eviction failed", err.message);
+    }
+}
+
 async function handlePlatformAssetProxy(req, res, url, method) {
     const session = await readSessionFromRequest(req);
     if (!session) {
@@ -347,6 +417,24 @@ async function handlePlatformAssetProxy(req, res, url, method) {
     if (!parsed) {
         sendJson(res, 400, { ok: false, error: "INVALID_ASSET_PROXY_URL" });
         return;
+    }
+    // Cache-first: serve from disk for GET requests without range headers.
+    const urlHash = sha256(target);
+    if (method === "GET" && !req.headers.range) {
+        const hit = await readAssetCache(urlHash);
+        if (hit) {
+            try {
+                const data = await readFile(hit.dataPath);
+                res.writeHead(200, {
+                    "content-type": hit.mimeType || "application/octet-stream",
+                    "content-length": String(data.length),
+                    "cache-control": `public, max-age=${ASSET_PROXY_TTL_SECONDS}, immutable`,
+                    "x-cache": "HIT",
+                });
+                res.end(data);
+                return;
+            } catch { /* cache file gone, fall through to upstream */ }
+        }
     }
     const headers = {
         accept: String(req.headers.accept || "*/*"),
@@ -361,6 +449,17 @@ async function handlePlatformAssetProxy(req, res, url, method) {
     res.writeHead(upstream.status, filteredProxyHeaders(upstream.headers));
     if (method === "HEAD" || !upstream.body) {
         res.end();
+        return;
+    }
+    // Buffer successful non-range GET responses to populate the disk cache,
+    // then flush to the client in one shot.
+    if (method === "GET" && upstream.ok && !req.headers.range) {
+        const chunks = [];
+        for await (const chunk of upstream.body) chunks.push(chunk);
+        const body = Buffer.concat(chunks);
+        res.end(body);
+        const mime = (upstream.headers.get("content-type") || "application/octet-stream").split(";")[0].trim();
+        void writeAssetCache(urlHash, mime, body);
         return;
     }
     for await (const chunk of upstream.body) res.write(chunk);
@@ -571,7 +670,7 @@ async function serveObject(req, res, storageKey, userId, method) {
         const headers = {
             "content-type": item.mimeType || "application/octet-stream",
             "content-length": String(info.size),
-            "cache-control": "private, max-age=300",
+            "cache-control": "private, max-age=86400",
             etag: `"${sha256(`${storageKey}:${info.size}:${info.mtimeMs}`)}"`,
             "accept-ranges": "bytes",
         };

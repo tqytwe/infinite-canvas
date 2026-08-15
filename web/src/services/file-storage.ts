@@ -21,18 +21,36 @@ export async function uploadMediaFile(input: string | Blob, prefix = "file"): Pr
     return { url, sourceUrl, storageKey, bytes: blob.size, mimeType: blob.type || "application/octet-stream", ...meta, cloudStatus: cloud.cloudStatus, ...(cloud.cloudError ? { cloudError: cloud.cloudError } : {}) };
 }
 
+// Deduplicates concurrent resolves for the same media key.
+const resolveMediaInflight = new Map<string, Promise<string>>();
+
 export async function resolveMediaUrl(storageKey?: string, fallback = "") {
     if (!storageKey) return fallback;
     if (isCanvasManagedMode() && !isCanvasAuthenticated()) return fallback;
     const cached = objectUrls.get(storageKey);
     if (cached) return cached;
-    const localBlob = await store.getItem<Blob>(storageKey);
-    const blob = localBlob || (await getCloudObject(storageKey));
-    if (!blob) return fallback;
-    if (!localBlob && isCanvasManagedMode()) await store.setItem(storageKey, blob);
-    const url = URL.createObjectURL(blob);
-    objectUrls.set(storageKey, url);
-    return url;
+    const existing = resolveMediaInflight.get(storageKey);
+    if (existing) return existing.then((url) => url || fallback);
+    const promise = (async () => {
+        const localBlob = await store.getItem<Blob>(storageKey);
+        const blob = localBlob || (await getCloudObject(storageKey));
+        if (!blob) return fallback;
+        if (!localBlob && isCanvasManagedMode()) await store.setItem(storageKey, blob);
+        const url = URL.createObjectURL(blob);
+        objectUrls.set(storageKey, url);
+        return url;
+    })().finally(() => resolveMediaInflight.delete(storageKey));
+    resolveMediaInflight.set(storageKey, promise);
+    return promise;
+}
+
+/** Warm the local blob cache for multiple media files in parallel (max 4 concurrent). */
+export async function prefetchMedia(keys: string[]): Promise<void> {
+    const CONCURRENCY = 4;
+    const unique = [...new Set(keys.filter(Boolean))].filter((k) => !objectUrls.has(k));
+    for (let i = 0; i < unique.length; i += CONCURRENCY) {
+        await Promise.all(unique.slice(i, i + CONCURRENCY).map((k) => resolveMediaUrl(k).catch(() => undefined)));
+    }
 }
 
 export async function getMediaBlob(storageKey: string) {

@@ -36,18 +36,37 @@ export async function uploadImage(input: string | Blob): Promise<UploadedImage> 
     return { url, sourceUrl, storageKey, width: meta.width, height: meta.height, bytes: blob.size, mimeType: blob.type || meta.mimeType, cloudStatus: cloud.cloudStatus, ...(cloud.cloudError ? { cloudError: cloud.cloudError } : {}) };
 }
 
+// Deduplicates concurrent resolves for the same key (same image in multiple nodes).
+const resolveImageInflight = new Map<string, Promise<string>>();
+
 export async function resolveImageUrl(storageKey?: string, fallback = "") {
     if (!storageKey) return fallback;
     if (isCanvasManagedMode() && !isCanvasAuthenticated()) return fallback;
     const cached = objectUrls.get(storageKey);
     if (cached) return cached;
-    const localBlob = await store.getItem<Blob>(storageKey);
-    const blob = localBlob || (await getCloudObject(storageKey));
-    if (!blob) return fallback;
-    if (!localBlob && isCanvasManagedMode()) await store.setItem(storageKey, blob);
-    const url = URL.createObjectURL(blob);
-    objectUrls.set(storageKey, url);
-    return url;
+    const existing = resolveImageInflight.get(storageKey);
+    if (existing) return existing.then((url) => url || fallback);
+    const promise = (async () => {
+        const localBlob = await store.getItem<Blob>(storageKey);
+        const blob = localBlob || (await getCloudObject(storageKey));
+        if (!blob) return fallback;
+        if (!localBlob && isCanvasManagedMode()) await store.setItem(storageKey, blob);
+        const url = URL.createObjectURL(blob);
+        objectUrls.set(storageKey, url);
+        return url;
+    })().finally(() => resolveImageInflight.delete(storageKey));
+    resolveImageInflight.set(storageKey, promise);
+    return promise;
+}
+
+/** Warm the local blob cache for multiple images in parallel (max 6 concurrent).
+ *  Call this after loading canvas state so images appear without sequential waterfall. */
+export async function prefetchImages(keys: string[]): Promise<void> {
+    const CONCURRENCY = 6;
+    const unique = [...new Set(keys.filter(Boolean))].filter((k) => !objectUrls.has(k));
+    for (let i = 0; i < unique.length; i += CONCURRENCY) {
+        await Promise.all(unique.slice(i, i + CONCURRENCY).map((k) => resolveImageUrl(k).catch(() => undefined)));
+    }
 }
 
 export async function getImageBlob(storageKey: string) {
