@@ -4,17 +4,18 @@ import { App, Empty, Input, Modal, Spin, Tag } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { ALL_PROMPTS_OPTION } from "@/services/api/prompts";
+import type { PromptMediaType } from "@/services/api/prompt-source-presets";
 import { cn } from "@/lib/utils";
 import { PromptCard } from "./prompt-card";
 import { usePromptList } from "./use-prompt-list";
 
-export function PromptSelectDialog({ open, onOpenChange, onSelect }: { open: boolean; onOpenChange: (open: boolean) => void; onSelect: (prompt: string) => void }) {
+export function PromptSelectDialog({ open, onOpenChange, onSelect, mediaType }: { open: boolean; onOpenChange: (open: boolean) => void; onSelect: (prompt: string) => void; mediaType?: PromptMediaType }) {
     const { message } = App.useApp();
     const { t } = useTranslation();
     const [keyword, setKeyword] = useState("");
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [selectedCategory, setSelectedCategory] = useState(ALL_PROMPTS_OPTION);
-    const { query, items, tags: promptTags, categories: promptCategories } = usePromptList({ keyword, tags: selectedTags, category: selectedCategory, enabled: open });
+    const { query, items, tags: promptTags, categories: promptCategories } = usePromptList({ keyword, tags: selectedTags, category: selectedCategory, mediaType, enabled: open });
     const toggleTag = (tag: string) => {
         if (tag === ALL_PROMPTS_OPTION) return setSelectedTags([]);
         setSelectedTags((items) => (items.includes(tag) ? items.filter((item) => item !== tag) : [...items, tag]));

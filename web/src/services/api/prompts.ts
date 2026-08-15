@@ -3,11 +3,12 @@ import localforage from "localforage";
 import { runPromptSource, type RawPrompt } from "./prompt-source-runtime";
 import { usePromptSourceStore } from "@/stores/use-prompt-source-store";
 import i18n from "@/i18n";
-import type { PromptSource } from "./prompt-source-presets";
+import type { PromptMediaType, PromptSource } from "./prompt-source-presets";
 
 export type Prompt = RawPrompt & {
     sourceId: string;
     category: string;
+    mediaType: PromptMediaType;
     githubUrl: string;
 };
 
@@ -58,7 +59,7 @@ function cacheKey(sourceId: string) {
 }
 
 function sourceSignature(source: PromptSource) {
-    const value = `${source.name}\n${source.url}\n${source.homepage}`;
+    const value = `${source.name}\n${source.url}\n${source.homepage}\n${source.mediaType}\n${source.bundled}`;
     let hash = 0;
     for (let i = 0; i < value.length; i += 1) hash = (hash * 31 + value.charCodeAt(i)) | 0;
     return `${value.length}:${hash}`;
@@ -71,6 +72,7 @@ function withSourceMeta(source: PromptSource, items: RawPrompt[]): Prompt[] {
         referenceImageUrls: Array.isArray(item.referenceImageUrls) ? item.referenceImageUrls : [],
         sourceId: source.id,
         category: source.name,
+        mediaType: source.mediaType,
         githubUrl: item.sourceUrl || source.homepage,
     }));
 }
@@ -112,6 +114,11 @@ function getOrStartRefresh(source: PromptSource) {
 }
 
 async function getSourcePrompts(source: PromptSource): Promise<Prompt[]> {
+    if (source.bundled) {
+        const result = await getOrStartRefresh(source);
+        if (!result.success) throw new Error(result.lastError);
+        return (await readSourceCache(source.id))?.items || [];
+    }
     const cached = await readSourceCache(source.id);
     if (cached) {
         const stale = cached.signature !== sourceSignature(source) || Date.now() - cached.fetchedAt >= cacheTtlMs;
@@ -123,9 +130,9 @@ async function getSourcePrompts(source: PromptSource): Promise<Prompt[]> {
     return (await readSourceCache(source.id))?.items || [];
 }
 
-async function getAllPrompts(): Promise<Prompt[]> {
+async function getAllPrompts(mediaType?: PromptMediaType): Promise<Prompt[]> {
     const settled = await Promise.all(
-        enabledSources().map(async (source) => {
+        enabledSources().filter((source) => !mediaType || source.mediaType === mediaType).map(async (source) => {
             try {
                 return await getSourcePrompts(source);
             } catch {
@@ -136,14 +143,15 @@ async function getAllPrompts(): Promise<Prompt[]> {
     return settled.flat();
 }
 
-export async function fetchPrompts({ keyword = "", tag = [], category = ALL_PROMPTS_OPTION, page = 1, pageSize = 20 }: { keyword?: string; tag?: string[]; category?: string; page?: number; pageSize?: number } = {}) {
-    const items = await getAllPrompts();
+export async function fetchPrompts({ keyword = "", tag = [], category = ALL_PROMPTS_OPTION, mediaType, page = 1, pageSize = 20 }: { keyword?: string; tag?: string[]; category?: string; mediaType?: PromptMediaType; page?: number; pageSize?: number } = {}) {
+    const items = await getAllPrompts(mediaType);
     const normalizedKeyword = keyword.trim().toLowerCase();
     const normalizedPage = Math.max(1, page);
     const normalizedPageSize = Math.max(1, Math.min(100, pageSize));
-    const withoutTagFilter = filterPrompts(items, { keyword: normalizedKeyword, category, tags: [] });
-    const filtered = filterPrompts(items, { keyword: normalizedKeyword, category, tags: tag });
-    const categories = enabledSources().map((source) => source.name);
+    const scopedItems = mediaType ? items.filter((item) => item.mediaType === mediaType) : items;
+    const withoutTagFilter = filterPrompts(scopedItems, { keyword: normalizedKeyword, category, tags: [] });
+    const filtered = filterPrompts(scopedItems, { keyword: normalizedKeyword, category, tags: tag });
+    const categories = enabledSources().filter((source) => !mediaType || source.mediaType === mediaType).map((source) => source.name);
 
     return {
         items: filtered.slice((normalizedPage - 1) * normalizedPageSize, normalizedPage * normalizedPageSize),

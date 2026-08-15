@@ -1,4 +1,5 @@
 import i18n from "@/i18n";
+import { hasBundledPromptSource, loadBundledPromptSource } from "./prompt-bundles";
 import type { PromptSource } from "./prompt-source-presets";
 
 export type RawPrompt = {
@@ -7,6 +8,7 @@ export type RawPrompt = {
     prompt: string;
     description: string;
     coverUrl: string;
+    originalCoverUrl?: string;
     referenceImageUrls: string[];
     tags: string[];
     preview: string;
@@ -29,10 +31,10 @@ async function fetchSource(source: PromptSource, options?: RunOptions) {
 }
 
 export async function runPromptSource(source: PromptSource, options?: RunOptions): Promise<RawPrompt[]> {
-    if (!source.url.trim()) throw new Error(i18n.t("config.promptSources.runtime.urlRequired"));
+    if (!source.bundled && !source.url.trim()) throw new Error(i18n.t("config.promptSources.runtime.urlRequired"));
     let data: unknown;
     try {
-        data = await fetchSource(source, options);
+        data = source.bundled && hasBundledPromptSource(source.id) ? await loadBundledPromptSource(source.id) : await fetchSource(source, options);
     } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") throw error;
         throw new Error(i18n.t("config.promptSources.runtime.fetchFailed", { name: source.name, error: error instanceof Error ? error.message : String(error) }));
@@ -67,6 +69,7 @@ function normalizeItems(values: unknown[], source: PromptSource) {
             prompt,
             description: stringValue(record.description),
             coverUrl,
+            originalCoverUrl: optionalString(record.originalCoverUrl),
             referenceImageUrls,
             tags: stringArray(record.tags),
             preview: stringValue(record.preview),
@@ -107,6 +110,7 @@ function optionalNumber(value: unknown) {
 
 function absoluteUrl(baseUrl: string, path: string) {
     if (!path) return "";
+    if (path.startsWith("/") || path.startsWith("data:") || path.startsWith("blob:")) return path;
     try {
         return new URL(path, baseUrl).toString();
     } catch {

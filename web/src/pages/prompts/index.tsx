@@ -10,6 +10,7 @@ import { useCopyText } from "@/hooks/use-copy-text";
 import { cn } from "@/lib/utils";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { ALL_PROMPTS_OPTION, type Prompt } from "@/services/api/prompts";
+import type { PromptMediaType } from "@/services/api/prompt-source-presets";
 import { useCanvasCanWrite } from "@/services/canvas-cloud";
 
 export default function PromptsPage() {
@@ -20,9 +21,10 @@ export default function PromptsPage() {
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [selectedCategory, setSelectedCategory] = useState(ALL_PROMPTS_OPTION);
     const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
+    const [mediaType, setMediaType] = useState<PromptMediaType>("image");
     const addAsset = useAssetStore((state) => state.addAsset);
     const copyText = useCopyText();
-    const { query, items: promptItems, tags: promptTags, categories: promptCategoryOptions, total: totalPrompts } = usePromptList({ keyword: titleKeyword, tags: selectedTags, category: selectedCategory });
+    const { query, items: promptItems, tags: promptTags, categories: promptCategoryOptions, total: totalPrompts } = usePromptList({ keyword: titleKeyword, tags: selectedTags, category: selectedCategory, mediaType });
 
     useEffect(() => {
         if (query.isError) message.error(query.error instanceof Error ? query.error.message : t("prompts.loadFailed"));
@@ -52,7 +54,18 @@ export default function PromptsPage() {
                         <h1 className="text-2xl font-semibold text-stone-950 dark:text-stone-100">{t("prompts.title")}</h1>
                         <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">{t("prompts.total", { count: totalPrompts })}</p>
                     </div>
-                    <div className="mt-5 grid items-start gap-5 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6">
+                    <div className="mt-5 flex flex-wrap gap-2">
+                        {([
+                            ["image", t("prompts.mediaTypes.image")],
+                            ["video", t("prompts.mediaTypes.video")],
+                            ["canvas", t("prompts.mediaTypes.canvas")],
+                        ] as const).map(([value, label]) => (
+                            <Button key={value} type={mediaType === value ? "primary" : "default"} size="small" onClick={() => { setMediaType(value); setSelectedCategory(ALL_PROMPTS_OPTION); setSelectedTags([]); }}>
+                                {label}
+                            </Button>
+                        ))}
+                    </div>
+                    <div className="mt-4 grid items-start gap-5 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6">
                         <aside className="thin-scrollbar max-h-72 overflow-y-auto border-b border-stone-200 pb-5 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-6rem)] lg:border-b-0 lg:border-r lg:pb-8 lg:pr-5 dark:border-stone-800">
                             <PromptFilter label={t("prompts.category")} options={promptCategoryOptions} selected={selectedCategory} onChange={setSelectedCategory} />
                             <div className="mt-6">

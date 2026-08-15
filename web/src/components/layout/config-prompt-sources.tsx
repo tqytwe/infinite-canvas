@@ -108,6 +108,7 @@ export function ConfigPromptSources() {
                                 <div className="flex min-w-0 items-center gap-2">
                                     <span className="truncate text-sm font-semibold">{source.name}</span>
                                     {source.builtIn ? <Tag className="m-0 shrink-0 text-[10px]">{t("config.promptSources.builtIn")}</Tag> : null}
+                                    <Tag className="m-0 shrink-0 text-[10px]">{t(`prompts.mediaTypes.${source.mediaType}`)}</Tag>
                                 </div>
                                 <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500">
                                     <a className="max-w-full truncate hover:text-stone-800 hover:underline dark:hover:text-stone-200" href={source.homepage || source.url} target="_blank" rel="noreferrer">
