@@ -1,4 +1,4 @@
-import { ArrowRight, FileText } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { App, Button, Image, Tag } from "antd";
 import { useNavigate } from "react-router-dom";
@@ -32,7 +32,7 @@ export default function IndexPage() {
     const [previewOpen, setPreviewOpen] = useState(false);
 
     useEffect(() => {
-        void fetchPrompts({ pageSize: 12, mediaType: "image" })
+        void fetchPrompts({ pageSize: 12 })
             .then((data) => setPromptShowcase(data.items))
             .catch((error) => message.error(error instanceof Error ? error.message : i18n.t("home.promptError")));
     }, [message]);
@@ -84,8 +84,8 @@ export default function IndexPage() {
                                     index === 3 && "md:col-span-2",
                                 )}
                             >
-                                {item.coverUrl ? <img src={item.coverUrl} alt={item.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" /> : <div className="flex h-full items-center justify-center bg-stone-200 p-8 text-stone-500 transition duration-500 group-hover:bg-stone-300 dark:bg-stone-800 dark:text-stone-400 dark:group-hover:bg-stone-700"><FileText className="size-12 opacity-35" /></div>}
-                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/45 to-transparent p-4 text-white">
+                                <img src={item.coverUrl} alt={item.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
+                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/35 to-transparent p-4 text-white">
                                     <div className="mb-2 flex flex-wrap gap-1.5">
                                         {item.tags.slice(0, 2).map((tag) => (
                                             <Tag key={tag} variant="filled" className="m-0 bg-white/15 text-[11px] text-white backdrop-blur">
@@ -110,7 +110,9 @@ export default function IndexPage() {
                 }}
             >
                 <div className="hidden">
-                    {promptShowcase.filter((item) => item.coverUrl).map((item) => <Image key={item.id} src={item.coverUrl} alt={item.title} />)}
+                    {promptShowcase.map((item) => (
+                        <Image key={item.id} src={item.coverUrl} alt={item.title} />
+                    ))}
                 </div>
             </Image.PreviewGroup>
         </main>

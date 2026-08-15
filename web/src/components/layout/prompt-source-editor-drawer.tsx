@@ -1,4 +1,4 @@
-import { App, Button, Drawer, Input, Select, Space, Switch } from "antd";
+import { App, Button, Drawer, Input, Space, Switch } from "antd";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -55,20 +55,6 @@ export function PromptSourceEditorDrawer({ open, source, onSave, onClose }: { op
                 <label className="block">
                     <span className="mb-1.5 block text-sm font-medium">{t("config.promptSources.editor.homepage")}</span>
                     <Input value={draft.homepage} onChange={(event) => patch({ homepage: event.target.value })} placeholder="https://example.com" />
-                </label>
-                <label className="block">
-                    <span className="mb-1.5 block text-sm font-medium">{t("config.promptSources.editor.mediaType")}</span>
-                    <Select
-                        className="w-full"
-                        value={draft.mediaType}
-                        onChange={(mediaType) => patch({ mediaType })}
-                        options={[
-                            { value: "image", label: t("config.promptSources.image") },
-                            { value: "video", label: t("config.promptSources.video") },
-                            { value: "canvas", label: t("config.promptSources.canvas") },
-                            { value: "all", label: t("config.promptSources.allMedia") },
-                        ]}
-                    />
                 </label>
                 <div className="flex items-center justify-between border-y border-stone-200 py-3 dark:border-stone-800">
                     <span className="text-sm font-medium">{t("config.promptSources.editor.enabled")}</span>
