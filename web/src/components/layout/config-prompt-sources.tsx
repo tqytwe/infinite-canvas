@@ -108,11 +108,11 @@ export function ConfigPromptSources() {
                                 <div className="flex min-w-0 items-center gap-2">
                                     <span className="truncate text-sm font-semibold">{source.name}</span>
                                     {source.builtIn ? <Tag className="m-0 shrink-0 text-[10px]">{t("config.promptSources.builtIn")}</Tag> : null}
+                                    {source.storage === "local" ? <Tag color="green" className="m-0 shrink-0 text-[10px]">{t("config.promptSources.local")}</Tag> : null}
+                                    <Tag className="m-0 shrink-0 text-[10px]">{source.mediaType === "image" ? t("config.promptSources.image") : source.mediaType === "video" ? t("config.promptSources.video") : source.mediaType === "canvas" ? t("config.promptSources.canvas") : t("config.promptSources.allMedia")}</Tag>
                                 </div>
                                 <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500">
-                                    <a className="max-w-full truncate hover:text-stone-800 hover:underline dark:hover:text-stone-200" href={source.homepage || source.url} target="_blank" rel="noreferrer">
-                                        {source.homepage || source.url}
-                                    </a>
+                                    {source.homepage ? <a className="max-w-full truncate hover:text-stone-800 hover:underline dark:hover:text-stone-200" href={source.homepage} target="_blank" rel="noreferrer">{source.homepage}</a> : <span>{t("config.promptSources.localBundle")}</span>}
                                     <span className="tabular-nums">{t("config.promptSources.itemCount", { count: status?.count ?? 0 })}</span>
                                     {status?.lastError ? <Tag color="error" className="m-0 text-[10px]" title={status.lastError}>{t("config.promptSources.failed")}</Tag> : status?.lastSuccessAt ? <Tag color="success" className="m-0 text-[10px]">{t("config.promptSources.healthy")}</Tag> : <Tag className="m-0 text-[10px]">{t("config.promptSources.unsynced")}</Tag>}
                                     <span>{status?.lastSuccessAt ? t("config.promptSources.lastSuccess", { time: formatTime(status.lastSuccessAt, i18n.resolvedLanguage) }) : t("config.promptSources.neverFetched")}</span>
@@ -122,7 +122,7 @@ export function ConfigPromptSources() {
                                 <Button size="small" icon={<Eye className="size-3.5" />} onClick={() => setViewingId(source.id)}>
                                     {t("config.promptSources.view")}
                                 </Button>
-                                <Button disabled={!canWrite} size="small" icon={<RefreshCw className="size-3.5" />} loading={refreshingId === source.id} onClick={() => void handleRefreshOne(source)}>
+                                <Button disabled={!canWrite || source.storage === "local"} size="small" icon={<RefreshCw className="size-3.5" />} loading={refreshingId === source.id} onClick={() => void handleRefreshOne(source)}>
                                     {t("config.promptSources.refresh")}
                                 </Button>
                                 {!source.builtIn ? <Button disabled={!canWrite} size="small" icon={<Pencil className="size-3.5" />} onClick={() => setEditingSource(source)}>{t("config.promptSources.edit")}</Button> : null}

@@ -33,5 +33,13 @@ export async function importAppConfig(file: File) {
     }
     if (data.app !== "infinite-canvas" || data.version !== 1 || !data.config || !data.webdav || !data.promptSources) throw new Error(i18n.t("config.invalidFile"));
     useConfigStore.setState({ config: data.config, webdav: data.webdav });
-    usePromptSourceStore.setState(data.promptSources);
+    usePromptSourceStore.setState({
+        ...data.promptSources,
+        sources: data.promptSources.sources.map((source) => ({
+            ...source,
+            mediaType: source.mediaType || "all",
+            format: source.format || "json",
+            storage: source.storage || "remote",
+        })),
+    });
 }

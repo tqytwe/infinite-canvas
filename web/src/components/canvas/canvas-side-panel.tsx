@@ -460,7 +460,7 @@ const CanvasPromptsTab = memo(function CanvasPromptsTab({ onInsert, theme }: { o
     const { t } = useTranslation();
     const sources = usePromptSourceStore((state) => state.sources);
     const canWrite = useCanvasCanWrite();
-    const enabledSources = useMemo(() => sources.filter((source) => source.enabled), [sources]);
+    const enabledSources = useMemo(() => sources.filter((source) => source.enabled && (source.mediaType === "canvas" || source.mediaType === "all")), [sources]);
     const [keyword, setKeyword] = useState("");
     const [expanded, setExpanded] = useState<Record<string, boolean>>({});
     const [detail, setDetail] = useState<Prompt | null>(null);

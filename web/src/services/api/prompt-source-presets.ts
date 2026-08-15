@@ -7,10 +7,16 @@ export type PromptSource = {
     homepage: string;
     enabled: boolean;
     builtIn: boolean;
+    mediaType: PromptMediaType;
+    format: PromptSourceFormat;
+    storage: PromptSourceStorage;
+    localBundle?: PromptLocalBundleKey;
 };
 
-export const PROMPT_REGISTRY_HOMEPAGE = "https://github.com/yukkcat/image-prompts";
-const PROMPT_REGISTRY_SOURCE_BASE = "https://raw.githubusercontent.com/yukkcat/image-prompts/main/dist/sources";
+export type PromptMediaType = "image" | "video" | "canvas" | "all";
+export type PromptSourceFormat = "json" | "markdown";
+export type PromptSourceStorage = "local" | "remote";
+export type PromptLocalBundleKey = "image.zh-CN" | "video.zh-CN" | "canvas.zh-CN";
 
 export function createPromptSource(source?: Partial<PromptSource>): PromptSource {
     return {
@@ -20,19 +26,19 @@ export function createPromptSource(source?: Partial<PromptSource>): PromptSource
         homepage: source?.homepage?.trim() || "",
         enabled: source?.enabled ?? true,
         builtIn: source?.builtIn ?? false,
+        mediaType: source?.mediaType || "all",
+        format: source?.format || "json",
+        storage: source?.storage || "remote",
+        localBundle: source?.localBundle,
     };
 }
 
 export const DEFAULT_PROMPT_SOURCES: PromptSource[] = [
-    registrySource("banana-prompt-quicker", "Banana Prompt Quicker", "https://glidea.github.io/banana-prompt-quicker/"),
-    registrySource("davidwu-gpt-image2-prompts", "DavidWu GPT Image 2", "https://github.com/davidwuw0811-boop/awesome-gpt-image2-prompts"),
-    registrySource("freestylefly-gpt-image-2", "Freestylefly GPT Image 2", "https://github.com/freestylefly/awesome-gpt-image-2"),
-    registrySource("awesome-gpt-image", "Awesome GPT Image", "https://github.com/ZeroLu/awesome-gpt-image"),
-    registrySource("awesome-gpt4o-image-prompts", "Awesome GPT-4o", "https://github.com/ImgEdify/Awesome-GPT4o-Image-Prompts"),
-    registrySource("youmind-gpt-image-2", "YouMind GPT Image 2", "https://github.com/YouMind-OpenLab/awesome-gpt-image-2"),
-    registrySource("youmind-nano-banana-pro", "YouMind Nano Banana Pro", "https://github.com/YouMind-OpenLab/awesome-nano-banana-pro-prompts"),
+    localSource("jisudeng-image-zh", "Jisudeng 生图提示词（中文）", "image", "image.zh-CN", "https://github.com/songguoxs/gpt4o-image-prompts"),
+    localSource("jisudeng-video-zh", "Jisudeng 视频提示词（中文）", "video", "video.zh-CN", "https://github.com/YouMind-OpenLab/awesome-seedance-2-prompts"),
+    localSource("jisudeng-canvas-zh", "Jisudeng 幕布模板（中文）", "canvas", "canvas.zh-CN", ""),
 ];
 
-function registrySource(id: string, name: string, homepage: string): PromptSource {
-    return { id, name, url: `${PROMPT_REGISTRY_SOURCE_BASE}/${id}.json`, homepage, enabled: true, builtIn: true };
+function localSource(id: string, name: string, mediaType: Exclude<PromptMediaType, "all">, localBundle: PromptLocalBundleKey, homepage: string): PromptSource {
+    return { id, name, url: "", homepage, enabled: true, builtIn: true, mediaType, format: "json", storage: "local", localBundle };
 }

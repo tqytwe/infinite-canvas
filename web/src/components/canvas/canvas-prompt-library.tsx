@@ -24,7 +24,7 @@ export function CanvasPromptLibrary({ onSelect }: { onSelect: (prompt: string) =
                     aria-label={t("navigation.prompts")}
                 />
             </Tooltip>
-            <PromptSelectDialog open={open} onOpenChange={setOpen} onSelect={onSelect} />
+            <PromptSelectDialog open={open} onOpenChange={setOpen} onSelect={onSelect} mediaType="canvas" />
         </>
     );
 }

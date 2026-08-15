@@ -1,6 +1,6 @@
 import { FolderPlus, Search } from "lucide-react";
 import { type ReactNode, type UIEvent, useEffect, useState } from "react";
-import { App, Button, Empty, Input, Spin, Tag } from "antd";
+import { App, Button, Empty, Input, Segmented, Spin, Tag } from "antd";
 import { useTranslation } from "react-i18next";
 
 import { PromptCard } from "@/components/prompts/prompt-card";
@@ -10,6 +10,7 @@ import { useCopyText } from "@/hooks/use-copy-text";
 import { cn } from "@/lib/utils";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { ALL_PROMPTS_OPTION, type Prompt } from "@/services/api/prompts";
+import type { PromptMediaType } from "@/services/api/prompt-source-presets";
 import { useCanvasCanWrite } from "@/services/canvas-cloud";
 
 export default function PromptsPage() {
@@ -19,10 +20,11 @@ export default function PromptsPage() {
     const [titleKeyword, setTitleKeyword] = useState("");
     const [selectedTags, setSelectedTags] = useState<string[]>([]);
     const [selectedCategory, setSelectedCategory] = useState(ALL_PROMPTS_OPTION);
+    const [mediaType, setMediaType] = useState<PromptMediaType>("image");
     const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
     const addAsset = useAssetStore((state) => state.addAsset);
     const copyText = useCopyText();
-    const { query, items: promptItems, tags: promptTags, categories: promptCategoryOptions, total: totalPrompts } = usePromptList({ keyword: titleKeyword, tags: selectedTags, category: selectedCategory });
+    const { query, items: promptItems, tags: promptTags, categories: promptCategoryOptions, total: totalPrompts } = usePromptList({ keyword: titleKeyword, tags: selectedTags, category: selectedCategory, mediaType });
 
     useEffect(() => {
         if (query.isError) message.error(query.error instanceof Error ? query.error.message : t("prompts.loadFailed"));
@@ -51,6 +53,21 @@ export default function PromptsPage() {
                     <div className="text-center">
                         <h1 className="text-2xl font-semibold text-stone-950 dark:text-stone-100">{t("prompts.title")}</h1>
                         <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">{t("prompts.total", { count: totalPrompts })}</p>
+                        <Segmented
+                            className="mt-4"
+                            value={mediaType}
+                            onChange={(value) => {
+                                setMediaType(value as PromptMediaType);
+                                setSelectedCategory(ALL_PROMPTS_OPTION);
+                                setSelectedTags([]);
+                            }}
+                            options={[
+                                { label: t("prompts.allMedia"), value: "all" },
+                                { label: t("prompts.imageMedia"), value: "image" },
+                                { label: t("prompts.videoMedia"), value: "video" },
+                                { label: t("prompts.canvasMedia"), value: "canvas" },
+                            ]}
+                        />
                     </div>
                     <div className="mt-5 grid items-start gap-5 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-6">
                         <aside className="thin-scrollbar max-h-72 overflow-y-auto border-b border-stone-200 pb-5 lg:sticky lg:top-0 lg:max-h-[calc(100dvh-6rem)] lg:border-b-0 lg:border-r lg:pb-8 lg:pr-5 dark:border-stone-800">
