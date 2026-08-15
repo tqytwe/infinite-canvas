@@ -116,6 +116,7 @@ export default function ImagePage() {
     const [isReferenceDragActive, setIsReferenceDragActive] = useState(false);
     const [autoRunToken, setAutoRunToken] = useState(0);
     const logsRefreshIdRef = useRef(0);
+    const logSaveQueueRef = useRef(Promise.resolve());
     const imageCommand = useWorkbenchAgentStore((state) => state.imageCommand);
     const clearImageCommand = useWorkbenchAgentStore((state) => state.clearImageCommand);
     const updateAgentTask = useWorkbenchAgentStore((state) => state.updateTask);
@@ -383,24 +384,33 @@ export default function ImagePage() {
     };
 
     const saveLog = async (log: GenerationLog, resumePending = true) => {
-        const serialized = serializeLog(log);
-        try {
-            await logStore.setItem(log.id, serialized);
-        } catch (error) {
-            console.warn("[canvas-local] image workbench log save failed", log.id, error);
-        }
-        if (isCanvasManagedMode() && isCanvasAuthenticated()) {
-            try {
-                await upsertCloudWorkbenchLog("image-workbench", serialized, logs.map(serializeLog));
-            } catch (error) {
-                console.warn("[canvas-cloud] image workbench log save pending", error);
-            }
-        }
-        try {
-            await refreshLogs(resumePending);
-        } catch (error) {
-            console.warn("[canvas-cloud] image workbench refresh failed", error);
-        }
+        const previous = logSaveQueueRef.current;
+        const current = previous
+            .catch(() => undefined)
+            .then(async () => {
+                const serialized = serializeLog({ ...log, updatedAt: Math.max(Date.now(), (log.updatedAt || 0) + 1) });
+                try {
+                    await logStore.setItem(log.id, serialized);
+                } catch (error) {
+                    console.warn("[canvas-local] image workbench log save failed", log.id, error);
+                }
+                if (isCanvasManagedMode() && isCanvasAuthenticated()) {
+                    try {
+                        await upsertCloudWorkbenchLog("image-workbench", serialized, logs.map(serializeLog));
+                        logTaskEvent("cloud-state-saved", serialized, { imageCount: serialized.images.length });
+                    } catch (error) {
+                        console.warn("[canvas-cloud] image workbench log save pending", log.id, error);
+                        logTaskEvent("cloud-state-save-failed", serialized, { error: error instanceof Error ? error.message : String(error) });
+                    }
+                }
+                try {
+                    await refreshLogs(resumePending);
+                } catch (error) {
+                    console.warn("[canvas-cloud] image workbench refresh failed", error);
+                }
+            });
+        logSaveQueueRef.current = current;
+        await current;
     };
 
     const refreshLogs = async (resumePending = true) => {
@@ -424,9 +434,10 @@ export default function ImagePage() {
         const nextLogs = remoteLogs ? mergeLogs(remoteLogs, localLogs) : localLogs;
         if (refreshId !== logsRefreshIdRef.current) return nextLogs;
         setLogs(nextLogs);
-        if (cloudLogs && remoteLogs && !sameLogSet(remoteLogs, nextLogs) && isCanvasManagedMode() && isCanvasAuthenticated()) {
-            await replaceCloudWorkbenchLogs("image-workbench", nextLogs.map(serializeLog));
-        } else if (!cloudLogs && !cloudReadFailed && isCanvasManagedMode() && isCanvasAuthenticated() && nextLogs.length) {
+        // A non-empty cloud state is authoritative for existing IDs. Replacing it
+        // from a browser's local snapshot can roll a completed task back to
+        // pending when another refresh or tab is still finishing delivery.
+        if (!cloudLogs && !cloudReadFailed && isCanvasManagedMode() && isCanvasAuthenticated() && nextLogs.length) {
             await replaceCloudWorkbenchLogs("image-workbench", nextLogs.map(serializeLog));
         }
         if (resumePending) resumePendingLogs(nextLogs);
@@ -435,13 +446,19 @@ export default function ImagePage() {
 
     const resumePendingLogs = (items: GenerationLog[]) => {
         for (const log of items) {
-            if (log.status === "pending" && log.task) void pollGenerationLog(log);
+            if (log.status !== "pending") continue;
+            if (log.task) {
+                void pollGenerationLog(log);
+            } else {
+                void saveLog({ ...log, status: "failed", error: t("workbench.generationFailed"), failCount: Math.max(1, log.failCount), imageCount: Math.max(1, log.imageCount) }, false);
+            }
         }
     };
 
     const pollGenerationLog = async (log: GenerationLog, configOverride?: AiConfig, agentTaskId?: string) => {
         if (!log.task || activeLogIdsRef.current.has(log.id)) return;
         activeLogIdsRef.current.add(log.id);
+        logTaskEvent("poll-start", log);
         const expectedCount = Math.max(1, Number(log.config.count) || log.imageCount || 1);
         setRunning(true);
         setStartedAt((value) => value || performance.now());
@@ -470,6 +487,7 @@ export default function ImagePage() {
                     continue;
                 }
                 if (state.status === "completed") {
+                    logTaskEvent("provider-completed", log, { imageCount: state.images.length, attempt: attempt + 1 });
                     const providerImages = state.images.map((image) => ({
                         id: image.id,
                         dataUrl: image.dataUrl,
@@ -503,11 +521,17 @@ export default function ImagePage() {
                     }
                     if (agentTaskId) updateAgentTask(agentTaskId, { status: successCount ? "succeeded" : "failed", successCount, failCount, error: successCount ? undefined : t("imageWorkbench.missingResult") });
                     await saveLog(providerLog, false);
+                    logTaskEvent("provider-state-saved", providerLog, { imageCount: successCount });
                     if (!successCount) {
                         message.error(t("imageWorkbench.missingResult"));
                         return;
                     }
                     generatedImages = await deliverImageResults(providerImages);
+                    logTaskEvent("delivery-finished", log, {
+                        imageCount: generatedImages.length,
+                        storedCount: generatedImages.filter((image) => image.storageKey && !image.deliveryError).length,
+                        pendingCount: generatedImages.filter((image) => image.deliveryError).length,
+                    });
                     const deliveryFailed = generatedImages.some((image) => image.deliveryError);
                     const finalLog: GenerationLog = {
                         ...providerLog,
@@ -523,6 +547,7 @@ export default function ImagePage() {
                         ]);
                     }
                     await saveLog(finalLog, false);
+                    logTaskEvent("final-state-saved", finalLog, { imageCount: generatedImages.length });
                     deliveryFailed ? message.warning(t("imageWorkbench.deliveryPending")) : message.success(t("imageWorkbench.generated"));
                     return;
                 }
@@ -534,6 +559,7 @@ export default function ImagePage() {
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : t("workbench.generationFailed");
+            logTaskEvent("poll-failed", log, { error: errorMessage });
             const successCount = generatedImages.length;
             const failCount = Math.max(0, expectedCount - successCount);
             if (currentLogIdRef.current === log.id) {
@@ -1197,11 +1223,22 @@ async function normalizeLog(log: Partial<GenerationLog>, hydrateImages = true): 
 function serializeLog(log: GenerationLog): GenerationLog {
     return {
         ...log,
-        updatedAt: Date.now(),
+        updatedAt: log.updatedAt || Date.now(),
         references: log.references.map((item) => ({ ...item, dataUrl: item.storageKey ? "" : item.dataUrl })),
         images: log.images.map((image) => ({ ...image, dataUrl: image.storageKey ? "" : image.dataUrl })),
         thumbnails: [],
     };
+}
+
+function logTaskEvent(event: string, log: Pick<GenerationLog, "id" | "task" | "status" | "images">, details: Record<string, unknown> = {}) {
+    console.info("[canvas-image-task]", {
+        event,
+        logId: log.id,
+        taskId: log.task?.id,
+        status: log.status,
+        imageCount: log.images.length,
+        ...details,
+    });
 }
 
 function normalizeLogConfig(log: Partial<GenerationLog>): GenerationLogConfig {
@@ -1293,15 +1330,9 @@ function mergeLogs(remote: GenerationLog[], local: GenerationLog[]) {
     const merged = new Map(remote.map((log) => [log.id, log]));
     for (const log of local) {
         const current = merged.get(log.id);
-        if (!current || (log.updatedAt || log.createdAt) > (current.updatedAt || current.createdAt)) merged.set(log.id, log);
+        if (!current || (current.status === "pending" && log.status !== "pending" && (log.images.length || log.error))) merged.set(log.id, log);
     }
     return Array.from(merged.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-}
-
-function sameLogSet(first: GenerationLog[], second: GenerationLog[]) {
-    if (first.length !== second.length) return false;
-    const secondById = new Map(second.map((log) => [log.id, log]));
-    return first.every((log) => (log.updatedAt || log.createdAt) === (secondById.get(log.id)?.updatedAt || secondById.get(log.id)?.createdAt));
 }
 
 function delay(ms: number) {

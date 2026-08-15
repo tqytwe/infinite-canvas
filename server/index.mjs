@@ -61,6 +61,14 @@ server.listen(PORT, "0.0.0.0", () => {
 async function handleRequest(req, res) {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
     const method = req.method || "GET";
+    const requestId = randomBytes(8).toString("hex");
+    const startedAt = Date.now();
+    res.setHeader("x-canvas-request-id", requestId);
+    res.once("finish", () => {
+        if (url.pathname.startsWith("/api/")) {
+            console.log(`[canvas-request] ${requestId} ${method} ${url.pathname} ${res.statusCode} ${Date.now() - startedAt}ms`);
+        }
+    });
 
     if (url.pathname === "/health" || url.pathname === "/api/health") {
         await handleHealth(res);
