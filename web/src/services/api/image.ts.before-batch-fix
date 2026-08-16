@@ -1037,55 +1037,26 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
     const background = normalizeBackground(config.background);
-    
-    // 检查模型是否支持n参数批量生成
-    const modelSupportsN = !requestConfig.model.includes("gpt-image");
-    
     try {
-        if (modelSupportsN) {
-            // 支持n参数：一次请求生成多张
-            const response = await axios.post<ImageApiResponse>(
-                aiApiUrl(requestConfig, "/images/generations"),
-                {
-                    model: requestConfig.model,
-                    prompt: withSystemPrompt(requestConfig, prompt),
-                    n,
-                    ...(quality ? { quality } : {}),
-                    ...(requestSize ? { size: requestSize } : {}),
-                    ...(background ? { background } : {}),
-                    response_format: "b64_json",
-                    output_format: IMAGE_OUTPUT_FORMAT,
-                },
-                {
-                    headers: aiHeaders(requestConfig, "application/json"),
-                    signal: options?.signal,
-                },
-            );
-            return parseImagePayload(response.data);
-        } else {
-            // 不支持n参数：并行发送n次请求，每次生成1张
-            const requests = Array.from({ length: n }, () =>
-                axios.post<ImageApiResponse>(
-                    aiApiUrl(requestConfig, "/images/generations"),
-                    {
-                        model: requestConfig.model,
-                        prompt: withSystemPrompt(requestConfig, prompt),
-                        n: 1,
-                        ...(quality ? { quality } : {}),
-                        ...(requestSize ? { size: requestSize } : {}),
-                        ...(background ? { background } : {}),
-                        response_format: "b64_json",
-                        output_format: IMAGE_OUTPUT_FORMAT,
-                    },
-                    {
-                        headers: aiHeaders(requestConfig, "application/json"),
-                        signal: options?.signal,
-                    },
-                )
-            );
-            const responses = await Promise.all(requests);
-            return responses.flatMap(response => parseImagePayload(response.data));
-        }
+        const response = await axios.post<ImageApiResponse>(
+            aiApiUrl(requestConfig, "/images/generations"),
+            {
+                model: requestConfig.model,
+                prompt: withSystemPrompt(requestConfig, prompt),
+                n,
+                ...(quality ? { quality } : {}),
+                ...(requestSize ? { size: requestSize } : {}),
+                ...(background ? { background } : {}),
+                response_format: "b64_json",
+                output_format: IMAGE_OUTPUT_FORMAT,
+            },
+            {
+                headers: aiHeaders(requestConfig, "application/json"),
+                signal: options?.signal,
+            },
+        );
+        const images = parseImagePayload(response.data);
+        return images;
     } catch (error) {
         throw new Error(readAxiosError(error, apiText("requestFailed")));
     }
