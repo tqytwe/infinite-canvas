@@ -115,6 +115,10 @@ async function handleApi(req, res, url, method) {
         await handlePlatformBootstrap(req, res);
         return;
     }
+    if (url.pathname === "/api/platform/video/group" && method === "POST") {
+        await proxyPlatformVideoGroup(req, res);
+        return;
+    }
     if (url.pathname.startsWith("/api/platform/gateway/") || url.pathname === "/api/platform/gateway") {
         await proxyPlatformGateway(req, res, url);
         return;
@@ -276,10 +280,11 @@ async function handleSession(req, res) {
     const imageSession = gatewaySessionForPurpose(session, "image");
     const videoSession = gatewaySessionForPurpose(session, "video");
     const bootstrapPromise = fetchPlatformBootstrap(session);
+    const hasVideoSession = Boolean(session.sessions?.video?.apiKey && Number(session.sessions.video.apiKeyId) > 0);
     const [bootstrap, imageBootstrap, videoBootstrap] = await Promise.all([
         bootstrapPromise,
         imageSession !== session ? fetchPlatformBootstrap(session, imageSession) : bootstrapPromise,
-        videoSession !== session ? fetchPlatformBootstrap(session, videoSession) : bootstrapPromise,
+        hasVideoSession ? fetchPlatformBootstrap(session, videoSession) : Promise.resolve(null),
     ]);
     const user = bootstrap?.user || { id: session.userId };
     sendJson(res, 200, {
@@ -320,9 +325,36 @@ async function proxyPlatformGateway(req, res, url) {
         return;
     }
     const suffix = url.pathname.replace(/^\/api\/platform\/gateway/, "") || "/";
+    if (isVideoGenerationPath(suffix) && !session.sessions?.video?.apiKey) {
+        sendJson(res, 409, { ok: false, error: "VIDEO_SESSION_REQUIRED" });
+        return;
+    }
     const gatewaySession = gatewaySessionForPath(session, suffix);
     await proxyRequest(req, res, `${PLATFORM_API_BASE_URL}${suffix}${url.search}`, {
         authorization: `Bearer ${gatewaySession.apiKey}`,
+    }, { rewriteJson: true });
+}
+
+async function proxyPlatformVideoGroup(req, res) {
+    const session = await readSessionFromRequest(req);
+    if (!session) {
+        sendJson(res, 401, { ok: false, error: "AUTH_REQUIRED" });
+        return;
+    }
+    if (!EXCHANGE_SECRET || !PLATFORM_API_BASE_URL) {
+        sendJson(res, 503, { ok: false, error: "PLATFORM_PROXY_NOT_CONFIGURED" });
+        return;
+    }
+    const videoSession = session.sessions?.video;
+    if (!videoSession?.apiKey || !Number.isSafeInteger(Number(videoSession.apiKeyId)) || Number(videoSession.apiKeyId) <= 0) {
+        sendJson(res, 409, { ok: false, error: "VIDEO_SESSION_REQUIRED" });
+        return;
+    }
+    await proxyRequest(req, res, `${PLATFORM_API_BASE_URL}/api/v1/nextchat/group`, {
+        "x-nextchat-secret": EXCHANGE_SECRET,
+        "x-nextchat-user-id": String(session.userId),
+        "x-nextchat-api-key-id": String(videoSession.apiKeyId),
+        authorization: `Bearer ${videoSession.apiKey}`,
     }, { rewriteJson: true });
 }
 
@@ -338,7 +370,6 @@ async function proxyPlatformImageStudio(req, res, url) {
     }
     const suffix = url.pathname.replace(/^\/api\/platform\/image-studio/, "") || "/";
     const imageSession = gatewaySessionForPurpose(session, "image");
-    const videoSession = gatewaySessionForPurpose(session, "video");
     await proxyRequest(req, res, `${PLATFORM_API_BASE_URL}/api/v1/nextchat/image-studio${suffix}${url.search}`, {
         "x-nextchat-secret": EXCHANGE_SECRET,
         "x-nextchat-user-id": String(session.userId),
@@ -1403,8 +1434,18 @@ function gatewaySessionForPath(session, suffix) {
     if (path.startsWith("/v1/images/") || path.startsWith("/v1/contents/generations/")) return gatewaySessionForPurpose(session, "image");
     // Video paths use a dedicated video session if available; fall back to the main (chat)
     // session — NOT the image session, which may not have video models configured.
-    if (path === "/v1/videos" || path.startsWith("/v1/videos/") || path === "/v1/agnesapi" || path.startsWith("/v1/contents/")) return gatewaySessionForPurpose(session, "video");
+    if (isVideoGatewayPath(path)) return gatewaySessionForPurpose(session, "video");
     return gatewaySessionForPurpose(session, "chat");
+}
+
+function isVideoGatewayPath(suffix) {
+    const path = String(suffix || "").toLowerCase();
+    return path === "/v1/videos" || path.startsWith("/v1/videos/") || path === "/v1/agnesapi" || path.startsWith("/v1/contents/");
+}
+
+function isVideoGenerationPath(suffix) {
+    const path = String(suffix || "").toLowerCase();
+    return path === "/v1/videos" || path === "/v1/videos/generations" || path === "/v1/agnesapi" || path.startsWith("/v1/contents/");
 }
 
 function mergeWorkspaceModels(primary, secondary) {
@@ -1575,4 +1616,3 @@ async function handleImageStudioMirror(req, res, session) {
         sendJson(res, 500, { ok: false, error: "MIRROR_FAILED", detail: String(err) });
     }
 }
-

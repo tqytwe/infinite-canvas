@@ -12,7 +12,7 @@
 - 当前代码提交：`fbb893e849c572cec093a0f93514d26930a8cb3b`
 - `origin/main`：与本地 HEAD 一致
 - 定制前基线：`b66936d891b82c2b51c1ed05e1a6eae3e31d4ca3`
-- 生产域名：`https://jisudengcanvas.zeabur.app`
+- 生产域名：`https://canvas.jisudeng.com`
 - Zeabur 项目：`gmssh`
 - Project ID：`6a51de14c2881a93656fa4c5`
 - Environment ID：`6a51de14104975fcb46761c3`
@@ -458,7 +458,7 @@ npx --yes zeabur@0.21.0 deployment log \
   --env-id 6a51de14104975fcb46761c3 \
   --type runtime
 
-curl -k -sS https://jisudengcanvas.zeabur.app/api/health
+curl -k -sS https://canvas.jisudeng.com/api/health
 ```
 
 ## 11. 验收标准
@@ -487,4 +487,3 @@ curl -k -sS https://jisudengcanvas.zeabur.app/api/health
 - 不要删除 NextChat/Image Studio 后端或移动协议，APP 仍依赖它们。
 - 不要为了 Canvas 结果展示再次修改计费逻辑。
 - 不要部署后不做真实任务验收。
-

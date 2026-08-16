@@ -24,6 +24,7 @@ export type ChannelModel = {
 export type ModelChannel = {
     id: string;
     name: string;
+    groupId?: number;
     baseUrl: string;
     apiKey: string;
     apiFormat: ApiCallFormat;
@@ -516,6 +517,7 @@ function createManagedChannel(group: unknown, index: number): ModelChannel | nul
     return {
         id: `managed-${sanitizeChannelId(rawId, index)}-${index + 1}`,
         name,
+        groupId: Number.isSafeInteger(Number(groupRecord.id)) && Number(groupRecord.id) > 0 ? Number(groupRecord.id) : undefined,
         baseUrl: "/api/platform/gateway",
         apiKey: "managed-session",
         apiFormat: "openai",
