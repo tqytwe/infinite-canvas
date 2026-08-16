@@ -179,10 +179,9 @@ export function resolveModelForCapability(config: AiConfig, currentModel: string
     return selectableModelsByCapability(config, capability)[0] || fallbackModel;
 }
 
-export function selectableModelsByCapability(config: AiConfig, capability?: ModelCapability, channelId?: string) {
+export function selectableModelsByCapability(config: AiConfig, capability?: ModelCapability) {
     if (!capability) return config.models;
-    const channels = channelId ? config.channels.filter((ch) => ch.id === channelId) : config.channels;
-    return channels.flatMap((channel) => channel.models.filter((model) => model.capability === capability).map((model) => encodeChannelModel(channel.id, model.name)));
+    return config.channels.flatMap((channel) => channel.models.filter((model) => model.capability === capability).map((model) => encodeChannelModel(channel.id, model.name)));
 }
 
 /** The user script (if any) attached to a model; empty string means use the system default call. */
