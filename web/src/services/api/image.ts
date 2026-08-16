@@ -791,7 +791,7 @@ export async function createManagedImageGenerationTask(config: AiConfig, prompt:
     const n = Math.max(1, Math.min(10, Math.floor(Math.abs(Number(config.count)) || 1)));
     const requestPrompt = references.length ? buildImageReferencePromptText(prompt, references) : prompt;
     const idempotencyKey = `canvas-image-${nanoid()}`;
-    const path = references.length ? "/images/edits/async" : "/images/generations/async";
+    const path = references.length ? "/api/platform/gateway/v1/images/edits/async" : "/api/platform/gateway/v1/images/generations/async";
     const url = aiApiUrl(requestConfig, path);
     const response = references.length
         ? await submitManagedImageEdit(url, requestConfig, requestPrompt, references, { quality, requestSize, background, n, idempotencyKey, signal: options?.signal })
@@ -820,11 +820,8 @@ async function submitManagedImageGeneration(
             model: config.model,
             prompt: withSystemPrompt(config, prompt),
             n: params.n,
-            ...(params.quality ? { quality: params.quality } : {}),
             ...(params.requestSize ? { size: params.requestSize } : {}),
-            ...(params.background ? { background: params.background } : {}),
             response_format: "url",
-            output_format: IMAGE_OUTPUT_FORMAT,
         }),
         signal: params.signal,
     }, 30_000);
@@ -843,7 +840,7 @@ async function submitManagedImageEdit(
     formData.set("prompt", withSystemPrompt(config, prompt));
     formData.set("n", String(params.n));
     formData.set("response_format", "url");
-    formData.set("output_format", IMAGE_OUTPUT_FORMAT);
+    
     if (params.quality) formData.set("quality", params.quality);
     if (params.requestSize) formData.set("size", params.requestSize);
     if (params.background) formData.set("background", params.background);
@@ -878,7 +875,7 @@ async function pollManagedImageTask(config: AiConfig, task: ManagedImageGenerati
 }
 
 export async function pollManagedImageGenerationTask(config: AiConfig, task: ManagedImageGenerationTask, options?: RequestOptions): Promise<ManagedImageGenerationTaskState> {
-    const pollPath = task.pollUrl || `/v1/images/tasks/${encodeURIComponent(task.id)}`;
+    const pollPath = task.pollUrl || `/api/platform/gateway/v1/images/tasks/${encodeURIComponent(task.id)}`;
     const pollUrl = managedGatewayUrl(config, pollPath);
     if (options?.signal?.aborted) throw new DOMException("Aborted", "AbortError");
     const response = await fetchWithTimeout(pollUrl, {
@@ -1005,7 +1002,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
     
     try {
         const response = await axios.post<ImageApiResponse>(
-            aiApiUrl(requestConfig, "/images/generations"),
+            aiApiUrl(requestConfig, "/api/platform/gateway/v1/images/generations"),
             {
                 model: requestConfig.model,
                 prompt: withSystemPrompt(requestConfig, prompt),
@@ -1013,9 +1010,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
                 ...(quality ? { quality } : {}),
                 ...(requestSize ? { size: requestSize } : {}),
                 ...(background ? { background } : {}),
-                response_format: "b64_json",
-                output_format: IMAGE_OUTPUT_FORMAT,
-            },
+                response_format: "b64_json",            },
             {
                 headers: aiHeaders(requestConfig, "application/json"),
                 signal: options?.signal,
@@ -1078,14 +1073,12 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
         const refs = await Promise.all(references.map((image) => imageToDataUrl(image)));
         try {
             const response = await axios.post<ImageApiResponse>(
-                aiApiUrl(requestConfig, "/images/generations"),
+                aiApiUrl(requestConfig, "/api/platform/gateway/v1/images/generations"),
                 {
                     model: requestConfig.model,
                     prompt: withSystemPrompt(requestConfig, requestPrompt),
                     n,
-                    response_format: "b64_json",
-                    output_format: IMAGE_OUTPUT_FORMAT,
-                    image: refs,
+                    response_format: "b64_json",                    image: refs,
                     ...(quality ? { quality } : {}),
                     ...(requestSize ? { size: requestSize } : {}),
                     ...(background ? { background } : {}),
@@ -1108,9 +1101,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     formData.set("model", requestConfig.model);
     formData.set("prompt", withSystemPrompt(requestConfig, requestPrompt));
     formData.set("n", String(n));
-    formData.set("response_format", "b64_json");
-    formData.set("output_format", IMAGE_OUTPUT_FORMAT);
-    if (quality) {
+    formData.set("response_format", "b64_json");    if (quality) {
         formData.set("quality", quality);
     }
     if (requestSize) {
@@ -1124,7 +1115,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     if (mask) formData.set("mask", dataUrlToFile(mask));
 
     try {
-        const response = await axios.post<ImageApiResponse>(aiApiUrl(requestConfig, "/images/edits"), formData, { headers: aiHeaders(requestConfig), signal: options?.signal });
+        const response = await axios.post<ImageApiResponse>(aiApiUrl(requestConfig, "/api/platform/gateway/v1/images/edits"), formData, { headers: aiHeaders(requestConfig), signal: options?.signal });
         const images = parseImagePayload(response.data);
         return images;
     } catch (error) {
