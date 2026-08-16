@@ -275,10 +275,11 @@ async function handleSession(req, res) {
     }
     const imageSession = gatewaySessionForPurpose(session, "image");
     const videoSession = gatewaySessionForPurpose(session, "video");
+    const bootstrapPromise = fetchPlatformBootstrap(session);
     const [bootstrap, imageBootstrap, videoBootstrap] = await Promise.all([
-        fetchPlatformBootstrap(session),
-        imageSession !== session ? fetchPlatformBootstrap(session, imageSession) : Promise.resolve(null),
-        videoSession !== session ? fetchPlatformBootstrap(session, videoSession) : Promise.resolve(null),
+        bootstrapPromise,
+        imageSession !== session ? fetchPlatformBootstrap(session, imageSession) : bootstrapPromise,
+        videoSession !== session ? fetchPlatformBootstrap(session, videoSession) : bootstrapPromise,
     ]);
     const user = bootstrap?.user || { id: session.userId };
     sendJson(res, 200, {
