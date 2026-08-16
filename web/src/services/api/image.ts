@@ -1083,8 +1083,20 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
                     },
                 )
             );
-            const responses = await Promise.all(requests);
-            return responses.flatMap(response => parseImagePayload(response.data));
+            const results = await Promise.allSettled(requests);
+            const successfulResponses = results
+                .filter((result): result is PromiseFulfilledResult<any> => result.status === "fulfilled")
+                .map(result => result.value);
+            
+            if (successfulResponses.length === 0) {
+                // 全部请求失败
+                const errors = results
+                    .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+                    .map(result => readAxiosError(result.reason, apiText("requestFailed")));
+                throw new Error(errors[0] || apiText("requestFailed"));
+            }
+            
+            return successfulResponses.flatMap(response => parseImagePayload(response.data));
         }
     } catch (error) {
         throw new Error(readAxiosError(error, apiText("requestFailed")));
