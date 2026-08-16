@@ -35,14 +35,15 @@ export async function uploadImage(input: string | Blob): Promise<UploadedImage> 
     const storageKey = `image:${nanoid()}`;
     
     // For managed mode with URL input: server-side ingest (intranet → disk, fast & reliable)
-    // But data URLs must be converted to Blob first (server ingest only supports CDN URLs)
+    // But data URLs and relative paths must be converted to Blob first (server ingest only supports full CDN URLs)
     console.log("[Canvas] Checking ingest branch:", {
         isManaged: isCanvasManagedMode(),
         isString: typeof input === "string",
         notDataUrl: typeof input === "string" && !input.startsWith("data:"),
-        willUseIngest: isCanvasManagedMode() && typeof input === "string" && !input.startsWith("data:")
+        notRelativePath: typeof input === "string" && !input.startsWith("/"),
+        willUseIngest: isCanvasManagedMode() && typeof input === "string" && !input.startsWith("data:") && !input.startsWith("/")
     });
-    if (isCanvasManagedMode() && typeof input === "string" && !input.startsWith("data:")) {
+    if (isCanvasManagedMode() && typeof input === "string" && !input.startsWith("data:") && !input.startsWith("/")) {
         console.log("[Canvas] Using server-side ingest for:", typeof input === "string" ? input.substring(0, 100) : input);
         const response = await fetch("/api/storage/ingest", {
             method: "POST",
