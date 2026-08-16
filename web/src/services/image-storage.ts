@@ -24,12 +24,26 @@ const objectUrls = new Map<string, string>();
 const CLOUD_SAVE_WAIT_MS = 30_000; // large images (2-10 MB) need > 3 s to upload
 
 export async function uploadImage(input: string | Blob): Promise<UploadedImage> {
+    console.log("[Canvas] uploadImage called:", { 
+        inputType: typeof input, 
+        isString: typeof input === "string",
+        startsWithData: typeof input === "string" ? input.startsWith("data:") : false,
+        isManaged: isCanvasManagedMode(),
+        first50: typeof input === "string" ? input.substring(0, 50) : "Blob"
+    });
     if (isCanvasManagedMode()) await requireCanvasWriteAccess();
     const storageKey = `image:${nanoid()}`;
     
     // For managed mode with URL input: server-side ingest (intranet → disk, fast & reliable)
     // But data URLs must be converted to Blob first (server ingest only supports CDN URLs)
+    console.log("[Canvas] Checking ingest branch:", {
+        isManaged: isCanvasManagedMode(),
+        isString: typeof input === "string",
+        notDataUrl: typeof input === "string" && !input.startsWith("data:"),
+        willUseIngest: isCanvasManagedMode() && typeof input === "string" && !input.startsWith("data:")
+    });
     if (isCanvasManagedMode() && typeof input === "string" && !input.startsWith("data:")) {
+        console.log("[Canvas] Using server-side ingest for:", typeof input === "string" ? input.substring(0, 100) : input);
         const response = await fetch("/api/storage/ingest", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -49,6 +63,7 @@ export async function uploadImage(input: string | Blob): Promise<UploadedImage> 
     }
     
     // For Blob input or non-managed mode: original client-side upload path
+    console.log("[Canvas] Using client-side Blob upload path");
     const blob = typeof input === "string" ? await readBlobResponse(await fetchWithTimeout(input, 5 * 60_000)) : input;
     await store.setItem(storageKey, blob);
     const cloud = await putCloudObjectBestEffort(storageKey, blob);
