@@ -790,6 +790,16 @@ function GenerationSettings({ config, model, updateConfig, openConfigDialog }: {
     const videoChannels = config.channels.filter((ch) => ch.models.some((m) => m.capability === "video"));
     const decoded = decodeChannelModel(model);
     const currentChannelId = decoded?.channelId ?? (videoChannels[0]?.id || "");
+    const initialGroupBootstrappedRef = useRef(false);
+    const initialVideoGroupId = videoChannels.find((channel) => channel.id === currentChannelId)?.groupId ?? videoChannels[0]?.groupId;
+
+    useEffect(() => {
+        if (!isCanvasManagedMode() || initialGroupBootstrappedRef.current || !initialVideoGroupId) return;
+        initialGroupBootstrappedRef.current = true;
+        void switchCanvasVideoGroup(initialVideoGroupId).catch(() => {
+            initialGroupBootstrappedRef.current = false;
+        });
+    }, [initialVideoGroupId]);
 
     const handleChannelChange = async (channelId: string) => {
         const channel = config.channels.find((ch) => ch.id === channelId);
