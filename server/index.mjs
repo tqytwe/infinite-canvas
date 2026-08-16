@@ -274,16 +274,18 @@ async function handleSession(req, res) {
         return;
     }
     const imageSession = gatewaySessionForPurpose(session, "image");
-    const [bootstrap, imageBootstrap] = await Promise.all([
+    const videoSession = gatewaySessionForPurpose(session, "video");
+    const [bootstrap, imageBootstrap, videoBootstrap] = await Promise.all([
         fetchPlatformBootstrap(session),
         imageSession !== session ? fetchPlatformBootstrap(session, imageSession) : Promise.resolve(null),
+        videoSession !== session ? fetchPlatformBootstrap(session, videoSession) : Promise.resolve(null),
     ]);
     const user = bootstrap?.user || { id: session.userId };
     sendJson(res, 200, {
         ok: true,
         authenticated: true,
         user: { ...user, ...(session.isAdmin ? { is_admin: true, role: "admin" } : {}) },
-        models: mergeWorkspaceModels(bootstrap?.models, imageBootstrap?.models),
+        models: mergeWorkspaceModels(mergeWorkspaceModels(bootstrap?.models, imageBootstrap?.models), videoBootstrap?.models),
         api_key_id: session.apiKeyId,
         expires_at: session.expiresAt,
     });
@@ -335,6 +337,7 @@ async function proxyPlatformImageStudio(req, res, url) {
     }
     const suffix = url.pathname.replace(/^\/api\/platform\/image-studio/, "") || "/";
     const imageSession = gatewaySessionForPurpose(session, "image");
+    const videoSession = gatewaySessionForPurpose(session, "video");
     await proxyRequest(req, res, `${PLATFORM_API_BASE_URL}/api/v1/nextchat/image-studio${suffix}${url.search}`, {
         "x-nextchat-secret": EXCHANGE_SECRET,
         "x-nextchat-user-id": String(session.userId),
