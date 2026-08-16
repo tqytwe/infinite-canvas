@@ -57,7 +57,7 @@ async function generateViaImageStudio(
     const jobId = await generateImageStudio({
         model: config.imageModel || config.model,
         prompt,
-        n: Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1))),
+        n: Math.max(1, Math.min(10, Math.floor(Math.abs(Number(config.count)) || 1))),
         quality: config.quality,
         size: config.size,
         background: config.background,

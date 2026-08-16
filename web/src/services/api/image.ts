@@ -772,47 +772,12 @@ function parseGeminiImagePayload(payload: GeminiPayload) {
 
 
 /** Check if a model does not support the n parameter (batch generation) */
-function modelSupportsNParameter(model: string): boolean {
-    const lowerModel = model.toLowerCase();
-    // Agnes models do not support n parameter according to official docs
-    // https://agnes-ai.com/en/docs/agnes-image-20-flash
-    if (lowerModel.includes("agnes")) return false;
-    // Add other models here if they do not support batch generation
-    return true;
-}
-
 async function requestManagedImageGeneration(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions) {
     const selectedModel = selectImageModel(config);
     const requestConfig = resolveModelRequestConfig(config, selectedModel);
-    const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
-    
-    // For models that do not support n parameter, send multiple single-image requests
-    if (!modelSupportsNParameter(requestConfig.model) && n > 1) {
-        const tasks = await Promise.all(
-            Array.from({ length: n }, async () => {
-                const singleConfig = { ...config, count: "1" };
-                const task = await createManagedImageGenerationTask(singleConfig, prompt, references, options);
-                if (!task) return null;
-                return task;
-            })
-        );
-        
-        const validTasks = tasks.filter((task): task is ManagedImageGenerationTask => task !== null);
-        if (validTasks.length === 0) return null;
-        
-        // Poll all tasks in parallel
-        const results = await Promise.all(
-            validTasks.map(task => pollManagedImageTask(resolveModelRequestConfig(config, task.model), task, options))
-        );
-        
-        // Flatten results into a single array
-        return results.flat();
-    }
-    
-    // For models that support n parameter, use the original flow
     const task = await createManagedImageGenerationTask(config, prompt, references, options);
     if (!task) return null;
-    return pollManagedImageTask(resolveModelRequestConfig(config, task.model), task, options);
+    return pollManagedImageTask(requestConfig, task, options);
 }
 
 export async function createManagedImageGenerationTask(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions): Promise<ManagedImageGenerationTask | null> {
@@ -823,7 +788,7 @@ export async function createManagedImageGenerationTask(config: AiConfig, prompt:
     const quality = normalizeQuality(config.quality);
     const requestSize = resolveRequestSize(quality, config.size);
     const background = normalizeBackground(config.background);
-    const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
+    const n = Math.max(1, Math.min(10, Math.floor(Math.abs(Number(config.count)) || 1)));
     const requestPrompt = references.length ? buildImageReferencePromptText(prompt, references) : prompt;
     const idempotencyKey = `canvas-image-${nanoid()}`;
     const path = references.length ? "/images/edits/async" : "/images/generations/async";
@@ -1006,7 +971,7 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
     }
     const selectedModel = selectImageModel(config);
     const requestConfig = resolveModelRequestConfig(config, selectedModel);
-    const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
+    const n = Math.max(1, Math.min(10, Math.floor(Math.abs(Number(config.count)) || 1)));
     const script = resolveModelScript(config, selectedModel);
     if (script) {
         const quality = normalizeQuality(config.quality);
@@ -1038,66 +1003,25 @@ export async function requestGeneration(config: AiConfig, prompt: string, option
     const requestSize = resolveRequestSize(quality, config.size);
     const background = normalizeBackground(config.background);
     
-    // 检查模型是否支持n参数批量生成
-    const modelSupportsN = !requestConfig.model.includes("gpt-image");
-    
     try {
-        if (modelSupportsN) {
-            // 支持n参数：一次请求生成多张
-            const response = await axios.post<ImageApiResponse>(
-                aiApiUrl(requestConfig, "/images/generations"),
-                {
-                    model: requestConfig.model,
-                    prompt: withSystemPrompt(requestConfig, prompt),
-                    n,
-                    ...(quality ? { quality } : {}),
-                    ...(requestSize ? { size: requestSize } : {}),
-                    ...(background ? { background } : {}),
-                    response_format: "b64_json",
-                    output_format: IMAGE_OUTPUT_FORMAT,
-                },
-                {
-                    headers: aiHeaders(requestConfig, "application/json"),
-                    signal: options?.signal,
-                },
-            );
-            return parseImagePayload(response.data);
-        } else {
-            // 不支持n参数：并行发送n次请求，每次生成1张
-            const requests = Array.from({ length: n }, () =>
-                axios.post<ImageApiResponse>(
-                    aiApiUrl(requestConfig, "/images/generations"),
-                    {
-                        model: requestConfig.model,
-                        prompt: withSystemPrompt(requestConfig, prompt),
-                        n: 1,
-                        ...(quality ? { quality } : {}),
-                        ...(requestSize ? { size: requestSize } : {}),
-                        ...(background ? { background } : {}),
-                        response_format: "b64_json",
-                        output_format: IMAGE_OUTPUT_FORMAT,
-                    },
-                    {
-                        headers: aiHeaders(requestConfig, "application/json"),
-                        signal: options?.signal,
-                    },
-                )
-            );
-            const results = await Promise.allSettled(requests);
-            const successfulResponses = results
-                .filter((result): result is PromiseFulfilledResult<any> => result.status === "fulfilled")
-                .map(result => result.value);
-            
-            if (successfulResponses.length === 0) {
-                // 全部请求失败
-                const errors = results
-                    .filter((result): result is PromiseRejectedResult => result.status === "rejected")
-                    .map(result => readAxiosError(result.reason, apiText("requestFailed")));
-                throw new Error(errors[0] || apiText("requestFailed"));
-            }
-            
-            return successfulResponses.flatMap(response => parseImagePayload(response.data));
-        }
+        const response = await axios.post<ImageApiResponse>(
+            aiApiUrl(requestConfig, "/images/generations"),
+            {
+                model: requestConfig.model,
+                prompt: withSystemPrompt(requestConfig, prompt),
+                n,
+                ...(quality ? { quality } : {}),
+                ...(requestSize ? { size: requestSize } : {}),
+                ...(background ? { background } : {}),
+                response_format: "b64_json",
+                output_format: IMAGE_OUTPUT_FORMAT,
+            },
+            {
+                headers: aiHeaders(requestConfig, "application/json"),
+                signal: options?.signal,
+            },
+        );
+        return parseImagePayload(response.data);
     } catch (error) {
         throw new Error(readAxiosError(error, apiText("requestFailed")));
     }
@@ -1114,7 +1038,7 @@ export async function requestEdit(config: AiConfig, prompt: string, references: 
     }
     const selectedModel = selectImageModel(config);
     const requestConfig = resolveModelRequestConfig(config, selectedModel);
-    const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
+    const n = Math.max(1, Math.min(10, Math.floor(Math.abs(Number(config.count)) || 1)));
     const requestPrompt = buildImageReferencePromptText(prompt, references);
     const script = resolveModelScript(config, selectedModel);
     if (script) {
