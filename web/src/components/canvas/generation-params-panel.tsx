@@ -1,1 +1,302 @@
-LyoqCiAqIEdlbmVyYXRpb24gUGFyYW1ldGVycyBGbG9hdGluZyBQYW5lbAogKgogKiBQaGFzZSAyLjQ6IOeUn+WbvuWPguaVsOaCrOa1rumdouadvwogKiAtIOaYvuekuuW9k+WJjeeUn+aIkOS7u+WKoeeahOWPguaVsAogKiAtIOaCrOa1ri/lm7rlrpov5pyA5bCP5YyWCiAqIC0g5a6e5pe25pu05paw6L+b5bqmCiAqLwoKaW1wb3J0IHsgdXNlU3RhdGUgfSBmcm9tICJyZWFjdCI7CmltcG9ydCB7IFgsIE1pbmltaXplMiwgTWF4aW1pemUyLCBQaW4gfSBmcm9tICJsdWNpZGUtcmVhY3QiOwoKZXhwb3J0IGludGVyZmFjZSBHZW5lcmF0aW9uUGFyYW1zIHsKICAgIG1vZGVsOiBzdHJpbmc7CiAgICBwcm9tcHQ6IHN0cmluZzsKICAgIG5lZ2F0aXZlUHJvbXB0Pzogc3RyaW5nOwogICAgd2lkdGg6IG51bWJlcjsKICAgIGhlaWdodDogbnVtYmVyOwogICAgc3RlcHM/OiBudW1iZXI7CiAgICBjZmdTY2FsZT86IG51bWJlcjsKICAgIHNlZWQ/OiBudW1iZXI7CiAgICBzYW1wbGVyPzogc3RyaW5nOwogICAgYmF0Y2hTaXplPzogbnVtYmVyOwogICAgW2tleTogc3RyaW5nXTogYW55Owp9CgpleHBvcnQgaW50ZXJmYWNlIEdlbmVyYXRpb25Qcm9ncmVzcyB7CiAgICBzdGF0dXM6ICJwZW5kaW5nIiB8ICJydW5uaW5nIiB8ICJjb21wbGV0ZWQiIHwgImZhaWxlZCI7CiAgICBwcm9ncmVzcz86IG51bWJlcjsgLy8gMC0xMDAKICAgIGN1cnJlbnRTdGVwPzogbnVtYmVyOwogICAgdG90YWxTdGVwcz86IG51bWJlcjsKICAgIGVsYXBzZWRUaW1lPzogbnVtYmVyOyAvLyDnp5IKICAgIGVzdGltYXRlZFRpbWU/OiBudW1iZXI7IC8vIOenkgp9CgpleHBvcnQgaW50ZXJmYWNlIEdlbmVyYXRpb25QYXJhbXNQYW5lbFByb3BzIHsKICAgIHBhcmFtczogR2VuZXJhdGlvblBhcmFtczsKICAgIHByb2dyZXNzPzogR2VuZXJhdGlvblByb2dyZXNzOwogICAgb25DbG9zZT86ICgpID0+IHZvaWQ7CiAgICBpbml0aWFsUG9zaXRpb24/OiB7IHg6IG51bWJlcjsgeTogbnVtYmVyIH07CiAgICBpbml0aWFsUGlubmVkPzogYm9vbGVhbjsKfQoKZXhwb3J0IGZ1bmN0aW9uIEdlbmVyYXRpb25QYXJhbXNQYW5lbCh7CiAgICBwYXJhbXMsCiAgICBwcm9ncmVzcywKICAgIG9uQ2xvc2UsCiAgICBpbml0aWFsUG9zaXRpb24gPSB7IHg6IDIwLCB5OiAxMDAgfSwKICAgIGluaXRpYWxQaW5uZWQgPSBmYWxzZSwKfTogR2VuZXJhdGlvblBhcmFtc1BhbmVsUHJvcHMpIHsKICAgIGNvbnN0IFtwb3NpdGlvbiwgc2V0UG9zaXRpb25dID0gdXNlU3RhdGUoaW5pdGlhbFBvc2l0aW9uKTsKICAgIGNvbnN0IFtpc0RyYWdnaW5nLCBzZXRJc0RyYWdnaW5nXSA9IHVzZVN0YXRlKGZhbHNlKTsKICAgIGNvbnN0IFtkcmFnT2Zmc2V0LCBzZXREcmFnT2Zmc2V0XSA9IHVzZVN0YXRlKHsgeDogMCwgeTogMCB9KTsKICAgIGNvbnN0IFtpc01pbmltaXplZCwgc2V0SXNNaW5pbWl6ZWRdID0gdXNlU3RhdGUoZmFsc2UpOwogICAgY29uc3QgW2lzUGlubmVkLCBzZXRJc1Bpbm5lZF0gPSB1c2VTdGF0ZShpbml0aWFsUGlubmVkKTsKCiAgICBjb25zdCBoYW5kbGVNb3VzZURvd24gPSAoZTogUmVhY3QuTW91c2VFdmVudCkgPT4gewogICAgICAgIGlmIChpc1Bpbm5lZCkgcmV0dXJuOwogICAgICAgIHNldElzRHJhZ2dpbmcodHJ1ZSk7CiAgICAgICAgc2V0RHJhZ09mZnNldCh7CiAgICAgICAgICAgIHg6IGUuY2xpZW50WCAtIHBvc2l0aW9uLngsCiAgICAgICAgICAgIHk6IGUuY2xpZW50WSAtIHBvc2l0aW9uLnksCiAgICAgICAgfSk7CiAgICB9OwoKICAgIGNvbnN0IGhhbmRsZU1vdXNlTW92ZSA9IChlOiBNb3VzZUV2ZW50KSA9PiB7CiAgICAgICAgaWYgKCFpc0RyYWdnaW5nIHx8IGlzUGlubmVkKSByZXR1cm47CiAgICAgICAgc2V0UG9zaXRpb24oewogICAgICAgICAgICB4OiBlLmNsaWVudFggLSBkcmFnT2Zmc2V0LngsCiAgICAgICAgICAgIHk6IGUuY2xpZW50WSAtIGRyYWdPZmZzZXQueSwKICAgICAgICB9KTsKICAgIH07CgogICAgY29uc3QgaGFuZGxlTW91c2VVcCA9ICgpID0+IHsKICAgICAgICBzZXRJc0RyYWdnaW5nKGZhbHNlKTsKICAgIH07CgogICAgLy8g5rOo5YaM5YWo5bGA6byg5qCH5LqL5Lu2CiAgICB1c2VTdGF0ZSgoKSA9PiB7CiAgICAgICAgZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcigibW91c2Vtb3ZlIiwgaGFuZGxlTW91c2VNb3ZlIGFzIGFueSk7CiAgICAgICAgZG9jdW1lbnQuYWRkRXZlbnRMaXN0ZW5lcigibW91c2V1cCIsIGhhbmRsZU1vdXNlVXApOwogICAgICAgIHJldHVybiAoKSA9PiB7CiAgICAgICAgICAgIGRvY3VtZW50LnJlbW92ZUV2ZW50TGlzdGVuZXIoIm1vdXNlbW92ZSIsIGhhbmRsZU1vdXNlTW92ZSBhcyBhbnkpOwogICAgICAgICAgICBkb2N1bWVudC5yZW1vdmVFdmVudExpc3RlbmVyKCJtb3VzZXVwIiwgaGFuZGxlTW91c2VVcCk7CiAgICAgICAgfTsKICAgIH0pOwoKICAgIGNvbnN0IHN0YXR1c0NvbG9ycyA9IHsKICAgICAgICBwZW5kaW5nOiAiIzZiNzI4MCIsCiAgICAgICAgcnVubmluZzogIiMzYjgyZjYiLAogICAgICAgIGNvbXBsZXRlZDogIiMxMGI5ODEiLAogICAgICAgIGZhaWxlZDogIiNlZjQ0NDQiLAogICAgfTsKCiAgICBjb25zdCBzdGF0dXNMYWJlbHMgPSB7CiAgICAgICAgcGVuZGluZzogIuetieW+heS4rSIsCiAgICAgICAgcnVubmluZzogIueUn+aIkOS4rSIsCiAgICAgICAgY29tcGxldGVkOiAi5bey5a6M5oiQIiwKICAgICAgICBmYWlsZWQ6ICLlpLHotKUiLAogICAgfTsKCiAgICByZXR1cm4gKAogICAgICAgIDxkaXYKICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgIHBvc2l0aW9uOiAiZml4ZWQiLAogICAgICAgICAgICAgICAgbGVmdDogYCR7cG9zaXRpb24ueH1weGAsCiAgICAgICAgICAgICAgICB0b3A6IGAke3Bvc2l0aW9uLnl9cHhgLAogICAgICAgICAgICAgICAgd2lkdGg6ICIzMjBweCIsCiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICJ3aGl0ZSIsCiAgICAgICAgICAgICAgICBib3JkZXJSYWRpdXM6ICI4cHgiLAogICAgICAgICAgICAgICAgYm94U2hhZG93OiAiMCA0cHggMTJweCByZ2JhKDAsMCwwLDAuMTUpIiwKICAgICAgICAgICAgICAgIHpJbmRleDogMTAwMCwKICAgICAgICAgICAgICAgIGJvcmRlcjogIjFweCBzb2xpZCAjZTVlN2ViIiwKICAgICAgICAgICAgfX0KICAgICAgICA+CiAgICAgICAgICAgIHsvKiDmoIfpopjmoI8gKi99CiAgICAgICAgICAgIDxkaXYKICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjAuNzVyZW0gMXJlbSIsCiAgICAgICAgICAgICAgICAgICAgYmFja2dyb3VuZENvbG9yOiAiI2Y5ZmFmYiIsCiAgICAgICAgICAgICAgICAgICAgYm9yZGVyQm90dG9tOiAiMXB4IHNvbGlkICNlNWU3ZWIiLAogICAgICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjhweCA4cHggMCAwIiwKICAgICAgICAgICAgICAgICAgICBjdXJzb3I6IGlzUGlubmVkID8gImRlZmF1bHQiIDogIm1vdmUiLAogICAgICAgICAgICAgICAgICAgIGRpc3BsYXk6ICJmbGV4IiwKICAgICAgICAgICAgICAgICAgICBhbGlnbkl0ZW1zOiAiY2VudGVyIiwKICAgICAgICAgICAgICAgICAgICBqdXN0aWZ5Q29udGVudDogInNwYWNlLWJldHdlZW4iLAogICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgIG9uTW91c2VEb3duPXtoYW5kbGVNb3VzZURvd259CiAgICAgICAgICAgID4KICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZGlzcGxheTogImZsZXgiLCBhbGlnbkl0ZW1zOiAiY2VudGVyIiwgZ2FwOiAiMC41cmVtIiB9fT4KICAgICAgICAgICAgICAgICAgICA8ZGl2CiAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICB3aWR0aDogIjhweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBoZWlnaHQ6ICI4cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiNTAlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogcHJvZ3Jlc3MgPyBzdGF0dXNDb2xvcnNbcHJvZ3Jlc3Muc3RhdHVzXSA6ICIjNmI3MjgwIiwKICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAvPgogICAgICAgICAgICAgICAgICAgIDxzcGFuIHN0eWxlPXt7IGZvbnRTaXplOiAiMTRweCIsIGZvbnRXZWlnaHQ6ICI2MDAiLCBjb2xvcjogIiMzNzQxNTEiIH19PgogICAgICAgICAgICAgICAgICAgICAgICDnlJ/miJDlj4LmlbAKICAgICAgICAgICAgICAgICAgICA8L3NwYW4+CiAgICAgICAgICAgICAgICAgICAge3Byb2dyZXNzICYmICgKICAgICAgICAgICAgICAgICAgICAgICAgPHNwYW4gc3R5bGU9e3sgZm9udFNpemU6ICIxMnB4IiwgY29sb3I6ICIjNmI3MjgwIiB9fT4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIHtzdGF0dXNMYWJlbHNbcHJvZ3Jlc3Muc3RhdHVzXX0KICAgICAgICAgICAgICAgICAgICAgICAgPC9zcGFuPgogICAgICAgICAgICAgICAgICAgICl9CiAgICAgICAgICAgICAgICA8L2Rpdj4KCiAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGRpc3BsYXk6ICJmbGV4IiwgZ2FwOiAiMC4yNXJlbSIgfX0+CiAgICAgICAgICAgICAgICAgICAgPGJ1dHRvbgogICAgICAgICAgICAgICAgICAgICAgICBvbkNsaWNrPXsoKSA9PiBzZXRJc1Bpbm5lZCghaXNQaW5uZWQpfQogICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjAuMjVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyOiAibm9uZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICJ0cmFuc3BhcmVudCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBjdXJzb3I6ICJwb2ludGVyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiBpc1Bpbm5lZCA/ICIjM2I4MmY2IiA6ICIjNmI3MjgwIiwKICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgdGl0bGU9e2lzUGlubmVkID8gIuWPlua2iOWbuuWumiIgOiAi5Zu65a6aIn0KICAgICAgICAgICAgICAgICAgICA+CiAgICAgICAgICAgICAgICAgICAgICAgIDxQaW4gc2l6ZT17MTR9IC8+CiAgICAgICAgICAgICAgICAgICAgPC9idXR0b24+CiAgICAgICAgICAgICAgICAgICAgPGJ1dHRvbgogICAgICAgICAgICAgICAgICAgICAgICBvbkNsaWNrPXsoKSA9PiBzZXRJc01pbmltaXplZCghaXNNaW5pbWl6ZWQpfQogICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjAuMjVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyOiAibm9uZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICJ0cmFuc3BhcmVudCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBjdXJzb3I6ICJwb2ludGVyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiAiIzZiNzI4MCIsCiAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgIHRpdGxlPXtpc01pbmltaXplZCA/ICLlsZXlvIAiIDogIuacgOWwj+WMliJ9CiAgICAgICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICAgICAgICB7aXNNaW5pbWl6ZWQgPyA8TWF4aW1pemUyIHNpemU9ezE0fSAvPiA6IDxNaW5pbWl6ZTIgc2l6ZT17MTR9IC8+fQogICAgICAgICAgICAgICAgICAgIDwvYnV0dG9uPgogICAgICAgICAgICAgICAgICAgIDxidXR0b24KICAgICAgICAgICAgICAgICAgICAgICAgb25DbGljaz17b25DbG9zZX0KICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIwLjI1cmVtIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlcjogIm5vbmUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYmFja2dyb3VuZENvbG9yOiAidHJhbnNwYXJlbnQiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgY3Vyc29yOiAicG9pbnRlciIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBjb2xvcjogIiM2YjcyODAiLAogICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICB0aXRsZT0i5YWz6ZetIgogICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAgPFggc2l6ZT17MTR9IC8+CiAgICAgICAgICAgICAgICAgICAgPC9idXR0b24+CiAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgPC9kaXY+CgogICAgICAgICAgICB7Lyog5YaF5a655Yy65Z+fICovfQogICAgICAgICAgICB7IWlzTWluaW1pemVkICYmICgKICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgcGFkZGluZzogIjFyZW0iLCBtYXhIZWlnaHQ6ICI1MDBweCIsIG92ZXJmbG93WTogImF1dG8iIH19PgogICAgICAgICAgICAgICAgICAgIHsvKiDov5vluqbmnaEgKi99CiAgICAgICAgICAgICAgICAgICAge3Byb2dyZXNzICYmIHByb2dyZXNzLnN0YXR1cyA9PT0gInJ1bm5pbmciICYmIHByb2dyZXNzLnByb2dyZXNzICE9PSB1bmRlZmluZWQgJiYgKAogICAgICAgICAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IG1hcmdpbkJvdHRvbTogIjFyZW0iIH19PgogICAgICAgICAgICAgICAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBkaXNwbGF5OiAiZmxleCIsIGp1c3RpZnlDb250ZW50OiAic3BhY2UtYmV0d2VlbiIsIG1hcmdpbkJvdHRvbTogIjAuNXJlbSIgfX0+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgPHNwYW4gc3R5bGU9e3sgZm9udFNpemU6ICIxMnB4IiwgY29sb3I6ICIjNmI3MjgwIiB9fT7ov5vluqY8L3NwYW4+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgPHNwYW4gc3R5bGU9e3sgZm9udFNpemU6ICIxMnB4IiwgY29sb3I6ICIjMzc0MTUxIiwgZm9udFdlaWdodDogIjUwMCIgfX0+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHtwcm9ncmVzcy5wcm9ncmVzcy50b0ZpeGVkKDApfSUKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8L3NwYW4+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxkaXYKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB3aWR0aDogIjEwMCUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBoZWlnaHQ6ICI2cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICIjZTVlN2ViIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiM3B4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgb3ZlcmZsb3c6ICJoaWRkZW4iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgPGRpdgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgd2lkdGg6IGAke3Byb2dyZXNzLnByb2dyZXNzfSVgLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgaGVpZ2h0OiAiMTAwJSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICIjM2I4MmY2IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHRyYW5zaXRpb246ICJ3aWR0aCAwLjNzIGVhc2UiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIC8+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIHtwcm9ncmVzcy5jdXJyZW50U3RlcCAhPT0gdW5kZWZpbmVkICYmIHByb2dyZXNzLnRvdGFsU3RlcHMgIT09IHVuZGVmaW5lZCAmJiAoCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBtYXJnaW5Ub3A6ICIwLjI1cmVtIiwgZm9udFNpemU6ICIxMXB4IiwgY29sb3I6ICIjOWNhM2FmIiB9fT4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgU3RlcCB7cHJvZ3Jlc3MuY3VycmVudFN0ZXB9IC8ge3Byb2dyZXNzLnRvdGFsU3RlcHN9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICApfQogICAgICAgICAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgICAgICAgICApfQoKICAgICAgICAgICAgICAgICAgICB7Lyog5Y+C5pWw5YiX6KGoICovfQogICAgICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZGlzcGxheTogImZsZXgiLCBmbGV4RGlyZWN0aW9uOiAiY29sdW1uIiwgZ2FwOiAiMC43NXJlbSIgfX0+CiAgICAgICAgICAgICAgICAgICAgICAgIDxQYXJhbUl0ZW0gbGFiZWw9IuaooeWeiyIgdmFsdWU9e3BhcmFtcy5tb2RlbH0gLz4KICAgICAgICAgICAgICAgICAgICAgICAgPFBhcmFtSXRlbSBsYWJlbD0i5o+Q56S66K+NIiB2YWx1ZT17cGFyYW1zLnByb21wdH0gbXVsdGlsaW5lIC8+CiAgICAgICAgICAgICAgICAgICAgICAgIHtwYXJhbXMubmVnYXRpdmVQcm9tcHQgJiYgKAogICAgICAgICAgICAgICAgICAgICAgICAgICAgPFBhcmFtSXRlbSBsYWJlbD0i6LSf6Z2i5o+Q56S66K+NIiB2YWx1ZT17cGFyYW1zLm5lZ2F0aXZlUHJvbXB0fSBtdWx0aWxpbmUgLz4KICAgICAgICAgICAgICAgICAgICAgICAgKX0KICAgICAgICAgICAgICAgICAgICAgICAgPFBhcmFtSXRlbSBsYWJlbD0i5bC65a+4IiB2YWx1ZT17YCR7cGFyYW1zLndpZHRofSDDlyAke3BhcmFtcy5oZWlnaHR9YH0gLz4KICAgICAgICAgICAgICAgICAgICAgICAge3BhcmFtcy5zdGVwcyAhPT0gdW5kZWZpbmVkICYmIDxQYXJhbUl0ZW0gbGFiZWw9IuatpeaVsCIgdmFsdWU9e3BhcmFtcy5zdGVwc30gLz59CiAgICAgICAgICAgICAgICAgICAgICAgIHtwYXJhbXMuY2ZnU2NhbGUgIT09IHVuZGVmaW5lZCAmJiA8UGFyYW1JdGVtIGxhYmVsPSJDRkcgU2NhbGUiIHZhbHVlPXtwYXJhbXMuY2ZnU2NhbGV9IC8+fQogICAgICAgICAgICAgICAgICAgICAgICB7cGFyYW1zLnNlZWQgIT09IHVuZGVmaW5lZCAmJiA8UGFyYW1JdGVtIGxhYmVsPSLnp43lrZAiIHZhbHVlPXtwYXJhbXMuc2VlZH0gLz59CiAgICAgICAgICAgICAgICAgICAgICAgIHtwYXJhbXMuc2FtcGxlciAmJiA8UGFyYW1JdGVtIGxhYmVsPSLph4fmoLflmagiIHZhbHVlPXtwYXJhbXMuc2FtcGxlcn0gLz59CiAgICAgICAgICAgICAgICAgICAgICAgIHtwYXJhbXMuYmF0Y2hTaXplICE9PSB1bmRlZmluZWQgJiYgcGFyYW1zLmJhdGNoU2l6ZSA+IDEgJiYgKAogICAgICAgICAgICAgICAgICAgICAgICAgICAgPFBhcmFtSXRlbSBsYWJlbD0i5om55qyh5aSn5bCPIiB2YWx1ZT17cGFyYW1zLmJhdGNoU2l6ZX0gLz4KICAgICAgICAgICAgICAgICAgICAgICAgKX0KICAgICAgICAgICAgICAgICAgICA8L2Rpdj4KCiAgICAgICAgICAgICAgICAgICAgey8qIOaXtumXtOS/oeaBryAqL30KICAgICAgICAgICAgICAgICAgICB7cHJvZ3Jlc3MgJiYgKHByb2dyZXNzLmVsYXBzZWRUaW1lICE9PSB1bmRlZmluZWQgfHwgcHJvZ3Jlc3MuZXN0aW1hdGVkVGltZSAhPT0gdW5kZWZpbmVkKSAmJiAoCiAgICAgICAgICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgbWFyZ2luVG9wOiAiMXJlbSIsIHBhZGRpbmdUb3A6ICIxcmVtIiwgYm9yZGVyVG9wOiAiMXB4IHNvbGlkICNlNWU3ZWIiIH19PgogICAgICAgICAgICAgICAgICAgICAgICAgICAge3Byb2dyZXNzLmVsYXBzZWRUaW1lICE9PSB1bmRlZmluZWQgJiYgKAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZm9udFNpemU6ICIxMnB4IiwgY29sb3I6ICIjNmI3MjgwIiwgbWFyZ2luQm90dG9tOiAiMC4yNXJlbSIgfX0+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIOW3sueUqOaXtumXtDoge2Zvcm1hdFRpbWUocHJvZ3Jlc3MuZWxhcHNlZFRpbWUpfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgICAgICAgICAgICAgKX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgIHtwcm9ncmVzcy5lc3RpbWF0ZWRUaW1lICE9PSB1bmRlZmluZWQgJiYgcHJvZ3Jlc3Muc3RhdHVzID09PSAicnVubmluZyIgJiYgKAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZm9udFNpemU6ICIxMnB4IiwgY29sb3I6ICIjNmI3MjgwIiB9fT4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg6aKE6K6h5Ymp5L2ZOiB7Zm9ybWF0VGltZShwcm9ncmVzcy5lc3RpbWF0ZWRUaW1lKX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICl9CiAgICAgICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgICAgICl9CiAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgKX0KICAgICAgICA8L2Rpdj4KICAgICk7Cn0KCmludGVyZmFjZSBQYXJhbUl0ZW1Qcm9wcyB7CiAgICBsYWJlbDogc3RyaW5nOwogICAgdmFsdWU6IHN0cmluZyB8IG51bWJlcjsKICAgIG11bHRpbGluZT86IGJvb2xlYW47Cn0KCmZ1bmN0aW9uIFBhcmFtSXRlbSh7IGxhYmVsLCB2YWx1ZSwgbXVsdGlsaW5lID0gZmFsc2UgfTogUGFyYW1JdGVtUHJvcHMpIHsKICAgIHJldHVybiAoCiAgICAgICAgPGRpdj4KICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBmb250U2l6ZTogIjExcHgiLCBjb2xvcjogIiM2YjcyODAiLCBtYXJnaW5Cb3R0b206ICIwLjI1cmVtIiwgZm9udFdlaWdodDogIjUwMCIgfX0+CiAgICAgICAgICAgICAgICB7bGFiZWx9CiAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICA8ZGl2CiAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgIGZvbnRTaXplOiAiMTNweCIsCiAgICAgICAgICAgICAgICAgICAgY29sb3I6ICIjMzc0MTUxIiwKICAgICAgICAgICAgICAgICAgICB3b3JkQnJlYWs6ICJicmVhay13b3JkIiwKICAgICAgICAgICAgICAgICAgICAuLi4obXVsdGlsaW5lICYmIHsKICAgICAgICAgICAgICAgICAgICAgICAgbWF4SGVpZ2h0OiAiNjBweCIsCiAgICAgICAgICAgICAgICAgICAgICAgIG92ZXJmbG93WTogImF1dG8iLAogICAgICAgICAgICAgICAgICAgICAgICBsaW5lSGVpZ2h0OiAiMS40IiwKICAgICAgICAgICAgICAgICAgICB9KSwKICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgID4KICAgICAgICAgICAgICAgIHt2YWx1ZX0KICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgPC9kaXY+CiAgICApOwp9CgpmdW5jdGlvbiBmb3JtYXRUaW1lKHNlY29uZHM6IG51bWJlcik6IHN0cmluZyB7CiAgICBjb25zdCBtaW5zID0gTWF0aC5mbG9vcihzZWNvbmRzIC8gNjApOwogICAgY29uc3Qgc2VjcyA9IE1hdGguZmxvb3Ioc2Vjb25kcyAlIDYwKTsKICAgIHJldHVybiBtaW5zID4gMCA/IGAke21pbnN95YiGJHtzZWNzfeenkmAgOiBgJHtzZWNzfeenkmA7Cn0K
+/**
+ * Generation Parameters Floating Panel
+ *
+ * Phase 2.4: 生图参数悬浮面板
+ * - 显示当前生成任务的参数
+ * - 悬浮/固定/最小化
+ * - 实时更新进度
+ */
+
+import { useState } from "react";
+import { X, Minimize2, Maximize2, Pin } from "lucide-react";
+
+export interface GenerationParams {
+    model: string;
+    prompt: string;
+    negativePrompt?: string;
+    width: number;
+    height: number;
+    steps?: number;
+    cfgScale?: number;
+    seed?: number;
+    sampler?: string;
+    batchSize?: number;
+    [key: string]: any;
+}
+
+export interface GenerationProgress {
+    status: "pending" | "running" | "completed" | "failed";
+    progress?: number; // 0-100
+    currentStep?: number;
+    totalSteps?: number;
+    elapsedTime?: number; // 秒
+    estimatedTime?: number; // 秒
+}
+
+export interface GenerationParamsPanelProps {
+    params: GenerationParams;
+    progress?: GenerationProgress;
+    onClose?: () => void;
+    initialPosition?: { x: number; y: number };
+    initialPinned?: boolean;
+}
+
+export function GenerationParamsPanel({
+    params,
+    progress,
+    onClose,
+    initialPosition = { x: 20, y: 100 },
+    initialPinned = false,
+}: GenerationParamsPanelProps) {
+    const [position, setPosition] = useState(initialPosition);
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const [isMinimized, setIsMinimized] = useState(false);
+    const [isPinned, setIsPinned] = useState(initialPinned);
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        if (isPinned) return;
+        setIsDragging(true);
+        setDragOffset({
+            x: e.clientX - position.x,
+            y: e.clientY - position.y,
+        });
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+        if (!isDragging || isPinned) return;
+        setPosition({
+            x: e.clientX - dragOffset.x,
+            y: e.clientY - dragOffset.y,
+        });
+    };
+
+    const handleMouseUp = () => {
+        setIsDragging(false);
+    };
+
+    // 注册全局鼠标事件
+    useState(() => {
+        document.addEventListener("mousemove", handleMouseMove as any);
+        document.addEventListener("mouseup", handleMouseUp);
+        return () => {
+            document.removeEventListener("mousemove", handleMouseMove as any);
+            document.removeEventListener("mouseup", handleMouseUp);
+        };
+    });
+
+    const statusColors = {
+        pending: "#6b7280",
+        running: "#3b82f6",
+        completed: "#10b981",
+        failed: "#ef4444",
+    };
+
+    const statusLabels = {
+        pending: "等待中",
+        running: "生成中",
+        completed: "已完成",
+        failed: "失败",
+    };
+
+    return (
+        <div
+            style={{
+                position: "fixed",
+                left: `${position.x}px`,
+                top: `${position.y}px`,
+                width: "320px",
+                backgroundColor: "white",
+                borderRadius: "8px",
+                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                zIndex: 1000,
+                border: "1px solid #e5e7eb",
+            }}
+        >
+            {/* 标题栏 */}
+            <div
+                style={{
+                    padding: "0.75rem 1rem",
+                    backgroundColor: "#f9fafb",
+                    borderBottom: "1px solid #e5e7eb",
+                    borderRadius: "8px 8px 0 0",
+                    cursor: isPinned ? "default" : "move",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                }}
+                onMouseDown={handleMouseDown}
+            >
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <div
+                        style={{
+                            width: "8px",
+                            height: "8px",
+                            borderRadius: "50%",
+                            backgroundColor: progress ? statusColors[progress.status] : "#6b7280",
+                        }}
+                    />
+                    <span style={{ fontSize: "14px", fontWeight: "600", color: "#374151" }}>
+                        生成参数
+                    </span>
+                    {progress && (
+                        <span style={{ fontSize: "12px", color: "#6b7280" }}>
+                            {statusLabels[progress.status]}
+                        </span>
+                    )}
+                </div>
+
+                <div style={{ display: "flex", gap: "0.25rem" }}>
+                    <button
+                        onClick={() => setIsPinned(!isPinned)}
+                        style={{
+                            padding: "0.25rem",
+                            border: "none",
+                            backgroundColor: "transparent",
+                            cursor: "pointer",
+                            color: isPinned ? "#3b82f6" : "#6b7280",
+                        }}
+                        title={isPinned ? "取消固定" : "固定"}
+                    >
+                        <Pin size={14} />
+                    </button>
+                    <button
+                        onClick={() => setIsMinimized(!isMinimized)}
+                        style={{
+                            padding: "0.25rem",
+                            border: "none",
+                            backgroundColor: "transparent",
+                            cursor: "pointer",
+                            color: "#6b7280",
+                        }}
+                        title={isMinimized ? "展开" : "最小化"}
+                    >
+                        {isMinimized ? <Maximize2 size={14} /> : <Minimize2 size={14} />}
+                    </button>
+                    <button
+                        onClick={onClose}
+                        style={{
+                            padding: "0.25rem",
+                            border: "none",
+                            backgroundColor: "transparent",
+                            cursor: "pointer",
+                            color: "#6b7280",
+                        }}
+                        title="关闭"
+                    >
+                        <X size={14} />
+                    </button>
+                </div>
+            </div>
+
+            {/* 内容区域 */}
+            {!isMinimized && (
+                <div style={{ padding: "1rem", maxHeight: "500px", overflowY: "auto" }}>
+                    {/* 进度条 */}
+                    {progress && progress.status === "running" && progress.progress !== undefined && (
+                        <div style={{ marginBottom: "1rem" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.5rem" }}>
+                                <span style={{ fontSize: "12px", color: "#6b7280" }}>进度</span>
+                                <span style={{ fontSize: "12px", color: "#374151", fontWeight: "500" }}>
+                                    {progress.progress.toFixed(0)}%
+                                </span>
+                            </div>
+                            <div
+                                style={{
+                                    width: "100%",
+                                    height: "6px",
+                                    backgroundColor: "#e5e7eb",
+                                    borderRadius: "3px",
+                                    overflow: "hidden",
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        width: `${progress.progress}%`,
+                                        height: "100%",
+                                        backgroundColor: "#3b82f6",
+                                        transition: "width 0.3s ease",
+                                    }}
+                                />
+                            </div>
+                            {progress.currentStep !== undefined && progress.totalSteps !== undefined && (
+                                <div style={{ marginTop: "0.25rem", fontSize: "11px", color: "#9ca3af" }}>
+                                    Step {progress.currentStep} / {progress.totalSteps}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* 参数列表 */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                        <ParamItem label="模型" value={params.model} />
+                        <ParamItem label="提示词" value={params.prompt} multiline />
+                        {params.negativePrompt && (
+                            <ParamItem label="负面提示词" value={params.negativePrompt} multiline />
+                        )}
+                        <ParamItem label="尺寸" value={`${params.width} × ${params.height}`} />
+                        {params.steps !== undefined && <ParamItem label="步数" value={params.steps} />}
+                        {params.cfgScale !== undefined && <ParamItem label="CFG Scale" value={params.cfgScale} />}
+                        {params.seed !== undefined && <ParamItem label="种子" value={params.seed} />}
+                        {params.sampler && <ParamItem label="采样器" value={params.sampler} />}
+                        {params.batchSize !== undefined && params.batchSize > 1 && (
+                            <ParamItem label="批次大小" value={params.batchSize} />
+                        )}
+                    </div>
+
+                    {/* 时间信息 */}
+                    {progress && (progress.elapsedTime !== undefined || progress.estimatedTime !== undefined) && (
+                        <div style={{ marginTop: "1rem", paddingTop: "1rem", borderTop: "1px solid #e5e7eb" }}>
+                            {progress.elapsedTime !== undefined && (
+                                <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "0.25rem" }}>
+                                    已用时间: {formatTime(progress.elapsedTime)}
+                                </div>
+                            )}
+                            {progress.estimatedTime !== undefined && progress.status === "running" && (
+                                <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                                    预计剩余: {formatTime(progress.estimatedTime)}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+}
+
+interface ParamItemProps {
+    label: string;
+    value: string | number;
+    multiline?: boolean;
+}
+
+function ParamItem({ label, value, multiline = false }: ParamItemProps) {
+    return (
+        <div>
+            <div style={{ fontSize: "11px", color: "#6b7280", marginBottom: "0.25rem", fontWeight: "500" }}>
+                {label}
+            </div>
+            <div
+                style={{
+                    fontSize: "13px",
+                    color: "#374151",
+                    wordBreak: "break-word",
+                    ...(multiline && {
+                        maxHeight: "60px",
+                        overflowY: "auto",
+                        lineHeight: "1.4",
+                    }),
+                }}
+            >
+                {value}
+            </div>
+        </div>
+    );
+}
+
+function formatTime(seconds: number): string {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return mins > 0 ? `${mins}分${secs}秒` : `${secs}秒`;
+}

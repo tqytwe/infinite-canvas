@@ -1,1 +1,262 @@
-LyoqCiAqIEltYWdlIHRvIFZpZGVvIFNob3J0Y3V0CiAqCiAqIFBoYXNlIDIuNjog5Zu+6L2s6KeG6aKR5b+r5o235YWl5Y+jCiAqIC0g5LuO55S75biD5Zu+54mH6IqC54K55b+r6YCf5ZCv5Yqo6KeG6aKR55Sf5oiQCiAqIC0g6Ieq5Yqo5o+Q5Y+W5Zu+54mH5L2c5Li66aaW5binCiAqIC0g6aKE5aGr5YWF5Y+C5pWwCiAqLwoKaW1wb3J0IHsgdXNlU3RhdGUgfSBmcm9tICJyZWFjdCI7CmltcG9ydCB7IFZpZGVvLCBTcGFya2xlcywgWCB9IGZyb20gImx1Y2lkZS1yZWFjdCI7CgpleHBvcnQgaW50ZXJmYWNlIEltYWdlVG9WaWRlb1Nob3J0Y3V0UHJvcHMgewogICAgaW1hZ2VVcmw6IHN0cmluZzsKICAgIG9uR2VuZXJhdGU6IChwYXJhbXM6IFZpZGVvR2VuZXJhdGlvblBhcmFtcykgPT4gdm9pZDsKICAgIG9uQ2xvc2U6ICgpID0+IHZvaWQ7Cn0KCmV4cG9ydCBpbnRlcmZhY2UgVmlkZW9HZW5lcmF0aW9uUGFyYW1zIHsKICAgIGZpcnN0RnJhbWVJbWFnZTogc3RyaW5nOwogICAgcHJvbXB0OiBzdHJpbmc7CiAgICBkdXJhdGlvbjogbnVtYmVyOyAvLyDnp5IKICAgIGZwczogbnVtYmVyOwogICAgbW90aW9uOiAibG93IiB8ICJtZWRpdW0iIHwgImhpZ2giOwogICAgbW9kZWw/OiBzdHJpbmc7Cn0KCmV4cG9ydCBmdW5jdGlvbiBJbWFnZVRvVmlkZW9TaG9ydGN1dCh7CiAgICBpbWFnZVVybCwKICAgIG9uR2VuZXJhdGUsCiAgICBvbkNsb3NlLAp9OiBJbWFnZVRvVmlkZW9TaG9ydGN1dFByb3BzKSB7CiAgICBjb25zdCBbcHJvbXB0LCBzZXRQcm9tcHRdID0gdXNlU3RhdGUoIiIpOwogICAgY29uc3QgW2R1cmF0aW9uLCBzZXREdXJhdGlvbl0gPSB1c2VTdGF0ZSg0KTsKICAgIGNvbnN0IFtmcHMsIHNldEZwc10gPSB1c2VTdGF0ZSgyNCk7CiAgICBjb25zdCBbbW90aW9uLCBzZXRNb3Rpb25dID0gdXNlU3RhdGU8ImxvdyIgfCAibWVkaXVtIiB8ICJoaWdoIj4oIm1lZGl1bSIpOwoKICAgIGNvbnN0IGhhbmRsZUdlbmVyYXRlID0gKCkgPT4gewogICAgICAgIG9uR2VuZXJhdGUoewogICAgICAgICAgICBmaXJzdEZyYW1lSW1hZ2U6IGltYWdlVXJsLAogICAgICAgICAgICBwcm9tcHQsCiAgICAgICAgICAgIGR1cmF0aW9uLAogICAgICAgICAgICBmcHMsCiAgICAgICAgICAgIG1vdGlvbiwKICAgICAgICB9KTsKICAgIH07CgogICAgcmV0dXJuICgKICAgICAgICA8ZGl2CiAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICBwb3NpdGlvbjogImZpeGVkIiwKICAgICAgICAgICAgICAgIGluc2V0OiAwLAogICAgICAgICAgICAgICAgYmFja2dyb3VuZENvbG9yOiAicmdiYSgwLCAwLCAwLCAwLjUpIiwKICAgICAgICAgICAgICAgIGRpc3BsYXk6ICJmbGV4IiwKICAgICAgICAgICAgICAgIGFsaWduSXRlbXM6ICJjZW50ZXIiLAogICAgICAgICAgICAgICAganVzdGlmeUNvbnRlbnQ6ICJjZW50ZXIiLAogICAgICAgICAgICAgICAgekluZGV4OiAxMDAwLAogICAgICAgICAgICB9fQogICAgICAgICAgICBvbkNsaWNrPXtvbkNsb3NlfQogICAgICAgID4KICAgICAgICAgICAgPGRpdgogICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICJ3aGl0ZSIsCiAgICAgICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiMTJweCIsCiAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjJyZW0iLAogICAgICAgICAgICAgICAgICAgIHdpZHRoOiAiOTAlIiwKICAgICAgICAgICAgICAgICAgICBtYXhXaWR0aDogIjYwMHB4IiwKICAgICAgICAgICAgICAgICAgICBtYXhIZWlnaHQ6ICI5MHZoIiwKICAgICAgICAgICAgICAgICAgICBvdmVyZmxvd1k6ICJhdXRvIiwKICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICBvbkNsaWNrPXsoZSkgPT4gZS5zdG9wUHJvcGFnYXRpb24oKX0KICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgey8qIOagh+mimCAqL30KICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZGlzcGxheTogImZsZXgiLCBhbGlnbkl0ZW1zOiAiY2VudGVyIiwganVzdGlmeUNvbnRlbnQ6ICJzcGFjZS1iZXR3ZWVuIiwgbWFyZ2luQm90dG9tOiAiMS41cmVtIiB9fT4KICAgICAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGRpc3BsYXk6ICJmbGV4IiwgYWxpZ25JdGVtczogImNlbnRlciIsIGdhcDogIjAuNXJlbSIgfX0+CiAgICAgICAgICAgICAgICAgICAgICAgIDxWaWRlbyBzaXplPXsyNH0gY29sb3I9IiMzYjgyZjYiIC8+CiAgICAgICAgICAgICAgICAgICAgICAgIDxoMiBzdHlsZT17eyBmb250U2l6ZTogIjIwcHgiLCBmb250V2VpZ2h0OiAiNjAwIiB9fT7lm77niYfovazop4bpopE8L2gyPgogICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgICAgIDxidXR0b24KICAgICAgICAgICAgICAgICAgICAgICAgb25DbGljaz17b25DbG9zZX0KICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIwLjVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyOiAibm9uZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICJ0cmFuc3BhcmVudCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBjdXJzb3I6ICJwb2ludGVyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiAiIzZiNzI4MCIsCiAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICAgICAgICA8WCBzaXplPXsyMH0gLz4KICAgICAgICAgICAgICAgICAgICA8L2J1dHRvbj4KICAgICAgICAgICAgICAgIDwvZGl2PgoKICAgICAgICAgICAgICAgIHsvKiDpooTop4jlm74gKi99CiAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IG1hcmdpbkJvdHRvbTogIjEuNXJlbSIgfX0+CiAgICAgICAgICAgICAgICAgICAgPGxhYmVsIHN0eWxlPXt7IGRpc3BsYXk6ICJibG9jayIsIGZvbnRTaXplOiAiMTRweCIsIGZvbnRXZWlnaHQ6ICI1MDAiLCBtYXJnaW5Cb3R0b206ICIwLjVyZW0iLCBjb2xvcjogIiMzNzQxNTEiIH19PgogICAgICAgICAgICAgICAgICAgICAgICDpppbluKflm77niYcKICAgICAgICAgICAgICAgICAgICA8L2xhYmVsPgogICAgICAgICAgICAgICAgICAgIDxkaXYKICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHdpZHRoOiAiMTAwJSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBtYXhIZWlnaHQ6ICIzMDBweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXJSYWRpdXM6ICI4cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgb3ZlcmZsb3c6ICJoaWRkZW4iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyOiAiMXB4IHNvbGlkICNlNWU3ZWIiLAogICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAgPGltZwogICAgICAgICAgICAgICAgICAgICAgICAgICAgc3JjPXtpbWFnZVVybH0KICAgICAgICAgICAgICAgICAgICAgICAgICAgIGFsdD0i6aaW5binIgogICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB3aWR0aDogIjEwMCUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGhlaWdodDogImF1dG8iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGRpc3BsYXk6ICJibG9jayIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICAvPgogICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgPC9kaXY+CgogICAgICAgICAgICAgICAgey8qIOaPkOekuuivjSAqL30KICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgbWFyZ2luQm90dG9tOiAiMS41cmVtIiB9fT4KICAgICAgICAgICAgICAgICAgICA8bGFiZWwgc3R5bGU9e3sgZGlzcGxheTogImJsb2NrIiwgZm9udFNpemU6ICIxNHB4IiwgZm9udFdlaWdodDogIjUwMCIsIG1hcmdpbkJvdHRvbTogIjAuNXJlbSIsIGNvbG9yOiAiIzM3NDE1MSIgfX0+CiAgICAgICAgICAgICAgICAgICAgICAgIOi/kOWKqOaPj+i/sAogICAgICAgICAgICAgICAgICAgIDwvbGFiZWw+CiAgICAgICAgICAgICAgICAgICAgPHRleHRhcmVhCiAgICAgICAgICAgICAgICAgICAgICAgIHZhbHVlPXtwcm9tcHR9CiAgICAgICAgICAgICAgICAgICAgICAgIG9uQ2hhbmdlPXsoZSkgPT4gc2V0UHJvbXB0KGUudGFyZ2V0LnZhbHVlKX0KICAgICAgICAgICAgICAgICAgICAgICAgcGxhY2Vob2xkZXI9IuaPj+i/sOinhumikeS4reeahOi/kOWKqOWSjOWPmOWMli4uLiIKICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHdpZHRoOiAiMTAwJSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBtaW5IZWlnaHQ6ICIxMDBweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBwYWRkaW5nOiAiMC43NXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXJSYWRpdXM6ICI2cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyOiAiMXB4IHNvbGlkICNkMWQ1ZGIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgZm9udFNpemU6ICIxNHB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHJlc2l6ZTogInZlcnRpY2FsIiwKICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAvPgogICAgICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgbWFyZ2luVG9wOiAiMC41cmVtIiwgZm9udFNpemU6ICIxMnB4IiwgY29sb3I6ICIjNmI3MjgwIiB9fT4KICAgICAgICAgICAgICAgICAgICAgICAg8J+SoSDmj5DnpLo6IOaPj+i/sOebuOacuui/kOWKqOOAgeeJqeS9k+WKqOS9nOOAgeeOr+Wig+WPmOWMluetiQogICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgPC9kaXY+CgogICAgICAgICAgICAgICAgey8qIOWPguaVsOiuvue9riAqL30KICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZGlzcGxheTogImdyaWQiLCBncmlkVGVtcGxhdGVDb2x1bW5zOiAiMWZyIDFmciIsIGdhcDogIjFyZW0iLCBtYXJnaW5Cb3R0b206ICIxLjVyZW0iIH19PgogICAgICAgICAgICAgICAgICAgIHsvKiDml7bplb8gKi99CiAgICAgICAgICAgICAgICAgICAgPGRpdj4KICAgICAgICAgICAgICAgICAgICAgICAgPGxhYmVsIHN0eWxlPXt7IGRpc3BsYXk6ICJibG9jayIsIGZvbnRTaXplOiAiMTRweCIsIGZvbnRXZWlnaHQ6ICI1MDAiLCBtYXJnaW5Cb3R0b206ICIwLjVyZW0iLCBjb2xvcjogIiMzNzQxNTEiIH19PgogICAgICAgICAgICAgICAgICAgICAgICAgICAg6KeG6aKR5pe26ZW/CiAgICAgICAgICAgICAgICAgICAgICAgIDwvbGFiZWw+CiAgICAgICAgICAgICAgICAgICAgICAgIDxzZWxlY3QKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHZhbHVlPXtkdXJhdGlvbn0KICAgICAgICAgICAgICAgICAgICAgICAgICAgIG9uQ2hhbmdlPXsoZSkgPT4gc2V0RHVyYXRpb24oTnVtYmVyKGUudGFyZ2V0LnZhbHVlKSl9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHdpZHRoOiAiMTAwJSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjAuNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiNnB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXI6ICIxcHggc29saWQgI2QxZDVkYiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZm9udFNpemU6ICIxNHB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxvcHRpb24gdmFsdWU9ezJ9PjIg56eSPC9vcHRpb24+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8b3B0aW9uIHZhbHVlPXs0fT40IOenkjwvb3B0aW9uPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgPG9wdGlvbiB2YWx1ZT17Nn0+NiDnp5I8L29wdGlvbj4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxvcHRpb24gdmFsdWU9ezh9Pjgg56eSPC9vcHRpb24+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8b3B0aW9uIHZhbHVlPXsxMH0+MTAg56eSPC9vcHRpb24+CiAgICAgICAgICAgICAgICAgICAgICAgIDwvc2VsZWN0PgogICAgICAgICAgICAgICAgICAgIDwvZGl2PgoKICAgICAgICAgICAgICAgICAgICB7Lyog5bin546HICovfQogICAgICAgICAgICAgICAgICAgIDxkaXY+CiAgICAgICAgICAgICAgICAgICAgICAgIDxsYWJlbCBzdHlsZT17eyBkaXNwbGF5OiAiYmxvY2siLCBmb250U2l6ZTogIjE0cHgiLCBmb250V2VpZ2h0OiAiNTAwIiwgbWFyZ2luQm90dG9tOiAiMC41cmVtIiwgY29sb3I6ICIjMzc0MTUxIiB9fT4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIOW4p+eOhwogICAgICAgICAgICAgICAgICAgICAgICA8L2xhYmVsPgogICAgICAgICAgICAgICAgICAgICAgICA8c2VsZWN0CiAgICAgICAgICAgICAgICAgICAgICAgICAgICB2YWx1ZT17ZnBzfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgb25DaGFuZ2U9eyhlKSA9PiBzZXRGcHMoTnVtYmVyKGUudGFyZ2V0LnZhbHVlKSl9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHdpZHRoOiAiMTAwJSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjAuNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiNnB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXI6ICIxcHggc29saWQgI2QxZDVkYiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZm9udFNpemU6ICIxNHB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxvcHRpb24gdmFsdWU9ezEyfT4xMiBGUFM8L29wdGlvbj4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxvcHRpb24gdmFsdWU9ezI0fT4yNCBGUFM8L29wdGlvbj4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxvcHRpb24gdmFsdWU9ezMwfT4zMCBGUFM8L29wdGlvbj4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxvcHRpb24gdmFsdWU9ezYwfT42MCBGUFM8L29wdGlvbj4KICAgICAgICAgICAgICAgICAgICAgICAgPC9zZWxlY3Q+CiAgICAgICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgICAgICA8L2Rpdj4KCiAgICAgICAgICAgICAgICB7Lyog6L+Q5Yqo5bmF5bqmICovfQogICAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBtYXJnaW5Cb3R0b206ICIycmVtIiB9fT4KICAgICAgICAgICAgICAgICAgICA8bGFiZWwgc3R5bGU9e3sgZGlzcGxheTogImJsb2NrIiwgZm9udFNpemU6ICIxNHB4IiwgZm9udFdlaWdodDogIjUwMCIsIG1hcmdpbkJvdHRvbTogIjAuNzVyZW0iLCBjb2xvcjogIiMzNzQxNTEiIH19PgogICAgICAgICAgICAgICAgICAgICAgICDov5DliqjluYXluqYKICAgICAgICAgICAgICAgICAgICA8L2xhYmVsPgogICAgICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZGlzcGxheTogImZsZXgiLCBnYXA6ICIwLjc1cmVtIiB9fT4KICAgICAgICAgICAgICAgICAgICAgICAgeyhbImxvdyIsICJtZWRpdW0iLCAiaGlnaCJdIGFzIGNvbnN0KS5tYXAoKGxldmVsKSA9PiAoCiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8YnV0dG9uCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAga2V5PXtsZXZlbH0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBvbkNsaWNrPXsoKSA9PiBzZXRNb3Rpb24obGV2ZWwpfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGZsZXg6IDEsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIwLjc1cmVtIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiNnB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyOiBtb3Rpb24gPT09IGxldmVsID8gIjJweCBzb2xpZCAjM2I4MmY2IiA6ICIxcHggc29saWQgI2QxZDVkYiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogbW90aW9uID09PSBsZXZlbCA/ICIjZWZmNmZmIiA6ICJ3aGl0ZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGN1cnNvcjogInBvaW50ZXIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBmb250U2l6ZTogIjE0cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBjb2xvcjogbW90aW9uID09PSBsZXZlbCA/ICIjM2I4MmY2IiA6ICIjMzc0MTUxIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZm9udFdlaWdodDogbW90aW9uID09PSBsZXZlbCA/ICI2MDAiIDogIjQwMCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB7bGV2ZWwgPT09ICJsb3ciICYmICLkvY4gKOeos+WumikifQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHtsZXZlbCA9PT0gIm1lZGl1bSIgJiYgIuS4rSAo5bmz6KGhKSJ9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAge2xldmVsID09PSAiaGlnaCIgJiYgIumrmCAo5Yqo5oSfKSJ9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8L2J1dHRvbj4KICAgICAgICAgICAgICAgICAgICAgICAgKSl9CiAgICAgICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgICAgICA8L2Rpdj4KCiAgICAgICAgICAgICAgICB7Lyog5pON5L2c5oyJ6ZKuICovfQogICAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBkaXNwbGF5OiAiZmxleCIsIGdhcDogIjFyZW0iLCBqdXN0aWZ5Q29udGVudDogImZsZXgtZW5kIiB9fT4KICAgICAgICAgICAgICAgICAgICA8YnV0dG9uCiAgICAgICAgICAgICAgICAgICAgICAgIG9uQ2xpY2s9e29uQ2xvc2V9CiAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBwYWRkaW5nOiAiMC43NXJlbSAxLjVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiNnB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlcjogIjFweCBzb2xpZCAjZDFkNWRiIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogIndoaXRlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGN1cnNvcjogInBvaW50ZXIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgZm9udFNpemU6ICIxNHB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGZvbnRXZWlnaHQ6ICI1MDAiLAogICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAg5Y+W5raICiAgICAgICAgICAgICAgICAgICAgPC9idXR0b24+CiAgICAgICAgICAgICAgICAgICAgPGJ1dHRvbgogICAgICAgICAgICAgICAgICAgICAgICBvbkNsaWNrPXtoYW5kbGVHZW5lcmF0ZX0KICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIwLjc1cmVtIDEuNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXJSYWRpdXM6ICI2cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyOiAibm9uZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICIjM2I4MmY2IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiAid2hpdGUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgY3Vyc29yOiAicG9pbnRlciIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBmb250U2l6ZTogIjE0cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgZm9udFdlaWdodDogIjUwMCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBkaXNwbGF5OiAiZmxleCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBhbGlnbkl0ZW1zOiAiY2VudGVyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGdhcDogIjAuNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICAgICAgICA8U3BhcmtsZXMgc2l6ZT17MTZ9IC8+CiAgICAgICAgICAgICAgICAgICAgICAgIOeUn+aIkOinhumikQogICAgICAgICAgICAgICAgICAgIDwvYnV0dG9uPgogICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgIDwvZGl2PgogICAgICAgIDwvZGl2PgogICAgKTsKfQo=
+/**
+ * Image to Video Shortcut
+ *
+ * Phase 2.6: 图转视频快捷入口
+ * - 从画布图片节点快速启动视频生成
+ * - 自动提取图片作为首帧
+ * - 预填充参数
+ */
+
+import { useState } from "react";
+import { Video, Sparkles, X } from "lucide-react";
+
+export interface ImageToVideoShortcutProps {
+    imageUrl: string;
+    onGenerate: (params: VideoGenerationParams) => void;
+    onClose: () => void;
+}
+
+export interface VideoGenerationParams {
+    firstFrameImage: string;
+    prompt: string;
+    duration: number; // 秒
+    fps: number;
+    motion: "low" | "medium" | "high";
+    model?: string;
+}
+
+export function ImageToVideoShortcut({
+    imageUrl,
+    onGenerate,
+    onClose,
+}: ImageToVideoShortcutProps) {
+    const [prompt, setPrompt] = useState("");
+    const [duration, setDuration] = useState(4);
+    const [fps, setFps] = useState(24);
+    const [motion, setMotion] = useState<"low" | "medium" | "high">("medium");
+
+    const handleGenerate = () => {
+        onGenerate({
+            firstFrameImage: imageUrl,
+            prompt,
+            duration,
+            fps,
+            motion,
+        });
+    };
+
+    return (
+        <div
+            style={{
+                position: "fixed",
+                inset: 0,
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 1000,
+            }}
+            onClick={onClose}
+        >
+            <div
+                style={{
+                    backgroundColor: "white",
+                    borderRadius: "12px",
+                    padding: "2rem",
+                    width: "90%",
+                    maxWidth: "600px",
+                    maxHeight: "90vh",
+                    overflowY: "auto",
+                }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* 标题 */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                        <Video size={24} color="#3b82f6" />
+                        <h2 style={{ fontSize: "20px", fontWeight: "600" }}>图片转视频</h2>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        style={{
+                            padding: "0.5rem",
+                            border: "none",
+                            backgroundColor: "transparent",
+                            cursor: "pointer",
+                            color: "#6b7280",
+                        }}
+                    >
+                        <X size={20} />
+                    </button>
+                </div>
+
+                {/* 预览图 */}
+                <div style={{ marginBottom: "1.5rem" }}>
+                    <label style={{ display: "block", fontSize: "14px", fontWeight: "500", marginBottom: "0.5rem", color: "#374151" }}>
+                        首帧图片
+                    </label>
+                    <div
+                        style={{
+                            width: "100%",
+                            maxHeight: "300px",
+                            borderRadius: "8px",
+                            overflow: "hidden",
+                            border: "1px solid #e5e7eb",
+                        }}
+                    >
+                        <img
+                            src={imageUrl}
+                            alt="首帧"
+                            style={{
+                                width: "100%",
+                                height: "auto",
+                                display: "block",
+                            }}
+                        />
+                    </div>
+                </div>
+
+                {/* 提示词 */}
+                <div style={{ marginBottom: "1.5rem" }}>
+                    <label style={{ display: "block", fontSize: "14px", fontWeight: "500", marginBottom: "0.5rem", color: "#374151" }}>
+                        运动描述
+                    </label>
+                    <textarea
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        placeholder="描述视频中的运动和变化..."
+                        style={{
+                            width: "100%",
+                            minHeight: "100px",
+                            padding: "0.75rem",
+                            borderRadius: "6px",
+                            border: "1px solid #d1d5db",
+                            fontSize: "14px",
+                            resize: "vertical",
+                        }}
+                    />
+                    <div style={{ marginTop: "0.5rem", fontSize: "12px", color: "#6b7280" }}>
+                        💡 提示: 描述相机运动、物体动作、环境变化等
+                    </div>
+                </div>
+
+                {/* 参数设置 */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
+                    {/* 时长 */}
+                    <div>
+                        <label style={{ display: "block", fontSize: "14px", fontWeight: "500", marginBottom: "0.5rem", color: "#374151" }}>
+                            视频时长
+                        </label>
+                        <select
+                            value={duration}
+                            onChange={(e) => setDuration(Number(e.target.value))}
+                            style={{
+                                width: "100%",
+                                padding: "0.5rem",
+                                borderRadius: "6px",
+                                border: "1px solid #d1d5db",
+                                fontSize: "14px",
+                            }}
+                        >
+                            <option value={2}>2 秒</option>
+                            <option value={4}>4 秒</option>
+                            <option value={6}>6 秒</option>
+                            <option value={8}>8 秒</option>
+                            <option value={10}>10 秒</option>
+                        </select>
+                    </div>
+
+                    {/* 帧率 */}
+                    <div>
+                        <label style={{ display: "block", fontSize: "14px", fontWeight: "500", marginBottom: "0.5rem", color: "#374151" }}>
+                            帧率
+                        </label>
+                        <select
+                            value={fps}
+                            onChange={(e) => setFps(Number(e.target.value))}
+                            style={{
+                                width: "100%",
+                                padding: "0.5rem",
+                                borderRadius: "6px",
+                                border: "1px solid #d1d5db",
+                                fontSize: "14px",
+                            }}
+                        >
+                            <option value={12}>12 FPS</option>
+                            <option value={24}>24 FPS</option>
+                            <option value={30}>30 FPS</option>
+                            <option value={60}>60 FPS</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* 运动幅度 */}
+                <div style={{ marginBottom: "2rem" }}>
+                    <label style={{ display: "block", fontSize: "14px", fontWeight: "500", marginBottom: "0.75rem", color: "#374151" }}>
+                        运动幅度
+                    </label>
+                    <div style={{ display: "flex", gap: "0.75rem" }}>
+                        {(["low", "medium", "high"] as const).map((level) => (
+                            <button
+                                key={level}
+                                onClick={() => setMotion(level)}
+                                style={{
+                                    flex: 1,
+                                    padding: "0.75rem",
+                                    borderRadius: "6px",
+                                    border: motion === level ? "2px solid #3b82f6" : "1px solid #d1d5db",
+                                    backgroundColor: motion === level ? "#eff6ff" : "white",
+                                    cursor: "pointer",
+                                    fontSize: "14px",
+                                    color: motion === level ? "#3b82f6" : "#374151",
+                                    fontWeight: motion === level ? "600" : "400",
+                                }}
+                            >
+                                {level === "low" && "低 (稳定)"}
+                                {level === "medium" && "中 (平衡)"}
+                                {level === "high" && "高 (动感)"}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* 操作按钮 */}
+                <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
+                    <button
+                        onClick={onClose}
+                        style={{
+                            padding: "0.75rem 1.5rem",
+                            borderRadius: "6px",
+                            border: "1px solid #d1d5db",
+                            backgroundColor: "white",
+                            cursor: "pointer",
+                            fontSize: "14px",
+                            fontWeight: "500",
+                        }}
+                    >
+                        取消
+                    </button>
+                    <button
+                        onClick={handleGenerate}
+                        style={{
+                            padding: "0.75rem 1.5rem",
+                            borderRadius: "6px",
+                            border: "none",
+                            backgroundColor: "#3b82f6",
+                            color: "white",
+                            cursor: "pointer",
+                            fontSize: "14px",
+                            fontWeight: "500",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.5rem",
+                        }}
+                    >
+                        <Sparkles size={16} />
+                        生成视频
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}

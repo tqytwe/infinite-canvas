@@ -1,1 +1,262 @@
-LyoqCiAqIE11bHRpLUFjY291bnQgTG9hZCBCYWxhbmNpbmcKICoKICogUGhhc2UgMy4yOiDlpJrotKblj7fotJ/ovb3lnYfooaEKICogLSDnrqHnkIblpJrkuKpBUEnotKblj7cKICogLSDoh6rliqjova7or6LliIbphY3or7fmsYIKICogLSDnm5HmjqfotKblj7fphY3pop3lkoznirbmgIEKICovCgpleHBvcnQgaW50ZXJmYWNlIEFjY291bnRDb25maWcgewogICAgaWQ6IHN0cmluZzsKICAgIG5hbWU6IHN0cmluZzsKICAgIGFwaUtleTogc3RyaW5nOwogICAgcHJvdmlkZXI6IHN0cmluZzsKICAgIGlzRW5hYmxlZDogYm9vbGVhbjsKICAgIHByaW9yaXR5OiBudW1iZXI7IC8vIOS8mOWFiOe6p++8jOaVsOWtl+i2iuWwj+i2iuS8mOWFiAogICAgcXVvdGE/OiB7CiAgICAgICAgdG90YWw6IG51bWJlcjsKICAgICAgICB1c2VkOiBudW1iZXI7CiAgICAgICAgcmVzZXRBdD86IG51bWJlcjsgLy8g6YeN572u5pe26Ze05oizCiAgICB9OwogICAgbGFzdFVzZWRBdD86IG51bWJlcjsKICAgIGVycm9yQ291bnQ6IG51bWJlcjsKfQoKZXhwb3J0IGludGVyZmFjZSBMb2FkQmFsYW5jZXJTdGF0cyB7CiAgICB0b3RhbFJlcXVlc3RzOiBudW1iZXI7CiAgICBzdWNjZXNzZnVsUmVxdWVzdHM6IG51bWJlcjsKICAgIGZhaWxlZFJlcXVlc3RzOiBudW1iZXI7CiAgICBhY2NvdW50VXNhZ2U6IFJlY29yZDxzdHJpbmcsIG51bWJlcj47Cn0KCi8qKgogKiDlpJrotKblj7fotJ/ovb3lnYfooaHlmagKICovCmV4cG9ydCBjbGFzcyBBY2NvdW50TG9hZEJhbGFuY2VyIHsKICAgIHByaXZhdGUgYWNjb3VudHM6IEFjY291bnRDb25maWdbXSA9IFtdOwogICAgcHJpdmF0ZSBzdGF0czogTG9hZEJhbGFuY2VyU3RhdHMgPSB7CiAgICAgICAgdG90YWxSZXF1ZXN0czogMCwKICAgICAgICBzdWNjZXNzZnVsUmVxdWVzdHM6IDAsCiAgICAgICAgZmFpbGVkUmVxdWVzdHM6IDAsCiAgICAgICAgYWNjb3VudFVzYWdlOiB7fSwKICAgIH07CiAgICBwcml2YXRlIGN1cnJlbnRJbmRleCA9IDA7CgogICAgY29uc3RydWN0b3IoYWNjb3VudHM6IEFjY291bnRDb25maWdbXSA9IFtdKSB7CiAgICAgICAgdGhpcy5hY2NvdW50cyA9IGFjY291bnRzLmZpbHRlcigoYSkgPT4gYS5pc0VuYWJsZWQpOwogICAgICAgIHRoaXMuc29ydEFjY291bnRzKCk7CiAgICB9CgogICAgLyoqCiAgICAgKiDmt7vliqDotKblj7cKICAgICAqLwogICAgYWRkQWNjb3VudChhY2NvdW50OiBBY2NvdW50Q29uZmlnKTogdm9pZCB7CiAgICAgICAgdGhpcy5hY2NvdW50cy5wdXNoKGFjY291bnQpOwogICAgICAgIHRoaXMuc29ydEFjY291bnRzKCk7CiAgICB9CgogICAgLyoqCiAgICAgKiDnp7vpmaTotKblj7cKICAgICAqLwogICAgcmVtb3ZlQWNjb3VudChhY2NvdW50SWQ6IHN0cmluZyk6IHZvaWQgewogICAgICAgIHRoaXMuYWNjb3VudHMgPSB0aGlzLmFjY291bnRzLmZpbHRlcigoYSkgPT4gYS5pZCAhPT0gYWNjb3VudElkKTsKICAgIH0KCiAgICAvKioKICAgICAqIOabtOaWsOi0puWPt+mFjee9rgogICAgICovCiAgICB1cGRhdGVBY2NvdW50KGFjY291bnRJZDogc3RyaW5nLCB1cGRhdGVzOiBQYXJ0aWFsPEFjY291bnRDb25maWc+KTogdm9pZCB7CiAgICAgICAgY29uc3QgYWNjb3VudCA9IHRoaXMuYWNjb3VudHMuZmluZCgoYSkgPT4gYS5pZCA9PT0gYWNjb3VudElkKTsKICAgICAgICBpZiAoYWNjb3VudCkgewogICAgICAgICAgICBPYmplY3QuYXNzaWduKGFjY291bnQsIHVwZGF0ZXMpOwogICAgICAgICAgICB0aGlzLnNvcnRBY2NvdW50cygpOwogICAgICAgIH0KICAgIH0KCiAgICAvKioKICAgICAqIOiOt+WPluS4i+S4gOS4quWPr+eUqOi0puWPt++8iOi9ruivouetlueVpe+8iQogICAgICovCiAgICBnZXROZXh0QWNjb3VudCgpOiBBY2NvdW50Q29uZmlnIHwgbnVsbCB7CiAgICAgICAgaWYgKHRoaXMuYWNjb3VudHMubGVuZ3RoID09PSAwKSB7CiAgICAgICAgICAgIHJldHVybiBudWxsOwogICAgICAgIH0KCiAgICAgICAgY29uc3QgYXZhaWxhYmxlQWNjb3VudHMgPSB0aGlzLmFjY291bnRzLmZpbHRlcigoYSkgPT4gdGhpcy5pc0FjY291bnRBdmFpbGFibGUoYSkpOwoKICAgICAgICBpZiAoYXZhaWxhYmxlQWNjb3VudHMubGVuZ3RoID09PSAwKSB7CiAgICAgICAgICAgIHJldHVybiBudWxsOwogICAgICAgIH0KCiAgICAgICAgLy8g6L2u6K+i562W55WlCiAgICAgICAgY29uc3QgYWNjb3VudCA9IGF2YWlsYWJsZUFjY291bnRzW3RoaXMuY3VycmVudEluZGV4ICUgYXZhaWxhYmxlQWNjb3VudHMubGVuZ3RoXTsKICAgICAgICB0aGlzLmN1cnJlbnRJbmRleCA9ICh0aGlzLmN1cnJlbnRJbmRleCArIDEpICUgYXZhaWxhYmxlQWNjb3VudHMubGVuZ3RoOwoKICAgICAgICAvLyDmm7TmlrDkvb/nlKjml7bpl7QKICAgICAgICBhY2NvdW50Lmxhc3RVc2VkQXQgPSBEYXRlLm5vdygpOwoKICAgICAgICAvLyDmm7TmlrDnu5/orqEKICAgICAgICB0aGlzLnN0YXRzLnRvdGFsUmVxdWVzdHMrKzsKICAgICAgICB0aGlzLnN0YXRzLmFjY291bnRVc2FnZVthY2NvdW50LmlkXSA9ICh0aGlzLnN0YXRzLmFjY291bnRVc2FnZVthY2NvdW50LmlkXSB8fCAwKSArIDE7CgogICAgICAgIHJldHVybiBhY2NvdW50OwogICAgfQoKICAgIC8qKgogICAgICog6I635Y+W5LyY5YWI57qn5pyA6auY55qE5Y+v55So6LSm5Y+3CiAgICAgKi8KICAgIGdldFByaW9yaXR5QWNjb3VudCgpOiBBY2NvdW50Q29uZmlnIHwgbnVsbCB7CiAgICAgICAgY29uc3QgYXZhaWxhYmxlQWNjb3VudHMgPSB0aGlzLmFjY291bnRzLmZpbHRlcigoYSkgPT4gdGhpcy5pc0FjY291bnRBdmFpbGFibGUoYSkpOwoKICAgICAgICBpZiAoYXZhaWxhYmxlQWNjb3VudHMubGVuZ3RoID09PSAwKSB7CiAgICAgICAgICAgIHJldHVybiBudWxsOwogICAgICAgIH0KCiAgICAgICAgLy8g6L+U5Zue5LyY5YWI57qn5pyA6auY77yI5pWw5a2X5pyA5bCP77yJ55qE6LSm5Y+3CiAgICAgICAgY29uc3QgYWNjb3VudCA9IGF2YWlsYWJsZUFjY291bnRzWzBdOwogICAgICAgIGFjY291bnQubGFzdFVzZWRBdCA9IERhdGUubm93KCk7CgogICAgICAgIHRoaXMuc3RhdHMudG90YWxSZXF1ZXN0cysrOwogICAgICAgIHRoaXMuc3RhdHMuYWNjb3VudFVzYWdlW2FjY291bnQuaWRdID0gKHRoaXMuc3RhdHMuYWNjb3VudFVzYWdlW2FjY291bnQuaWRdIHx8IDApICsgMTsKCiAgICAgICAgcmV0dXJuIGFjY291bnQ7CiAgICB9CgogICAgLyoqCiAgICAgKiDmoIforrDor7fmsYLmiJDlip8KICAgICAqLwogICAgbWFya1N1Y2Nlc3MoYWNjb3VudElkOiBzdHJpbmcpOiB2b2lkIHsKICAgICAgICBjb25zdCBhY2NvdW50ID0gdGhpcy5hY2NvdW50cy5maW5kKChhKSA9PiBhLmlkID09PSBhY2NvdW50SWQpOwogICAgICAgIGlmIChhY2NvdW50KSB7CiAgICAgICAgICAgIGFjY291bnQuZXJyb3JDb3VudCA9IDA7CiAgICAgICAgICAgIGlmIChhY2NvdW50LnF1b3RhKSB7CiAgICAgICAgICAgICAgICBhY2NvdW50LnF1b3RhLnVzZWQrKzsKICAgICAgICAgICAgfQogICAgICAgIH0KICAgICAgICB0aGlzLnN0YXRzLnN1Y2Nlc3NmdWxSZXF1ZXN0cysrOwogICAgfQoKICAgIC8qKgogICAgICog5qCH6K6w6K+35rGC5aSx6LSlCiAgICAgKi8KICAgIG1hcmtGYWlsdXJlKGFjY291bnRJZDogc3RyaW5nKTogdm9pZCB7CiAgICAgICAgY29uc3QgYWNjb3VudCA9IHRoaXMuYWNjb3VudHMuZmluZCgoYSkgPT4gYS5pZCA9PT0gYWNjb3VudElkKTsKICAgICAgICBpZiAoYWNjb3VudCkgewogICAgICAgICAgICBhY2NvdW50LmVycm9yQ291bnQrKzsKICAgICAgICAgICAgLy8g6L+e57ut5aSx6LSlM+asoeWQjuemgeeUqOi0puWPtwogICAgICAgICAgICBpZiAoYWNjb3VudC5lcnJvckNvdW50ID49IDMpIHsKICAgICAgICAgICAgICAgIGFjY291bnQuaXNFbmFibGVkID0gZmFsc2U7CiAgICAgICAgICAgIH0KICAgICAgICB9CiAgICAgICAgdGhpcy5zdGF0cy5mYWlsZWRSZXF1ZXN0cysrOwogICAgfQoKICAgIC8qKgogICAgICog5qOA5p+l6LSm5Y+35piv5ZCm5Y+v55SoCiAgICAgKi8KICAgIHByaXZhdGUgaXNBY2NvdW50QXZhaWxhYmxlKGFjY291bnQ6IEFjY291bnRDb25maWcpOiBib29sZWFuIHsKICAgICAgICBpZiAoIWFjY291bnQuaXNFbmFibGVkKSB7CiAgICAgICAgICAgIHJldHVybiBmYWxzZTsKICAgICAgICB9CgogICAgICAgIC8vIOajgOafpemFjeminQogICAgICAgIGlmIChhY2NvdW50LnF1b3RhKSB7CiAgICAgICAgICAgIC8vIOajgOafpemFjemineaYr+WQpuW3sumHjee9rgogICAgICAgICAgICBpZiAoYWNjb3VudC5xdW90YS5yZXNldEF0ICYmIERhdGUubm93KCkgPj0gYWNjb3VudC5xdW90YS5yZXNldEF0KSB7CiAgICAgICAgICAgICAgICBhY2NvdW50LnF1b3RhLnVzZWQgPSAwOwogICAgICAgICAgICB9CgogICAgICAgICAgICAvLyDmo4Dmn6XmmK/lkKbotoXlh7rphY3pop0KICAgICAgICAgICAgaWYgKGFjY291bnQucXVvdGEudXNlZCA+PSBhY2NvdW50LnF1b3RhLnRvdGFsKSB7CiAgICAgICAgICAgICAgICByZXR1cm4gZmFsc2U7CiAgICAgICAgICAgIH0KICAgICAgICB9CgogICAgICAgIC8vIOajgOafpemUmeivr+asoeaVsAogICAgICAgIGlmIChhY2NvdW50LmVycm9yQ291bnQgPj0gMykgewogICAgICAgICAgICByZXR1cm4gZmFsc2U7CiAgICAgICAgfQoKICAgICAgICByZXR1cm4gdHJ1ZTsKICAgIH0KCiAgICAvKioKICAgICAqIOaMieS8mOWFiOe6p+aOkuW6j+i0puWPtwogICAgICovCiAgICBwcml2YXRlIHNvcnRBY2NvdW50cygpOiB2b2lkIHsKICAgICAgICB0aGlzLmFjY291bnRzLnNvcnQoKGEsIGIpID0+IGEucHJpb3JpdHkgLSBiLnByaW9yaXR5KTsKICAgIH0KCiAgICAvKioKICAgICAqIOiOt+WPluaJgOaciei0puWPtwogICAgICovCiAgICBnZXRBY2NvdW50cygpOiBBY2NvdW50Q29uZmlnW10gewogICAgICAgIHJldHVybiBbLi4udGhpcy5hY2NvdW50c107CiAgICB9CgogICAgLyoqCiAgICAgKiDojrflj5bnu5/orqHkv6Hmga8KICAgICAqLwogICAgZ2V0U3RhdHMoKTogTG9hZEJhbGFuY2VyU3RhdHMgewogICAgICAgIHJldHVybiB7IC4uLnRoaXMuc3RhdHMgfTsKICAgIH0KCiAgICAvKioKICAgICAqIOmHjee9rue7n+iuoeS/oeaBrwogICAgICovCiAgICByZXNldFN0YXRzKCk6IHZvaWQgewogICAgICAgIHRoaXMuc3RhdHMgPSB7CiAgICAgICAgICAgIHRvdGFsUmVxdWVzdHM6IDAsCiAgICAgICAgICAgIHN1Y2Nlc3NmdWxSZXF1ZXN0czogMCwKICAgICAgICAgICAgZmFpbGVkUmVxdWVzdHM6IDAsCiAgICAgICAgICAgIGFjY291bnRVc2FnZToge30sCiAgICAgICAgfTsKICAgIH0KCiAgICAvKioKICAgICAqIOaMgeS5heWMluWIsGxvY2FsU3RvcmFnZQogICAgICovCiAgICBzYXZlKCk6IHZvaWQgewogICAgICAgIGNvbnN0IGRhdGEgPSB7CiAgICAgICAgICAgIGFjY291bnRzOiB0aGlzLmFjY291bnRzLAogICAgICAgICAgICBzdGF0czogdGhpcy5zdGF0cywKICAgICAgICB9OwogICAgICAgIGxvY2FsU3RvcmFnZS5zZXRJdGVtKCJhY2NvdW50LWxvYWQtYmFsYW5jZXIiLCBKU09OLnN0cmluZ2lmeShkYXRhKSk7CiAgICB9CgogICAgLyoqCiAgICAgKiDku45sb2NhbFN0b3JhZ2XliqDovb0KICAgICAqLwogICAgc3RhdGljIGxvYWQoKTogQWNjb3VudExvYWRCYWxhbmNlciB7CiAgICAgICAgdHJ5IHsKICAgICAgICAgICAgY29uc3QgZGF0YSA9IGxvY2FsU3RvcmFnZS5nZXRJdGVtKCJhY2NvdW50LWxvYWQtYmFsYW5jZXIiKTsKICAgICAgICAgICAgaWYgKGRhdGEpIHsKICAgICAgICAgICAgICAgIGNvbnN0IHBhcnNlZCA9IEpTT04ucGFyc2UoZGF0YSk7CiAgICAgICAgICAgICAgICBjb25zdCBiYWxhbmNlciA9IG5ldyBBY2NvdW50TG9hZEJhbGFuY2VyKHBhcnNlZC5hY2NvdW50cyB8fCBbXSk7CiAgICAgICAgICAgICAgICBiYWxhbmNlci5zdGF0cyA9IHBhcnNlZC5zdGF0cyB8fCBiYWxhbmNlci5zdGF0czsKICAgICAgICAgICAgICAgIHJldHVybiBiYWxhbmNlcjsKICAgICAgICAgICAgfQogICAgICAgIH0gY2F0Y2ggKGUpIHsKICAgICAgICAgICAgY29uc29sZS5lcnJvcigiRmFpbGVkIHRvIGxvYWQgYWNjb3VudCBsb2FkIGJhbGFuY2VyOiIsIGUpOwogICAgICAgIH0KICAgICAgICByZXR1cm4gbmV3IEFjY291bnRMb2FkQmFsYW5jZXIoKTsKICAgIH0KfQoKLyoqCiAqIOWFqOWxgOi0n+i9veWdh+ihoeWZqOWunuS+iwogKi8KbGV0IGdsb2JhbEJhbGFuY2VyOiBBY2NvdW50TG9hZEJhbGFuY2VyIHwgbnVsbCA9IG51bGw7CgpleHBvcnQgZnVuY3Rpb24gZ2V0QWNjb3VudExvYWRCYWxhbmNlcigpOiBBY2NvdW50TG9hZEJhbGFuY2VyIHsKICAgIGlmICghZ2xvYmFsQmFsYW5jZXIpIHsKICAgICAgICBnbG9iYWxCYWxhbmNlciA9IEFjY291bnRMb2FkQmFsYW5jZXIubG9hZCgpOwogICAgfQogICAgcmV0dXJuIGdsb2JhbEJhbGFuY2VyOwp9CgpleHBvcnQgZnVuY3Rpb24gc2F2ZUFjY291bnRMb2FkQmFsYW5jZXIoKTogdm9pZCB7CiAgICBpZiAoZ2xvYmFsQmFsYW5jZXIpIHsKICAgICAgICBnbG9iYWxCYWxhbmNlci5zYXZlKCk7CiAgICB9Cn0K
+/**
+ * Multi-Account Load Balancing
+ *
+ * Phase 3.2: 多账号负载均衡
+ * - 管理多个API账号
+ * - 自动轮询分配请求
+ * - 监控账号配额和状态
+ */
+
+export interface AccountConfig {
+    id: string;
+    name: string;
+    apiKey: string;
+    provider: string;
+    isEnabled: boolean;
+    priority: number; // 优先级，数字越小越优先
+    quota?: {
+        total: number;
+        used: number;
+        resetAt?: number; // 重置时间戳
+    };
+    lastUsedAt?: number;
+    errorCount: number;
+}
+
+export interface LoadBalancerStats {
+    totalRequests: number;
+    successfulRequests: number;
+    failedRequests: number;
+    accountUsage: Record<string, number>;
+}
+
+/**
+ * 多账号负载均衡器
+ */
+export class AccountLoadBalancer {
+    private accounts: AccountConfig[] = [];
+    private stats: LoadBalancerStats = {
+        totalRequests: 0,
+        successfulRequests: 0,
+        failedRequests: 0,
+        accountUsage: {},
+    };
+    private currentIndex = 0;
+
+    constructor(accounts: AccountConfig[] = []) {
+        this.accounts = accounts.filter((a) => a.isEnabled);
+        this.sortAccounts();
+    }
+
+    /**
+     * 添加账号
+     */
+    addAccount(account: AccountConfig): void {
+        this.accounts.push(account);
+        this.sortAccounts();
+    }
+
+    /**
+     * 移除账号
+     */
+    removeAccount(accountId: string): void {
+        this.accounts = this.accounts.filter((a) => a.id !== accountId);
+    }
+
+    /**
+     * 更新账号配置
+     */
+    updateAccount(accountId: string, updates: Partial<AccountConfig>): void {
+        const account = this.accounts.find((a) => a.id === accountId);
+        if (account) {
+            Object.assign(account, updates);
+            this.sortAccounts();
+        }
+    }
+
+    /**
+     * 获取下一个可用账号（轮询策略）
+     */
+    getNextAccount(): AccountConfig | null {
+        if (this.accounts.length === 0) {
+            return null;
+        }
+
+        const availableAccounts = this.accounts.filter((a) => this.isAccountAvailable(a));
+
+        if (availableAccounts.length === 0) {
+            return null;
+        }
+
+        // 轮询策略
+        const account = availableAccounts[this.currentIndex % availableAccounts.length];
+        this.currentIndex = (this.currentIndex + 1) % availableAccounts.length;
+
+        // 更新使用时间
+        account.lastUsedAt = Date.now();
+
+        // 更新统计
+        this.stats.totalRequests++;
+        this.stats.accountUsage[account.id] = (this.stats.accountUsage[account.id] || 0) + 1;
+
+        return account;
+    }
+
+    /**
+     * 获取优先级最高的可用账号
+     */
+    getPriorityAccount(): AccountConfig | null {
+        const availableAccounts = this.accounts.filter((a) => this.isAccountAvailable(a));
+
+        if (availableAccounts.length === 0) {
+            return null;
+        }
+
+        // 返回优先级最高（数字最小）的账号
+        const account = availableAccounts[0];
+        account.lastUsedAt = Date.now();
+
+        this.stats.totalRequests++;
+        this.stats.accountUsage[account.id] = (this.stats.accountUsage[account.id] || 0) + 1;
+
+        return account;
+    }
+
+    /**
+     * 标记请求成功
+     */
+    markSuccess(accountId: string): void {
+        const account = this.accounts.find((a) => a.id === accountId);
+        if (account) {
+            account.errorCount = 0;
+            if (account.quota) {
+                account.quota.used++;
+            }
+        }
+        this.stats.successfulRequests++;
+    }
+
+    /**
+     * 标记请求失败
+     */
+    markFailure(accountId: string): void {
+        const account = this.accounts.find((a) => a.id === accountId);
+        if (account) {
+            account.errorCount++;
+            // 连续失败3次后禁用账号
+            if (account.errorCount >= 3) {
+                account.isEnabled = false;
+            }
+        }
+        this.stats.failedRequests++;
+    }
+
+    /**
+     * 检查账号是否可用
+     */
+    private isAccountAvailable(account: AccountConfig): boolean {
+        if (!account.isEnabled) {
+            return false;
+        }
+
+        // 检查配额
+        if (account.quota) {
+            // 检查配额是否已重置
+            if (account.quota.resetAt && Date.now() >= account.quota.resetAt) {
+                account.quota.used = 0;
+            }
+
+            // 检查是否超出配额
+            if (account.quota.used >= account.quota.total) {
+                return false;
+            }
+        }
+
+        // 检查错误次数
+        if (account.errorCount >= 3) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * 按优先级排序账号
+     */
+    private sortAccounts(): void {
+        this.accounts.sort((a, b) => a.priority - b.priority);
+    }
+
+    /**
+     * 获取所有账号
+     */
+    getAccounts(): AccountConfig[] {
+        return [...this.accounts];
+    }
+
+    /**
+     * 获取统计信息
+     */
+    getStats(): LoadBalancerStats {
+        return { ...this.stats };
+    }
+
+    /**
+     * 重置统计信息
+     */
+    resetStats(): void {
+        this.stats = {
+            totalRequests: 0,
+            successfulRequests: 0,
+            failedRequests: 0,
+            accountUsage: {},
+        };
+    }
+
+    /**
+     * 持久化到localStorage
+     */
+    save(): void {
+        const data = {
+            accounts: this.accounts,
+            stats: this.stats,
+        };
+        localStorage.setItem("account-load-balancer", JSON.stringify(data));
+    }
+
+    /**
+     * 从localStorage加载
+     */
+    static load(): AccountLoadBalancer {
+        try {
+            const data = localStorage.getItem("account-load-balancer");
+            if (data) {
+                const parsed = JSON.parse(data);
+                const balancer = new AccountLoadBalancer(parsed.accounts || []);
+                balancer.stats = parsed.stats || balancer.stats;
+                return balancer;
+            }
+        } catch (e) {
+            console.error("Failed to load account load balancer:", e);
+        }
+        return new AccountLoadBalancer();
+    }
+}
+
+/**
+ * 全局负载均衡器实例
+ */
+let globalBalancer: AccountLoadBalancer | null = null;
+
+export function getAccountLoadBalancer(): AccountLoadBalancer {
+    if (!globalBalancer) {
+        globalBalancer = AccountLoadBalancer.load();
+    }
+    return globalBalancer;
+}
+
+export function saveAccountLoadBalancer(): void {
+    if (globalBalancer) {
+        globalBalancer.save();
+    }
+}

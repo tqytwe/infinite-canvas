@@ -1,1 +1,419 @@
-LyoqCiAqIEFjY291bnQgTWFuYWdlciBDb21wb25lbnQKICoKICogUGhhc2UgMy4yOiDotKblj7fnrqHnkIZVSQogKiAtIOa3u+WKoC/nvJbovpEv5Yig6Zmk6LSm5Y+3CiAqIC0g5pi+56S66LSm5Y+354q25oCB5ZKM6YWN6aKdCiAqIC0g5rWL6K+V6LSm5Y+36L+e5o6lCiAqLwoKaW1wb3J0IHsgdXNlU3RhdGUgfSBmcm9tICJyZWFjdCI7CmltcG9ydCB7IFBsdXMsIEVkaXQyLCBUcmFzaDIsIENoZWNrQ2lyY2xlMiwgWENpcmNsZSwgQWxlcnRDaXJjbGUgfSBmcm9tICJsdWNpZGUtcmVhY3QiOwppbXBvcnQgdHlwZSB7IEFjY291bnRDb25maWcgfSBmcm9tICJAL3NlcnZpY2VzL2FjY291bnQtbG9hZC1iYWxhbmNlciI7CmltcG9ydCB7IGdldEFjY291bnRMb2FkQmFsYW5jZXIsIHNhdmVBY2NvdW50TG9hZEJhbGFuY2VyIH0gZnJvbSAiQC9zZXJ2aWNlcy9hY2NvdW50LWxvYWQtYmFsYW5jZXIiOwoKZXhwb3J0IGZ1bmN0aW9uIEFjY291bnRNYW5hZ2VyKCkgewogICAgY29uc3QgYmFsYW5jZXIgPSBnZXRBY2NvdW50TG9hZEJhbGFuY2VyKCk7CiAgICBjb25zdCBbYWNjb3VudHMsIHNldEFjY291bnRzXSA9IHVzZVN0YXRlPEFjY291bnRDb25maWdbXT4oYmFsYW5jZXIuZ2V0QWNjb3VudHMoKSk7CiAgICBjb25zdCBbaXNBZGRpbmdBY2NvdW50LCBzZXRJc0FkZGluZ0FjY291bnRdID0gdXNlU3RhdGUoZmFsc2UpOwogICAgY29uc3QgW2VkaXRpbmdBY2NvdW50SWQsIHNldEVkaXRpbmdBY2NvdW50SWRdID0gdXNlU3RhdGU8c3RyaW5nIHwgbnVsbD4obnVsbCk7CgogICAgY29uc3QgcmVmcmVzaEFjY291bnRzID0gKCkgPT4gewogICAgICAgIHNldEFjY291bnRzKGJhbGFuY2VyLmdldEFjY291bnRzKCkpOwogICAgICAgIHNhdmVBY2NvdW50TG9hZEJhbGFuY2VyKCk7CiAgICB9OwoKICAgIGNvbnN0IGhhbmRsZUFkZEFjY291bnQgPSAoYWNjb3VudDogQWNjb3VudENvbmZpZykgPT4gewogICAgICAgIGJhbGFuY2VyLmFkZEFjY291bnQoYWNjb3VudCk7CiAgICAgICAgcmVmcmVzaEFjY291bnRzKCk7CiAgICAgICAgc2V0SXNBZGRpbmdBY2NvdW50KGZhbHNlKTsKICAgIH07CgogICAgY29uc3QgaGFuZGxlVXBkYXRlQWNjb3VudCA9IChhY2NvdW50SWQ6IHN0cmluZywgdXBkYXRlczogUGFydGlhbDxBY2NvdW50Q29uZmlnPikgPT4gewogICAgICAgIGJhbGFuY2VyLnVwZGF0ZUFjY291bnQoYWNjb3VudElkLCB1cGRhdGVzKTsKICAgICAgICByZWZyZXNoQWNjb3VudHMoKTsKICAgICAgICBzZXRFZGl0aW5nQWNjb3VudElkKG51bGwpOwogICAgfTsKCiAgICBjb25zdCBoYW5kbGVEZWxldGVBY2NvdW50ID0gKGFjY291bnRJZDogc3RyaW5nKSA9PiB7CiAgICAgICAgaWYgKGNvbmZpcm0oIuehruWumuWIoOmZpOi/meS4qui0puWPt++8nyIpKSB7CiAgICAgICAgICAgIGJhbGFuY2VyLnJlbW92ZUFjY291bnQoYWNjb3VudElkKTsKICAgICAgICAgICAgcmVmcmVzaEFjY291bnRzKCk7CiAgICAgICAgfQogICAgfTsKCiAgICBjb25zdCBzdGF0cyA9IGJhbGFuY2VyLmdldFN0YXRzKCk7CgogICAgcmV0dXJuICgKICAgICAgICA8ZGl2IHN0eWxlPXt7IHBhZGRpbmc6ICIycmVtIiB9fT4KICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBtYXJnaW5Cb3R0b206ICIycmVtIiB9fT4KICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZGlzcGxheTogImZsZXgiLCBhbGlnbkl0ZW1zOiAiY2VudGVyIiwganVzdGlmeUNvbnRlbnQ6ICJzcGFjZS1iZXR3ZWVuIiwgbWFyZ2luQm90dG9tOiAiMXJlbSIgfX0+CiAgICAgICAgICAgICAgICAgICAgPGgyIHN0eWxlPXt7IGZvbnRTaXplOiAiMjRweCIsIGZvbnRXZWlnaHQ6ICI2MDAiIH19Pui0puWPt+euoeeQhjwvaDI+CiAgICAgICAgICAgICAgICAgICAgPGJ1dHRvbgogICAgICAgICAgICAgICAgICAgICAgICBvbkNsaWNrPXsoKSA9PiBzZXRJc0FkZGluZ0FjY291bnQodHJ1ZSl9CiAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBwYWRkaW5nOiAiMC41cmVtIDFyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiNnB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlcjogIm5vbmUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYmFja2dyb3VuZENvbG9yOiAiIzNiODJmNiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBjb2xvcjogIndoaXRlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGN1cnNvcjogInBvaW50ZXIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgZGlzcGxheTogImZsZXgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYWxpZ25JdGVtczogImNlbnRlciIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBnYXA6ICIwLjVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAgPFBsdXMgc2l6ZT17MTZ9IC8+CiAgICAgICAgICAgICAgICAgICAgICAgIOa3u+WKoOi0puWPtwogICAgICAgICAgICAgICAgICAgIDwvYnV0dG9uPgogICAgICAgICAgICAgICAgPC9kaXY+CgogICAgICAgICAgICAgICAgey8qIOe7n+iuoeS/oeaBryAqL30KICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZGlzcGxheTogImdyaWQiLCBncmlkVGVtcGxhdGVDb2x1bW5zOiAicmVwZWF0KDQsIDFmcikiLCBnYXA6ICIxcmVtIiwgbWFyZ2luQm90dG9tOiAiMnJlbSIgfX0+CiAgICAgICAgICAgICAgICAgICAgPFN0YXRDYXJkIGxhYmVsPSLmgLvor7fmsYIiIHZhbHVlPXtzdGF0cy50b3RhbFJlcXVlc3RzfSAvPgogICAgICAgICAgICAgICAgICAgIDxTdGF0Q2FyZCBsYWJlbD0i5oiQ5YqfIiB2YWx1ZT17c3RhdHMuc3VjY2Vzc2Z1bFJlcXVlc3RzfSBjb2xvcj0iIzEwYjk4MSIgLz4KICAgICAgICAgICAgICAgICAgICA8U3RhdENhcmQgbGFiZWw9IuWksei0pSIgdmFsdWU9e3N0YXRzLmZhaWxlZFJlcXVlc3RzfSBjb2xvcj0iI2VmNDQ0NCIgLz4KICAgICAgICAgICAgICAgICAgICA8U3RhdENhcmQgbGFiZWw9Iui0puWPt+aVsCIgdmFsdWU9e2FjY291bnRzLmxlbmd0aH0gLz4KICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICA8L2Rpdj4KCiAgICAgICAgICAgIHsvKiDotKblj7fliJfooaggKi99CiAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZGlzcGxheTogImZsZXgiLCBmbGV4RGlyZWN0aW9uOiAiY29sdW1uIiwgZ2FwOiAiMXJlbSIgfX0+CiAgICAgICAgICAgICAgICB7YWNjb3VudHMubWFwKChhY2NvdW50KSA9PiAoCiAgICAgICAgICAgICAgICAgICAgPEFjY291bnRDYXJkCiAgICAgICAgICAgICAgICAgICAgICAgIGtleT17YWNjb3VudC5pZH0KICAgICAgICAgICAgICAgICAgICAgICAgYWNjb3VudD17YWNjb3VudH0KICAgICAgICAgICAgICAgICAgICAgICAgdXNhZ2VDb3VudD17c3RhdHMuYWNjb3VudFVzYWdlW2FjY291bnQuaWRdIHx8IDB9CiAgICAgICAgICAgICAgICAgICAgICAgIG9uRWRpdD17KCkgPT4gc2V0RWRpdGluZ0FjY291bnRJZChhY2NvdW50LmlkKX0KICAgICAgICAgICAgICAgICAgICAgICAgb25EZWxldGU9eygpID0+IGhhbmRsZURlbGV0ZUFjY291bnQoYWNjb3VudC5pZCl9CiAgICAgICAgICAgICAgICAgICAgICAgIG9uVG9nZ2xlRW5hYmxlZD17KGVuYWJsZWQpID0+IGhhbmRsZVVwZGF0ZUFjY291bnQoYWNjb3VudC5pZCwgeyBpc0VuYWJsZWQ6IGVuYWJsZWQgfSl9CiAgICAgICAgICAgICAgICAgICAgLz4KICAgICAgICAgICAgICAgICkpfQogICAgICAgICAgICA8L2Rpdj4KCiAgICAgICAgICAgIHsvKiDmt7vliqDotKblj7flr7nor53moYYgKi99CiAgICAgICAgICAgIHtpc0FkZGluZ0FjY291bnQgJiYgKAogICAgICAgICAgICAgICAgPEFjY291bnREaWFsb2cKICAgICAgICAgICAgICAgICAgICBvblNhdmU9e2hhbmRsZUFkZEFjY291bnR9CiAgICAgICAgICAgICAgICAgICAgb25DbG9zZT17KCkgPT4gc2V0SXNBZGRpbmdBY2NvdW50KGZhbHNlKX0KICAgICAgICAgICAgICAgIC8+CiAgICAgICAgICAgICl9CgogICAgICAgICAgICB7Lyog57yW6L6R6LSm5Y+35a+56K+d5qGGICovfQogICAgICAgICAgICB7ZWRpdGluZ0FjY291bnRJZCAmJiAoCiAgICAgICAgICAgICAgICA8QWNjb3VudERpYWxvZwogICAgICAgICAgICAgICAgICAgIGFjY291bnQ9e2FjY291bnRzLmZpbmQoKGEpID0+IGEuaWQgPT09IGVkaXRpbmdBY2NvdW50SWQpfQogICAgICAgICAgICAgICAgICAgIG9uU2F2ZT17KGFjY291bnQpID0+IGhhbmRsZVVwZGF0ZUFjY291bnQoZWRpdGluZ0FjY291bnRJZCwgYWNjb3VudCl9CiAgICAgICAgICAgICAgICAgICAgb25DbG9zZT17KCkgPT4gc2V0RWRpdGluZ0FjY291bnRJZChudWxsKX0KICAgICAgICAgICAgICAgIC8+CiAgICAgICAgICAgICl9CiAgICAgICAgPC9kaXY+CiAgICApOwp9CgpmdW5jdGlvbiBTdGF0Q2FyZCh7IGxhYmVsLCB2YWx1ZSwgY29sb3IgPSAiIzM3NDE1MSIgfTogeyBsYWJlbDogc3RyaW5nOyB2YWx1ZTogbnVtYmVyOyBjb2xvcj86IHN0cmluZyB9KSB7CiAgICByZXR1cm4gKAogICAgICAgIDxkaXYKICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIxcmVtIiwKICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjhweCIsCiAgICAgICAgICAgICAgICBib3JkZXI6ICIxcHggc29saWQgI2U1ZTdlYiIsCiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICJ3aGl0ZSIsCiAgICAgICAgICAgIH19CiAgICAgICAgPgogICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGZvbnRTaXplOiAiMTJweCIsIGNvbG9yOiAiIzZiNzI4MCIsIG1hcmdpbkJvdHRvbTogIjAuNXJlbSIgfX0+e2xhYmVsfTwvZGl2PgogICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGZvbnRTaXplOiAiMjRweCIsIGZvbnRXZWlnaHQ6ICI2MDAiLCBjb2xvciB9fT57dmFsdWV9PC9kaXY+CiAgICAgICAgPC9kaXY+CiAgICApOwp9CgppbnRlcmZhY2UgQWNjb3VudENhcmRQcm9wcyB7CiAgICBhY2NvdW50OiBBY2NvdW50Q29uZmlnOwogICAgdXNhZ2VDb3VudDogbnVtYmVyOwogICAgb25FZGl0OiAoKSA9PiB2b2lkOwogICAgb25EZWxldGU6ICgpID0+IHZvaWQ7CiAgICBvblRvZ2dsZUVuYWJsZWQ6IChlbmFibGVkOiBib29sZWFuKSA9PiB2b2lkOwp9CgpmdW5jdGlvbiBBY2NvdW50Q2FyZCh7IGFjY291bnQsIHVzYWdlQ291bnQsIG9uRWRpdCwgb25EZWxldGUsIG9uVG9nZ2xlRW5hYmxlZCB9OiBBY2NvdW50Q2FyZFByb3BzKSB7CiAgICBjb25zdCBpc0F2YWlsYWJsZSA9IGFjY291bnQuaXNFbmFibGVkICYmIGFjY291bnQuZXJyb3JDb3VudCA8IDM7CgogICAgcmV0dXJuICgKICAgICAgICA8ZGl2CiAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICBwYWRkaW5nOiAiMS41cmVtIiwKICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjhweCIsCiAgICAgICAgICAgICAgICBib3JkZXI6ICIxcHggc29saWQgI2U1ZTdlYiIsCiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICJ3aGl0ZSIsCiAgICAgICAgICAgIH19CiAgICAgICAgPgogICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGRpc3BsYXk6ICJmbGV4IiwgYWxpZ25JdGVtczogImZsZXgtc3RhcnQiLCBqdXN0aWZ5Q29udGVudDogInNwYWNlLWJldHdlZW4iIH19PgogICAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBmbGV4OiAxIH19PgogICAgICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZGlzcGxheTogImZsZXgiLCBhbGlnbkl0ZW1zOiAiY2VudGVyIiwgZ2FwOiAiMC41cmVtIiwgbWFyZ2luQm90dG9tOiAiMC41cmVtIiB9fT4KICAgICAgICAgICAgICAgICAgICAgICAge2lzQXZhaWxhYmxlID8gKAogICAgICAgICAgICAgICAgICAgICAgICAgICAgPENoZWNrQ2lyY2xlMiBzaXplPXsyMH0gY29sb3I9IiMxMGI5ODEiIC8+CiAgICAgICAgICAgICAgICAgICAgICAgICkgOiBhY2NvdW50LmVycm9yQ291bnQgPj0gMyA/ICgKICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxYQ2lyY2xlIHNpemU9ezIwfSBjb2xvcj0iI2VmNDQ0NCIgLz4KICAgICAgICAgICAgICAgICAgICAgICAgKSA6ICgKICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxBbGVydENpcmNsZSBzaXplPXsyMH0gY29sb3I9IiNmNTllMGIiIC8+CiAgICAgICAgICAgICAgICAgICAgICAgICl9CiAgICAgICAgICAgICAgICAgICAgICAgIDxoMyBzdHlsZT17eyBmb250U2l6ZTogIjE2cHgiLCBmb250V2VpZ2h0OiAiNjAwIiB9fT57YWNjb3VudC5uYW1lfTwvaDM+CiAgICAgICAgICAgICAgICAgICAgICAgIDxzcGFuCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIwLjI1cmVtIDAuNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiNHB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICIjZjNmNGY2IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBmb250U2l6ZTogIjExcHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiAiIzZiNzI4MCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICA+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICB7YWNjb3VudC5wcm92aWRlcn0KICAgICAgICAgICAgICAgICAgICAgICAgPC9zcGFuPgogICAgICAgICAgICAgICAgICAgIDwvZGl2PgoKICAgICAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGZvbnRTaXplOiAiMTNweCIsIGNvbG9yOiAiIzZiNzI4MCIsIG1hcmdpbkJvdHRvbTogIjAuNzVyZW0iIH19PgogICAgICAgICAgICAgICAgICAgICAgICDkvJjlhYjnuqc6IHthY2NvdW50LnByaW9yaXR5fSDCtyDkvb/nlKjmrKHmlbA6IHt1c2FnZUNvdW50fQogICAgICAgICAgICAgICAgICAgIDwvZGl2PgoKICAgICAgICAgICAgICAgICAgICB7Lyog6YWN6aKd5L+h5oGvICovfQogICAgICAgICAgICAgICAgICAgIHthY2NvdW50LnF1b3RhICYmICgKICAgICAgICAgICAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBtYXJnaW5Cb3R0b206ICIwLjc1cmVtIiB9fT4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZm9udFNpemU6ICIxMnB4IiwgY29sb3I6ICIjNmI3MjgwIiwgbWFyZ2luQm90dG9tOiAiMC4yNXJlbSIgfX0+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg6YWN6aKdOiB7YWNjb3VudC5xdW90YS51c2VkfSAvIHthY2NvdW50LnF1b3RhLnRvdGFsfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8ZGl2CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgd2lkdGg6ICIxMDAlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgaGVpZ2h0OiAiNHB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYmFja2dyb3VuZENvbG9yOiAiI2U1ZTdlYiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjJweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG92ZXJmbG93OiAiaGlkZGVuIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxkaXYKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHdpZHRoOiBgJHsoYWNjb3VudC5xdW90YS51c2VkIC8gYWNjb3VudC5xdW90YS50b3RhbCkgKiAxMDB9JWAsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBoZWlnaHQ6ICIxMDAlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogYWNjb3VudC5xdW90YS51c2VkID49IGFjY291bnQucXVvdGEudG90YWwgPyAiI2VmNDQ0NCIgOiAiIzNiODJmNiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgLz4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgICAgICAgICApfQoKICAgICAgICAgICAgICAgICAgICB7Lyog6ZSZ6K+v5o+Q56S6ICovfQogICAgICAgICAgICAgICAgICAgIHthY2NvdW50LmVycm9yQ291bnQgPiAwICYmICgKICAgICAgICAgICAgICAgICAgICAgICAgPGRpdgogICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBwYWRkaW5nOiAiMC41cmVtIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXJSYWRpdXM6ICI0cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogIiNmZWYyZjIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiAiI2RjMjYyNiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZm9udFNpemU6ICIxMnB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIOmUmeivr+asoeaVsDoge2FjY291bnQuZXJyb3JDb3VudH0KICAgICAgICAgICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgICAgICAgICAgKX0KICAgICAgICAgICAgICAgIDwvZGl2PgoKICAgICAgICAgICAgICAgIHsvKiDmk43kvZzmjInpkq4gKi99CiAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGRpc3BsYXk6ICJmbGV4IiwgZ2FwOiAiMC41cmVtIiB9fT4KICAgICAgICAgICAgICAgICAgICA8bGFiZWwgc3R5bGU9e3sgZGlzcGxheTogImZsZXgiLCBhbGlnbkl0ZW1zOiAiY2VudGVyIiwgY3Vyc29yOiAicG9pbnRlciIgfX0+CiAgICAgICAgICAgICAgICAgICAgICAgIDxpbnB1dAogICAgICAgICAgICAgICAgICAgICAgICAgICAgdHlwZT0iY2hlY2tib3giCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBjaGVja2VkPXthY2NvdW50LmlzRW5hYmxlZH0KICAgICAgICAgICAgICAgICAgICAgICAgICAgIG9uQ2hhbmdlPXsoZSkgPT4gb25Ub2dnbGVFbmFibGVkKGUudGFyZ2V0LmNoZWNrZWQpfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sgbWFyZ2luUmlnaHQ6ICIwLjVyZW0iIH19CiAgICAgICAgICAgICAgICAgICAgICAgIC8+CiAgICAgICAgICAgICAgICAgICAgICAgIDxzcGFuIHN0eWxlPXt7IGZvbnRTaXplOiAiMTNweCIgfX0+5ZCv55SoPC9zcGFuPgogICAgICAgICAgICAgICAgICAgIDwvbGFiZWw+CgogICAgICAgICAgICAgICAgICAgIDxidXR0b24KICAgICAgICAgICAgICAgICAgICAgICAgb25DbGljaz17b25FZGl0fQogICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjAuNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXI6ICIxcHggc29saWQgI2QxZDVkYiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXJSYWRpdXM6ICI0cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYmFja2dyb3VuZENvbG9yOiAid2hpdGUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgY3Vyc29yOiAicG9pbnRlciIsCiAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgIHRpdGxlPSLnvJbovpEiCiAgICAgICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICAgICAgICA8RWRpdDIgc2l6ZT17MTZ9IC8+CiAgICAgICAgICAgICAgICAgICAgPC9idXR0b24+CgogICAgICAgICAgICAgICAgICAgIDxidXR0b24KICAgICAgICAgICAgICAgICAgICAgICAgb25DbGljaz17b25EZWxldGV9CiAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBwYWRkaW5nOiAiMC41cmVtIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlcjogIjFweCBzb2xpZCAjZDFkNWRiIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjRweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICJ3aGl0ZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBjdXJzb3I6ICJwb2ludGVyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiAiI2VmNDQ0NCIsCiAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgIHRpdGxlPSLliKDpmaQiCiAgICAgICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICAgICAgICA8VHJhc2gyIHNpemU9ezE2fSAvPgogICAgICAgICAgICAgICAgICAgIDwvYnV0dG9uPgogICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgIDwvZGl2PgogICAgICAgIDwvZGl2PgogICAgKTsKfQoKaW50ZXJmYWNlIEFjY291bnREaWFsb2dQcm9wcyB7CiAgICBhY2NvdW50PzogQWNjb3VudENvbmZpZzsKICAgIG9uU2F2ZTogKGFjY291bnQ6IEFjY291bnRDb25maWcpID0+IHZvaWQ7CiAgICBvbkNsb3NlOiAoKSA9PiB2b2lkOwp9CgpmdW5jdGlvbiBBY2NvdW50RGlhbG9nKHsgYWNjb3VudCwgb25TYXZlLCBvbkNsb3NlIH06IEFjY291bnREaWFsb2dQcm9wcykgewogICAgY29uc3QgW2Zvcm1EYXRhLCBzZXRGb3JtRGF0YV0gPSB1c2VTdGF0ZTxBY2NvdW50Q29uZmlnPigKICAgICAgICBhY2NvdW50IHx8IHsKICAgICAgICAgICAgaWQ6IGBhY2NvdW50LSR7RGF0ZS5ub3coKX1gLAogICAgICAgICAgICBuYW1lOiAiIiwKICAgICAgICAgICAgYXBpS2V5OiAiIiwKICAgICAgICAgICAgcHJvdmlkZXI6ICIiLAogICAgICAgICAgICBpc0VuYWJsZWQ6IHRydWUsCiAgICAgICAgICAgIHByaW9yaXR5OiAxLAogICAgICAgICAgICBlcnJvckNvdW50OiAwLAogICAgICAgIH0KICAgICk7CgogICAgY29uc3QgaGFuZGxlU3VibWl0ID0gKGU6IFJlYWN0LkZvcm1FdmVudCkgPT4gewogICAgICAgIGUucHJldmVudERlZmF1bHQoKTsKICAgICAgICBvblNhdmUoZm9ybURhdGEpOwogICAgfTsKCiAgICByZXR1cm4gKAogICAgICAgIDxkaXYKICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgIHBvc2l0aW9uOiAiZml4ZWQiLAogICAgICAgICAgICAgICAgaW5zZXQ6IDAsCiAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICJyZ2JhKDAsIDAsIDAsIDAuNSkiLAogICAgICAgICAgICAgICAgZGlzcGxheTogImZsZXgiLAogICAgICAgICAgICAgICAgYWxpZ25JdGVtczogImNlbnRlciIsCiAgICAgICAgICAgICAgICBqdXN0aWZ5Q29udGVudDogImNlbnRlciIsCiAgICAgICAgICAgICAgICB6SW5kZXg6IDEwMDAsCiAgICAgICAgICAgIH19CiAgICAgICAgICAgIG9uQ2xpY2s9e29uQ2xvc2V9CiAgICAgICAgPgogICAgICAgICAgICA8ZGl2CiAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogIndoaXRlIiwKICAgICAgICAgICAgICAgICAgICBib3JkZXJSYWRpdXM6ICIxMnB4IiwKICAgICAgICAgICAgICAgICAgICBwYWRkaW5nOiAiMnJlbSIsCiAgICAgICAgICAgICAgICAgICAgd2lkdGg6ICI5MCUiLAogICAgICAgICAgICAgICAgICAgIG1heFdpZHRoOiAiNTAwcHgiLAogICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgIG9uQ2xpY2s9eyhlKSA9PiBlLnN0b3BQcm9wYWdhdGlvbigpfQogICAgICAgICAgICA+CiAgICAgICAgICAgICAgICA8aDMgc3R5bGU9e3sgZm9udFNpemU6ICIyMHB4IiwgZm9udFdlaWdodDogIjYwMCIsIG1hcmdpbkJvdHRvbTogIjEuNXJlbSIgfX0+CiAgICAgICAgICAgICAgICAgICAge2FjY291bnQgPyAi57yW6L6R6LSm5Y+3IiA6ICLmt7vliqDotKblj7cifQogICAgICAgICAgICAgICAgPC9oMz4KCiAgICAgICAgICAgICAgICA8Zm9ybSBvblN1Ym1pdD17aGFuZGxlU3VibWl0fT4KICAgICAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGRpc3BsYXk6ICJmbGV4IiwgZmxleERpcmVjdGlvbjogImNvbHVtbiIsIGdhcDogIjFyZW0iIH19PgogICAgICAgICAgICAgICAgICAgICAgICA8ZGl2PgogICAgICAgICAgICAgICAgICAgICAgICAgICAgPGxhYmVsIHN0eWxlPXt7IGRpc3BsYXk6ICJibG9jayIsIGZvbnRTaXplOiAiMTRweCIsIG1hcmdpbkJvdHRvbTogIjAuNXJlbSIgfX0+6LSm5Y+35ZCN56ewPC9sYWJlbD4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxpbnB1dAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHR5cGU9InRleHQiCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgdmFsdWU9e2Zvcm1EYXRhLm5hbWV9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgb25DaGFuZ2U9eyhlKSA9PiBzZXRGb3JtRGF0YSh7IC4uLmZvcm1EYXRhLCBuYW1lOiBlLnRhcmdldC52YWx1ZSB9KX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB3aWR0aDogIjEwMCUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBwYWRkaW5nOiAiMC41cmVtIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiNnB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyOiAiMXB4IHNvbGlkICNkMWQ1ZGIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgcmVxdWlyZWQKICAgICAgICAgICAgICAgICAgICAgICAgICAgIC8+CiAgICAgICAgICAgICAgICAgICAgICAgIDwvZGl2PgoKICAgICAgICAgICAgICAgICAgICAgICAgPGRpdj4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxsYWJlbCBzdHlsZT17eyBkaXNwbGF5OiAiYmxvY2siLCBmb250U2l6ZTogIjE0cHgiLCBtYXJnaW5Cb3R0b206ICIwLjVyZW0iIH19PkFQSSBLZXk8L2xhYmVsPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgPGlucHV0CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgdHlwZT0icGFzc3dvcmQiCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgdmFsdWU9e2Zvcm1EYXRhLmFwaUtleX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBvbkNoYW5nZT17KGUpID0+IHNldEZvcm1EYXRhKHsgLi4uZm9ybURhdGEsIGFwaUtleTogZS50YXJnZXQudmFsdWUgfSl9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgd2lkdGg6ICIxMDAlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjAuNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjZweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlcjogIjFweCBzb2xpZCAjZDFkNWRiIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHJlcXVpcmVkCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAvPgogICAgICAgICAgICAgICAgICAgICAgICA8L2Rpdj4KCiAgICAgICAgICAgICAgICAgICAgICAgIDxkaXY+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8bGFiZWwgc3R5bGU9e3sgZGlzcGxheTogImJsb2NrIiwgZm9udFNpemU6ICIxNHB4IiwgbWFyZ2luQm90dG9tOiAiMC41cmVtIiB9fT7mj5DkvpvllYY8L2xhYmVsPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgPGlucHV0CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgdHlwZT0idGV4dCIKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB2YWx1ZT17Zm9ybURhdGEucHJvdmlkZXJ9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgb25DaGFuZ2U9eyhlKSA9PiBzZXRGb3JtRGF0YSh7IC4uLmZvcm1EYXRhLCBwcm92aWRlcjogZS50YXJnZXQudmFsdWUgfSl9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgd2lkdGg6ICIxMDAlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjAuNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjZweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlcjogIjFweCBzb2xpZCAjZDFkNWRiIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHJlcXVpcmVkCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAvPgogICAgICAgICAgICAgICAgICAgICAgICA8L2Rpdj4KCiAgICAgICAgICAgICAgICAgICAgICAgIDxkaXY+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8bGFiZWwgc3R5bGU9e3sgZGlzcGxheTogImJsb2NrIiwgZm9udFNpemU6ICIxNHB4IiwgbWFyZ2luQm90dG9tOiAiMC41cmVtIiB9fT7kvJjlhYjnuqc8L2xhYmVsPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgPGlucHV0CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgdHlwZT0ibnVtYmVyIgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHZhbHVlPXtmb3JtRGF0YS5wcmlvcml0eX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBvbkNoYW5nZT17KGUpID0+IHNldEZvcm1EYXRhKHsgLi4uZm9ybURhdGEsIHByaW9yaXR5OiBwYXJzZUludChlLnRhcmdldC52YWx1ZSkgfSl9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgd2lkdGg6ICIxMDAlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjAuNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjZweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlcjogIjFweCBzb2xpZCAjZDFkNWRiIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG1pbj0iMSIKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICByZXF1aXJlZAogICAgICAgICAgICAgICAgICAgICAgICAgICAgLz4KICAgICAgICAgICAgICAgICAgICAgICAgPC9kaXY+CgogICAgICAgICAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGRpc3BsYXk6ICJmbGV4IiwgZ2FwOiAiMXJlbSIsIG1hcmdpblRvcDogIjFyZW0iIH19PgogICAgICAgICAgICAgICAgICAgICAgICAgICAgPGJ1dHRvbgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHR5cGU9ImJ1dHRvbiIKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBvbkNsaWNrPXtvbkNsb3NlfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGZsZXg6IDEsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIwLjc1cmVtIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiNnB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyOiAiMXB4IHNvbGlkICNkMWQ1ZGIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICJ3aGl0ZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGN1cnNvcjogInBvaW50ZXIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg5Y+W5raICiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8L2J1dHRvbj4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxidXR0b24KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB0eXBlPSJzdWJtaXQiCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZmxleDogMSwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjAuNzVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXJSYWRpdXM6ICI2cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXI6ICJub25lIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYmFja2dyb3VuZENvbG9yOiAiIzNiODJmNiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiAid2hpdGUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBjdXJzb3I6ICJwb2ludGVyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIOS/neWtmAogICAgICAgICAgICAgICAgICAgICAgICAgICAgPC9idXR0b24+CiAgICAgICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgPC9mb3JtPgogICAgICAgICAgICA8L2Rpdj4KICAgICAgICA8L2Rpdj4KICAgICk7Cn0K
+/**
+ * Account Manager Component
+ *
+ * Phase 3.2: 账号管理UI
+ * - 添加/编辑/删除账号
+ * - 显示账号状态和配额
+ * - 测试账号连接
+ */
+
+import { useState } from "react";
+import { Plus, Edit2, Trash2, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import type { AccountConfig } from "@/services/account-load-balancer";
+import { getAccountLoadBalancer, saveAccountLoadBalancer } from "@/services/account-load-balancer";
+
+export function AccountManager() {
+    const balancer = getAccountLoadBalancer();
+    const [accounts, setAccounts] = useState<AccountConfig[]>(balancer.getAccounts());
+    const [isAddingAccount, setIsAddingAccount] = useState(false);
+    const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+
+    const refreshAccounts = () => {
+        setAccounts(balancer.getAccounts());
+        saveAccountLoadBalancer();
+    };
+
+    const handleAddAccount = (account: AccountConfig) => {
+        balancer.addAccount(account);
+        refreshAccounts();
+        setIsAddingAccount(false);
+    };
+
+    const handleUpdateAccount = (accountId: string, updates: Partial<AccountConfig>) => {
+        balancer.updateAccount(accountId, updates);
+        refreshAccounts();
+        setEditingAccountId(null);
+    };
+
+    const handleDeleteAccount = (accountId: string) => {
+        if (confirm("确定删除这个账号？")) {
+            balancer.removeAccount(accountId);
+            refreshAccounts();
+        }
+    };
+
+    const stats = balancer.getStats();
+
+    return (
+        <div style={{ padding: "2rem" }}>
+            <div style={{ marginBottom: "2rem" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+                    <h2 style={{ fontSize: "24px", fontWeight: "600" }}>账号管理</h2>
+                    <button
+                        onClick={() => setIsAddingAccount(true)}
+                        style={{
+                            padding: "0.5rem 1rem",
+                            borderRadius: "6px",
+                            border: "none",
+                            backgroundColor: "#3b82f6",
+                            color: "white",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.5rem",
+                        }}
+                    >
+                        <Plus size={16} />
+                        添加账号
+                    </button>
+                </div>
+
+                {/* 统计信息 */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem", marginBottom: "2rem" }}>
+                    <StatCard label="总请求" value={stats.totalRequests} />
+                    <StatCard label="成功" value={stats.successfulRequests} color="#10b981" />
+                    <StatCard label="失败" value={stats.failedRequests} color="#ef4444" />
+                    <StatCard label="账号数" value={accounts.length} />
+                </div>
+            </div>
+
+            {/* 账号列表 */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                {accounts.map((account) => (
+                    <AccountCard
+                        key={account.id}
+                        account={account}
+                        usageCount={stats.accountUsage[account.id] || 0}
+                        onEdit={() => setEditingAccountId(account.id)}
+                        onDelete={() => handleDeleteAccount(account.id)}
+                        onToggleEnabled={(enabled) => handleUpdateAccount(account.id, { isEnabled: enabled })}
+                    />
+                ))}
+            </div>
+
+            {/* 添加账号对话框 */}
+            {isAddingAccount && (
+                <AccountDialog
+                    onSave={handleAddAccount}
+                    onClose={() => setIsAddingAccount(false)}
+                />
+            )}
+
+            {/* 编辑账号对话框 */}
+            {editingAccountId && (
+                <AccountDialog
+                    account={accounts.find((a) => a.id === editingAccountId)}
+                    onSave={(account) => handleUpdateAccount(editingAccountId, account)}
+                    onClose={() => setEditingAccountId(null)}
+                />
+            )}
+        </div>
+    );
+}
+
+function StatCard({ label, value, color = "#374151" }: { label: string; value: number; color?: string }) {
+    return (
+        <div
+            style={{
+                padding: "1rem",
+                borderRadius: "8px",
+                border: "1px solid #e5e7eb",
+                backgroundColor: "white",
+            }}
+        >
+            <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "0.5rem" }}>{label}</div>
+            <div style={{ fontSize: "24px", fontWeight: "600", color }}>{value}</div>
+        </div>
+    );
+}
+
+interface AccountCardProps {
+    account: AccountConfig;
+    usageCount: number;
+    onEdit: () => void;
+    onDelete: () => void;
+    onToggleEnabled: (enabled: boolean) => void;
+}
+
+function AccountCard({ account, usageCount, onEdit, onDelete, onToggleEnabled }: AccountCardProps) {
+    const isAvailable = account.isEnabled && account.errorCount < 3;
+
+    return (
+        <div
+            style={{
+                padding: "1.5rem",
+                borderRadius: "8px",
+                border: "1px solid #e5e7eb",
+                backgroundColor: "white",
+            }}
+        >
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                        {isAvailable ? (
+                            <CheckCircle2 size={20} color="#10b981" />
+                        ) : account.errorCount >= 3 ? (
+                            <XCircle size={20} color="#ef4444" />
+                        ) : (
+                            <AlertCircle size={20} color="#f59e0b" />
+                        )}
+                        <h3 style={{ fontSize: "16px", fontWeight: "600" }}>{account.name}</h3>
+                        <span
+                            style={{
+                                padding: "0.25rem 0.5rem",
+                                borderRadius: "4px",
+                                backgroundColor: "#f3f4f6",
+                                fontSize: "11px",
+                                color: "#6b7280",
+                            }}
+                        >
+                            {account.provider}
+                        </span>
+                    </div>
+
+                    <div style={{ fontSize: "13px", color: "#6b7280", marginBottom: "0.75rem" }}>
+                        优先级: {account.priority} · 使用次数: {usageCount}
+                    </div>
+
+                    {/* 配额信息 */}
+                    {account.quota && (
+                        <div style={{ marginBottom: "0.75rem" }}>
+                            <div style={{ fontSize: "12px", color: "#6b7280", marginBottom: "0.25rem" }}>
+                                配额: {account.quota.used} / {account.quota.total}
+                            </div>
+                            <div
+                                style={{
+                                    width: "100%",
+                                    height: "4px",
+                                    backgroundColor: "#e5e7eb",
+                                    borderRadius: "2px",
+                                    overflow: "hidden",
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        width: `${(account.quota.used / account.quota.total) * 100}%`,
+                                        height: "100%",
+                                        backgroundColor: account.quota.used >= account.quota.total ? "#ef4444" : "#3b82f6",
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 错误提示 */}
+                    {account.errorCount > 0 && (
+                        <div
+                            style={{
+                                padding: "0.5rem",
+                                borderRadius: "4px",
+                                backgroundColor: "#fef2f2",
+                                color: "#dc2626",
+                                fontSize: "12px",
+                            }}
+                        >
+                            错误次数: {account.errorCount}
+                        </div>
+                    )}
+                </div>
+
+                {/* 操作按钮 */}
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <label style={{ display: "flex", alignItems: "center", cursor: "pointer" }}>
+                        <input
+                            type="checkbox"
+                            checked={account.isEnabled}
+                            onChange={(e) => onToggleEnabled(e.target.checked)}
+                            style={{ marginRight: "0.5rem" }}
+                        />
+                        <span style={{ fontSize: "13px" }}>启用</span>
+                    </label>
+
+                    <button
+                        onClick={onEdit}
+                        style={{
+                            padding: "0.5rem",
+                            border: "1px solid #d1d5db",
+                            borderRadius: "4px",
+                            backgroundColor: "white",
+                            cursor: "pointer",
+                        }}
+                        title="编辑"
+                    >
+                        <Edit2 size={16} />
+                    </button>
+
+                    <button
+                        onClick={onDelete}
+                        style={{
+                            padding: "0.5rem",
+                            border: "1px solid #d1d5db",
+                            borderRadius: "4px",
+                            backgroundColor: "white",
+                            cursor: "pointer",
+                            color: "#ef4444",
+                        }}
+                        title="删除"
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+interface AccountDialogProps {
+    account?: AccountConfig;
+    onSave: (account: AccountConfig) => void;
+    onClose: () => void;
+}
+
+function AccountDialog({ account, onSave, onClose }: AccountDialogProps) {
+    const [formData, setFormData] = useState<AccountConfig>(
+        account || {
+            id: `account-${Date.now()}`,
+            name: "",
+            apiKey: "",
+            provider: "",
+            isEnabled: true,
+            priority: 1,
+            errorCount: 0,
+        }
+    );
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSave(formData);
+    };
+
+    return (
+        <div
+            style={{
+                position: "fixed",
+                inset: 0,
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 1000,
+            }}
+            onClick={onClose}
+        >
+            <div
+                style={{
+                    backgroundColor: "white",
+                    borderRadius: "12px",
+                    padding: "2rem",
+                    width: "90%",
+                    maxWidth: "500px",
+                }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <h3 style={{ fontSize: "20px", fontWeight: "600", marginBottom: "1.5rem" }}>
+                    {account ? "编辑账号" : "添加账号"}
+                </h3>
+
+                <form onSubmit={handleSubmit}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                        <div>
+                            <label style={{ display: "block", fontSize: "14px", marginBottom: "0.5rem" }}>账号名称</label>
+                            <input
+                                type="text"
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                style={{
+                                    width: "100%",
+                                    padding: "0.5rem",
+                                    borderRadius: "6px",
+                                    border: "1px solid #d1d5db",
+                                }}
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label style={{ display: "block", fontSize: "14px", marginBottom: "0.5rem" }}>API Key</label>
+                            <input
+                                type="password"
+                                value={formData.apiKey}
+                                onChange={(e) => setFormData({ ...formData, apiKey: e.target.value })}
+                                style={{
+                                    width: "100%",
+                                    padding: "0.5rem",
+                                    borderRadius: "6px",
+                                    border: "1px solid #d1d5db",
+                                }}
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label style={{ display: "block", fontSize: "14px", marginBottom: "0.5rem" }}>提供商</label>
+                            <input
+                                type="text"
+                                value={formData.provider}
+                                onChange={(e) => setFormData({ ...formData, provider: e.target.value })}
+                                style={{
+                                    width: "100%",
+                                    padding: "0.5rem",
+                                    borderRadius: "6px",
+                                    border: "1px solid #d1d5db",
+                                }}
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label style={{ display: "block", fontSize: "14px", marginBottom: "0.5rem" }}>优先级</label>
+                            <input
+                                type="number"
+                                value={formData.priority}
+                                onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) })}
+                                style={{
+                                    width: "100%",
+                                    padding: "0.5rem",
+                                    borderRadius: "6px",
+                                    border: "1px solid #d1d5db",
+                                }}
+                                min="1"
+                                required
+                            />
+                        </div>
+
+                        <div style={{ display: "flex", gap: "1rem", marginTop: "1rem" }}>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                style={{
+                                    flex: 1,
+                                    padding: "0.75rem",
+                                    borderRadius: "6px",
+                                    border: "1px solid #d1d5db",
+                                    backgroundColor: "white",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                取消
+                            </button>
+                            <button
+                                type="submit"
+                                style={{
+                                    flex: 1,
+                                    padding: "0.75rem",
+                                    borderRadius: "6px",
+                                    border: "none",
+                                    backgroundColor: "#3b82f6",
+                                    color: "white",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                保存
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}

@@ -1,1 +1,311 @@
-LyoqCiAqIFByb2dyZXNzIFBvbGxpbmcgVmlzdWFsaXphdGlvbgogKgogKiBQaGFzZSAyLjU6IOi/m+W6pui9ruivouWPr+inhuWMlgogKiAtIOaYvuekuuWQjuWPsOeUn+aIkOS7u+WKoemYn+WIlwogKiAtIOWunuaXtuabtOaWsOS7u+WKoeeKtuaAgQogKiAtIOaUr+aMgeWPlua2iOS7u+WKoQogKi8KCmltcG9ydCB7IHVzZUVmZmVjdCwgdXNlU3RhdGUgfSBmcm9tICJyZWFjdCI7CmltcG9ydCB7IExvYWRlcjIsIENoZWNrQ2lyY2xlMiwgWENpcmNsZSwgQ2xvY2ssIFggfSBmcm9tICJsdWNpZGUtcmVhY3QiOwoKZXhwb3J0IGludGVyZmFjZSBRdWV1ZWRUYXNrIHsKICAgIGlkOiBzdHJpbmc7CiAgICB0eXBlOiAiaW1hZ2UiIHwgInZpZGVvIjsKICAgIG1vZGVsOiBzdHJpbmc7CiAgICBwcm9tcHQ6IHN0cmluZzsKICAgIHN0YXR1czogInBlbmRpbmciIHwgInJ1bm5pbmciIHwgImNvbXBsZXRlZCIgfCAiZmFpbGVkIiB8ICJjYW5jZWxsZWQiOwogICAgcHJvZ3Jlc3M/OiBudW1iZXI7CiAgICBjcmVhdGVkQXQ6IG51bWJlcjsKICAgIHN0YXJ0ZWRBdD86IG51bWJlcjsKICAgIGNvbXBsZXRlZEF0PzogbnVtYmVyOwogICAgZXJyb3I/OiBzdHJpbmc7Cn0KCmV4cG9ydCBpbnRlcmZhY2UgUHJvZ3Jlc3NQb2xsaW5nVmlzdWFsaXplclByb3BzIHsKICAgIHRhc2tzOiBRdWV1ZWRUYXNrW107CiAgICBvbkNhbmNlbFRhc2s/OiAodGFza0lkOiBzdHJpbmcpID0+IHZvaWQ7CiAgICBvblJldHJ5VGFzaz86ICh0YXNrSWQ6IHN0cmluZykgPT4gdm9pZDsKICAgIG9uQ2xlYXJDb21wbGV0ZWQ/OiAoKSA9PiB2b2lkOwogICAgY2xhc3NOYW1lPzogc3RyaW5nOwp9CgpleHBvcnQgZnVuY3Rpb24gUHJvZ3Jlc3NQb2xsaW5nVmlzdWFsaXplcih7CiAgICB0YXNrcywKICAgIG9uQ2FuY2VsVGFzaywKICAgIG9uUmV0cnlUYXNrLAogICAgb25DbGVhckNvbXBsZXRlZCwKICAgIGNsYXNzTmFtZSA9ICIiLAp9OiBQcm9ncmVzc1BvbGxpbmdWaXN1YWxpemVyUHJvcHMpIHsKICAgIGNvbnN0IFtpc0V4cGFuZGVkLCBzZXRJc0V4cGFuZGVkXSA9IHVzZVN0YXRlKHRydWUpOwoKICAgIGNvbnN0IGFjdGl2ZVRhc2tzID0gdGFza3MuZmlsdGVyKCh0KSA9PiB0LnN0YXR1cyA9PT0gInBlbmRpbmciIHx8IHQuc3RhdHVzID09PSAicnVubmluZyIpOwogICAgY29uc3QgY29tcGxldGVkVGFza3MgPSB0YXNrcy5maWx0ZXIoKHQpID0+IHQuc3RhdHVzID09PSAiY29tcGxldGVkIik7CiAgICBjb25zdCBmYWlsZWRUYXNrcyA9IHRhc2tzLmZpbHRlcigodCkgPT4gdC5zdGF0dXMgPT09ICJmYWlsZWQiKTsKCiAgICBpZiAodGFza3MubGVuZ3RoID09PSAwKSByZXR1cm4gbnVsbDsKCiAgICByZXR1cm4gKAogICAgICAgIDxkaXYKICAgICAgICAgICAgY2xhc3NOYW1lPXtjbGFzc05hbWV9CiAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICBwb3NpdGlvbjogImZpeGVkIiwKICAgICAgICAgICAgICAgIGJvdHRvbTogIjIwcHgiLAogICAgICAgICAgICAgICAgcmlnaHQ6ICIyMHB4IiwKICAgICAgICAgICAgICAgIHdpZHRoOiAiMzgwcHgiLAogICAgICAgICAgICAgICAgYmFja2dyb3VuZENvbG9yOiAid2hpdGUiLAogICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiMTJweCIsCiAgICAgICAgICAgICAgICBib3hTaGFkb3c6ICIwIDRweCAxNnB4IHJnYmEoMCwwLDAsMC4xNSkiLAogICAgICAgICAgICAgICAgYm9yZGVyOiAiMXB4IHNvbGlkICNlNWU3ZWIiLAogICAgICAgICAgICAgICAgekluZGV4OiAxMDAwLAogICAgICAgICAgICB9fQogICAgICAgID4KICAgICAgICAgICAgey8qIOWktOmDqCAqL30KICAgICAgICAgICAgPGRpdgogICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICBwYWRkaW5nOiAiMXJlbSIsCiAgICAgICAgICAgICAgICAgICAgYm9yZGVyQm90dG9tOiAiMXB4IHNvbGlkICNlNWU3ZWIiLAogICAgICAgICAgICAgICAgICAgIGRpc3BsYXk6ICJmbGV4IiwKICAgICAgICAgICAgICAgICAgICBhbGlnbkl0ZW1zOiAiY2VudGVyIiwKICAgICAgICAgICAgICAgICAgICBqdXN0aWZ5Q29udGVudDogInNwYWNlLWJldHdlZW4iLAogICAgICAgICAgICAgICAgICAgIGN1cnNvcjogInBvaW50ZXIiLAogICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgIG9uQ2xpY2s9eygpID0+IHNldElzRXhwYW5kZWQoIWlzRXhwYW5kZWQpfQogICAgICAgICAgICA+CiAgICAgICAgICAgICAgICA8ZGl2PgogICAgICAgICAgICAgICAgICAgIDxoMyBzdHlsZT17eyBmb250U2l6ZTogIjE1cHgiLCBmb250V2VpZ2h0OiAiNjAwIiwgbWFyZ2luQm90dG9tOiAiMC4yNXJlbSIgfX0+CiAgICAgICAgICAgICAgICAgICAgICAgIOeUn+aIkOmYn+WIlwogICAgICAgICAgICAgICAgICAgIDwvaDM+CiAgICAgICAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBmb250U2l6ZTogIjEycHgiLCBjb2xvcjogIiM2YjcyODAiIH19PgogICAgICAgICAgICAgICAgICAgICAgICB7YWN0aXZlVGFza3MubGVuZ3RoID4gMCAmJiBgJHthY3RpdmVUYXNrcy5sZW5ndGh9IOS4qui/m+ihjOS4rWB9CiAgICAgICAgICAgICAgICAgICAgICAgIHthY3RpdmVUYXNrcy5sZW5ndGggPiAwICYmIGNvbXBsZXRlZFRhc2tzLmxlbmd0aCA+IDAgJiYgIiDCtyAifQogICAgICAgICAgICAgICAgICAgICAgICB7Y29tcGxldGVkVGFza3MubGVuZ3RoID4gMCAmJiBgJHtjb21wbGV0ZWRUYXNrcy5sZW5ndGh9IOS4quW3suWujOaIkGB9CiAgICAgICAgICAgICAgICAgICAgICAgIHtmYWlsZWRUYXNrcy5sZW5ndGggPiAwICYmIGAgwrcgJHtmYWlsZWRUYXNrcy5sZW5ndGh9IOS4quWksei0pWB9CiAgICAgICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgICAgICA8L2Rpdj4KCiAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGRpc3BsYXk6ICJmbGV4IiwgZ2FwOiAiMC41cmVtIiwgYWxpZ25JdGVtczogImNlbnRlciIgfX0+CiAgICAgICAgICAgICAgICAgICAge2NvbXBsZXRlZFRhc2tzLmxlbmd0aCA+IDAgJiYgb25DbGVhckNvbXBsZXRlZCAmJiAoCiAgICAgICAgICAgICAgICAgICAgICAgIDxidXR0b24KICAgICAgICAgICAgICAgICAgICAgICAgICAgIG9uQ2xpY2s9eyhlKSA9PiB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZS5zdG9wUHJvcGFnYXRpb24oKTsKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBvbkNsZWFyQ29tcGxldGVkKCk7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBmb250U2l6ZTogIjExcHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIwLjI1cmVtIDAuNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyOiAiMXB4IHNvbGlkICNkMWQ1ZGIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjRweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYmFja2dyb3VuZENvbG9yOiAid2hpdGUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGN1cnNvcjogInBvaW50ZXIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiAiIzZiNzI4MCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICA+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICDmuIXpmaTlt7LlrozmiJAKICAgICAgICAgICAgICAgICAgICAgICAgPC9idXR0b24+CiAgICAgICAgICAgICAgICAgICAgKX0KICAgICAgICAgICAgICAgICAgICA8c3BhbiBzdHlsZT17eyBmb250U2l6ZTogIjE4cHgiLCBjb2xvcjogIiM5Y2EzYWYiIH19PgogICAgICAgICAgICAgICAgICAgICAgICB7aXNFeHBhbmRlZCA/ICLiiJIiIDogIisifQogICAgICAgICAgICAgICAgICAgIDwvc3Bhbj4KICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICA8L2Rpdj4KCiAgICAgICAgICAgIHsvKiDku7vliqHliJfooaggKi99CiAgICAgICAgICAgIHtpc0V4cGFuZGVkICYmICgKICAgICAgICAgICAgICAgIDxkaXYKICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICBtYXhIZWlnaHQ6ICI0MDBweCIsCiAgICAgICAgICAgICAgICAgICAgICAgIG92ZXJmbG93WTogImF1dG8iLAogICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICA+CiAgICAgICAgICAgICAgICAgICAge3Rhc2tzLm1hcCgodGFzaykgPT4gKAogICAgICAgICAgICAgICAgICAgICAgICA8VGFza0l0ZW0KICAgICAgICAgICAgICAgICAgICAgICAgICAgIGtleT17dGFzay5pZH0KICAgICAgICAgICAgICAgICAgICAgICAgICAgIHRhc2s9e3Rhc2t9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBvbkNhbmNlbD17b25DYW5jZWxUYXNrfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgb25SZXRyeT17b25SZXRyeVRhc2t9CiAgICAgICAgICAgICAgICAgICAgICAgIC8+CiAgICAgICAgICAgICAgICAgICAgKSl9CiAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgKX0KICAgICAgICA8L2Rpdj4KICAgICk7Cn0KCmludGVyZmFjZSBUYXNrSXRlbVByb3BzIHsKICAgIHRhc2s6IFF1ZXVlZFRhc2s7CiAgICBvbkNhbmNlbD86ICh0YXNrSWQ6IHN0cmluZykgPT4gdm9pZDsKICAgIG9uUmV0cnk/OiAodGFza0lkOiBzdHJpbmcpID0+IHZvaWQ7Cn0KCmZ1bmN0aW9uIFRhc2tJdGVtKHsgdGFzaywgb25DYW5jZWwsIG9uUmV0cnkgfTogVGFza0l0ZW1Qcm9wcykgewogICAgY29uc3QgW3RpbWVFbGFwc2VkLCBzZXRUaW1lRWxhcHNlZF0gPSB1c2VTdGF0ZSgwKTsKCiAgICB1c2VFZmZlY3QoKCkgPT4gewogICAgICAgIGlmICh0YXNrLnN0YXR1cyAhPT0gInJ1bm5pbmciKSByZXR1cm47CgogICAgICAgIGNvbnN0IHN0YXJ0VGltZSA9IHRhc2suc3RhcnRlZEF0IHx8IERhdGUubm93KCk7CiAgICAgICAgY29uc3QgaW50ZXJ2YWwgPSBzZXRJbnRlcnZhbCgoKSA9PiB7CiAgICAgICAgICAgIHNldFRpbWVFbGFwc2VkKE1hdGguZmxvb3IoKERhdGUubm93KCkgLSBzdGFydFRpbWUpIC8gMTAwMCkpOwogICAgICAgIH0sIDEwMDApOwoKICAgICAgICByZXR1cm4gKCkgPT4gY2xlYXJJbnRlcnZhbChpbnRlcnZhbCk7CiAgICB9LCBbdGFzay5zdGF0dXMsIHRhc2suc3RhcnRlZEF0XSk7CgogICAgY29uc3Qgc3RhdHVzSWNvbnMgPSB7CiAgICAgICAgcGVuZGluZzogPENsb2NrIHNpemU9ezE2fSBjb2xvcj0iIzZiNzI4MCIgLz4sCiAgICAgICAgcnVubmluZzogPExvYWRlcjIgc2l6ZT17MTZ9IGNvbG9yPSIjM2I4MmY2IiBzdHlsZT17eyBhbmltYXRpb246ICJzcGluIDFzIGxpbmVhciBpbmZpbml0ZSIgfX0gLz4sCiAgICAgICAgY29tcGxldGVkOiA8Q2hlY2tDaXJjbGUyIHNpemU9ezE2fSBjb2xvcj0iIzEwYjk4MSIgLz4sCiAgICAgICAgZmFpbGVkOiA8WENpcmNsZSBzaXplPXsxNn0gY29sb3I9IiNlZjQ0NDQiIC8+LAogICAgICAgIGNhbmNlbGxlZDogPFhDaXJjbGUgc2l6ZT17MTZ9IGNvbG9yPSIjNmI3MjgwIiAvPiwKICAgIH07CgogICAgcmV0dXJuICgKICAgICAgICA8ZGl2CiAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICBwYWRkaW5nOiAiMXJlbSIsCiAgICAgICAgICAgICAgICBib3JkZXJCb3R0b206ICIxcHggc29saWQgI2YzZjRmNiIsCiAgICAgICAgICAgIH19CiAgICAgICAgPgogICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGRpc3BsYXk6ICJmbGV4IiwgYWxpZ25JdGVtczogImZsZXgtc3RhcnQiLCBnYXA6ICIwLjc1cmVtIiB9fT4KICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgbWFyZ2luVG9wOiAiMC4xMjVyZW0iIH19PntzdGF0dXNJY29uc1t0YXNrLnN0YXR1c119PC9kaXY+CgogICAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBmbGV4OiAxLCBtaW5XaWR0aDogMCB9fT4KICAgICAgICAgICAgICAgICAgICB7Lyog5Lu75Yqh5L+h5oGvICovfQogICAgICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgbWFyZ2luQm90dG9tOiAiMC41cmVtIiB9fT4KICAgICAgICAgICAgICAgICAgICAgICAgPGRpdgogICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBmb250U2l6ZTogIjEzcHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGZvbnRXZWlnaHQ6ICI1MDAiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiAiIzM3NDE1MSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgbWFyZ2luQm90dG9tOiAiMC4yNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICA+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICB7dGFzay5tb2RlbH0KICAgICAgICAgICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgICAgICAgICAgICAgIDxkaXYKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZm9udFNpemU6ICIxMnB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBjb2xvcjogIiM2YjcyODAiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG92ZXJmbG93OiAiaGlkZGVuIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB0ZXh0T3ZlcmZsb3c6ICJlbGxpcHNpcyIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgd2hpdGVTcGFjZTogIm5vd3JhcCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICAgICAgdGl0bGU9e3Rhc2sucHJvbXB0fQogICAgICAgICAgICAgICAgICAgICAgICA+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICB7dGFzay5wcm9tcHR9CiAgICAgICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgICAgIDwvZGl2PgoKICAgICAgICAgICAgICAgICAgICB7Lyog6L+b5bqm5p2hICovfQogICAgICAgICAgICAgICAgICAgIHt0YXNrLnN0YXR1cyA9PT0gInJ1bm5pbmciICYmIHRhc2sucHJvZ3Jlc3MgIT09IHVuZGVmaW5lZCAmJiAoCiAgICAgICAgICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgbWFyZ2luQm90dG9tOiAiMC41cmVtIiB9fT4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxkaXYKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB3aWR0aDogIjEwMCUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBoZWlnaHQ6ICI0cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICIjZTVlN2ViIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiMnB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgb3ZlcmZsb3c6ICJoaWRkZW4iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgPGRpdgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgd2lkdGg6IGAke3Rhc2sucHJvZ3Jlc3N9JWAsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBoZWlnaHQ6ICIxMDAlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogIiMzYjgyZjYiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgdHJhbnNpdGlvbjogIndpZHRoIDAuM3MgZWFzZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgLz4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgICAgICAgICAgICAgPGRpdgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG1hcmdpblRvcDogIjAuMjVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBmb250U2l6ZTogIjExcHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBjb2xvcjogIiM5Y2EzYWYiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBkaXNwbGF5OiAiZmxleCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGp1c3RpZnlDb250ZW50OiAic3BhY2UtYmV0d2VlbiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8c3Bhbj57dGFzay5wcm9ncmVzcy50b0ZpeGVkKDApfSU8L3NwYW4+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgPHNwYW4+e2Zvcm1hdFRpbWUodGltZUVsYXBzZWQpfTwvc3Bhbj4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgICAgICAgICApfQoKICAgICAgICAgICAgICAgICAgICB7Lyog6ZSZ6K+v5L+h5oGvICovfQogICAgICAgICAgICAgICAgICAgIHt0YXNrLnN0YXR1cyA9PT0gImZhaWxlZCIgJiYgdGFzay5lcnJvciAmJiAoCiAgICAgICAgICAgICAgICAgICAgICAgIDxkaXYKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZm9udFNpemU6ICIxMXB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBjb2xvcjogIiNlZjQ0NDQiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG1hcmdpblRvcDogIjAuMjVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIwLjVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogIiNmZWYyZjIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjRweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICA+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICB7dGFzay5lcnJvcn0KICAgICAgICAgICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgICAgICAgICAgKX0KCiAgICAgICAgICAgICAgICAgICAgey8qIOaTjeS9nOaMiemSriAqL30KICAgICAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGRpc3BsYXk6ICJmbGV4IiwgZ2FwOiAiMC41cmVtIiwgbWFyZ2luVG9wOiAiMC41cmVtIiB9fT4KICAgICAgICAgICAgICAgICAgICAgICAge3Rhc2suc3RhdHVzID09PSAicnVubmluZyIgJiYgb25DYW5jZWwgJiYgKAogICAgICAgICAgICAgICAgICAgICAgICAgICAgPGJ1dHRvbgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG9uQ2xpY2s9eygpID0+IG9uQ2FuY2VsKHRhc2suaWQpfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGZvbnRTaXplOiAiMTFweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIwLjI1cmVtIDAuNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlcjogIjFweCBzb2xpZCAjZDFkNWRiIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiNHB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYmFja2dyb3VuZENvbG9yOiAid2hpdGUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBjdXJzb3I6ICJwb2ludGVyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgY29sb3I6ICIjZWY0NDQ0IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIOWPlua2iAogICAgICAgICAgICAgICAgICAgICAgICAgICAgPC9idXR0b24+CiAgICAgICAgICAgICAgICAgICAgICAgICl9CiAgICAgICAgICAgICAgICAgICAgICAgIHt0YXNrLnN0YXR1cyA9PT0gImZhaWxlZCIgJiYgb25SZXRyeSAmJiAoCiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8YnV0dG9uCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgb25DbGljaz17KCkgPT4gb25SZXRyeSh0YXNrLmlkKX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBmb250U2l6ZTogIjExcHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBwYWRkaW5nOiAiMC4yNXJlbSAwLjVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXI6ICIxcHggc29saWQgI2QxZDVkYiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjRweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogIndoaXRlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgY3Vyc29yOiAicG9pbnRlciIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiAiIzNiODJmNiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICDph43or5UKICAgICAgICAgICAgICAgICAgICAgICAgICAgIDwvYnV0dG9uPgogICAgICAgICAgICAgICAgICAgICAgICApfQogICAgICAgICAgICAgICAgICAgICAgICB7dGFzay5zdGF0dXMgPT09ICJjb21wbGV0ZWQiICYmIHRhc2suY29tcGxldGVkQXQgJiYgKAogICAgICAgICAgICAgICAgICAgICAgICAgICAgPHNwYW4gc3R5bGU9e3sgZm9udFNpemU6ICIxMXB4IiwgY29sb3I6ICIjOWNhM2FmIiB9fT4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB7Zm9ybWF0VGltZShNYXRoLmZsb29yKCh0YXNrLmNvbXBsZXRlZEF0IC0gdGFzay5jcmVhdGVkQXQpIC8gMTAwMCkpfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgPC9zcGFuPgogICAgICAgICAgICAgICAgICAgICAgICApfQogICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgIDwvZGl2PgoKICAgICAgICAgICAgPHN0eWxlPntgCiAgICAgICAgICAgICAgICBAa2V5ZnJhbWVzIHNwaW4gewogICAgICAgICAgICAgICAgICAgIGZyb20geyB0cmFuc2Zvcm06IHJvdGF0ZSgwZGVnKTsgfQogICAgICAgICAgICAgICAgICAgIHRvIHsgdHJhbnNmb3JtOiByb3RhdGUoMzYwZGVnKTsgfQogICAgICAgICAgICAgICAgfQogICAgICAgICAgICBgfTwvc3R5bGU+CiAgICAgICAgPC9kaXY+CiAgICApOwp9CgpmdW5jdGlvbiBmb3JtYXRUaW1lKHNlY29uZHM6IG51bWJlcik6IHN0cmluZyB7CiAgICBpZiAoc2Vjb25kcyA8IDYwKSByZXR1cm4gYCR7c2Vjb25kc33np5JgOwogICAgY29uc3QgbWlucyA9IE1hdGguZmxvb3Ioc2Vjb25kcyAvIDYwKTsKICAgIGNvbnN0IHNlY3MgPSBzZWNvbmRzICUgNjA7CiAgICByZXR1cm4gYCR7bWluc33liIYke3NlY3N956eSYDsKfQo=
+/**
+ * Progress Polling Visualization
+ *
+ * Phase 2.5: 进度轮询可视化
+ * - 显示后台生成任务队列
+ * - 实时更新任务状态
+ * - 支持取消任务
+ */
+
+import { useEffect, useState } from "react";
+import { Loader2, CheckCircle2, XCircle, Clock, X } from "lucide-react";
+
+export interface QueuedTask {
+    id: string;
+    type: "image" | "video";
+    model: string;
+    prompt: string;
+    status: "pending" | "running" | "completed" | "failed" | "cancelled";
+    progress?: number;
+    createdAt: number;
+    startedAt?: number;
+    completedAt?: number;
+    error?: string;
+}
+
+export interface ProgressPollingVisualizerProps {
+    tasks: QueuedTask[];
+    onCancelTask?: (taskId: string) => void;
+    onRetryTask?: (taskId: string) => void;
+    onClearCompleted?: () => void;
+    className?: string;
+}
+
+export function ProgressPollingVisualizer({
+    tasks,
+    onCancelTask,
+    onRetryTask,
+    onClearCompleted,
+    className = "",
+}: ProgressPollingVisualizerProps) {
+    const [isExpanded, setIsExpanded] = useState(true);
+
+    const activeTasks = tasks.filter((t) => t.status === "pending" || t.status === "running");
+    const completedTasks = tasks.filter((t) => t.status === "completed");
+    const failedTasks = tasks.filter((t) => t.status === "failed");
+
+    if (tasks.length === 0) return null;
+
+    return (
+        <div
+            className={className}
+            style={{
+                position: "fixed",
+                bottom: "20px",
+                right: "20px",
+                width: "380px",
+                backgroundColor: "white",
+                borderRadius: "12px",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.15)",
+                border: "1px solid #e5e7eb",
+                zIndex: 1000,
+            }}
+        >
+            {/* 头部 */}
+            <div
+                style={{
+                    padding: "1rem",
+                    borderBottom: "1px solid #e5e7eb",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    cursor: "pointer",
+                }}
+                onClick={() => setIsExpanded(!isExpanded)}
+            >
+                <div>
+                    <h3 style={{ fontSize: "15px", fontWeight: "600", marginBottom: "0.25rem" }}>
+                        生成队列
+                    </h3>
+                    <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                        {activeTasks.length > 0 && `${activeTasks.length} 个进行中`}
+                        {activeTasks.length > 0 && completedTasks.length > 0 && " · "}
+                        {completedTasks.length > 0 && `${completedTasks.length} 个已完成`}
+                        {failedTasks.length > 0 && ` · ${failedTasks.length} 个失败`}
+                    </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+                    {completedTasks.length > 0 && onClearCompleted && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onClearCompleted();
+                            }}
+                            style={{
+                                fontSize: "11px",
+                                padding: "0.25rem 0.5rem",
+                                border: "1px solid #d1d5db",
+                                borderRadius: "4px",
+                                backgroundColor: "white",
+                                cursor: "pointer",
+                                color: "#6b7280",
+                            }}
+                        >
+                            清除已完成
+                        </button>
+                    )}
+                    <span style={{ fontSize: "18px", color: "#9ca3af" }}>
+                        {isExpanded ? "−" : "+"}
+                    </span>
+                </div>
+            </div>
+
+            {/* 任务列表 */}
+            {isExpanded && (
+                <div
+                    style={{
+                        maxHeight: "400px",
+                        overflowY: "auto",
+                    }}
+                >
+                    {tasks.map((task) => (
+                        <TaskItem
+                            key={task.id}
+                            task={task}
+                            onCancel={onCancelTask}
+                            onRetry={onRetryTask}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
+
+interface TaskItemProps {
+    task: QueuedTask;
+    onCancel?: (taskId: string) => void;
+    onRetry?: (taskId: string) => void;
+}
+
+function TaskItem({ task, onCancel, onRetry }: TaskItemProps) {
+    const [timeElapsed, setTimeElapsed] = useState(0);
+
+    useEffect(() => {
+        if (task.status !== "running") return;
+
+        const startTime = task.startedAt || Date.now();
+        const interval = setInterval(() => {
+            setTimeElapsed(Math.floor((Date.now() - startTime) / 1000));
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [task.status, task.startedAt]);
+
+    const statusIcons = {
+        pending: <Clock size={16} color="#6b7280" />,
+        running: <Loader2 size={16} color="#3b82f6" style={{ animation: "spin 1s linear infinite" }} />,
+        completed: <CheckCircle2 size={16} color="#10b981" />,
+        failed: <XCircle size={16} color="#ef4444" />,
+        cancelled: <XCircle size={16} color="#6b7280" />,
+    };
+
+    return (
+        <div
+            style={{
+                padding: "1rem",
+                borderBottom: "1px solid #f3f4f6",
+            }}
+        >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "0.75rem" }}>
+                <div style={{ marginTop: "0.125rem" }}>{statusIcons[task.status]}</div>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                    {/* 任务信息 */}
+                    <div style={{ marginBottom: "0.5rem" }}>
+                        <div
+                            style={{
+                                fontSize: "13px",
+                                fontWeight: "500",
+                                color: "#374151",
+                                marginBottom: "0.25rem",
+                            }}
+                        >
+                            {task.model}
+                        </div>
+                        <div
+                            style={{
+                                fontSize: "12px",
+                                color: "#6b7280",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                whiteSpace: "nowrap",
+                            }}
+                            title={task.prompt}
+                        >
+                            {task.prompt}
+                        </div>
+                    </div>
+
+                    {/* 进度条 */}
+                    {task.status === "running" && task.progress !== undefined && (
+                        <div style={{ marginBottom: "0.5rem" }}>
+                            <div
+                                style={{
+                                    width: "100%",
+                                    height: "4px",
+                                    backgroundColor: "#e5e7eb",
+                                    borderRadius: "2px",
+                                    overflow: "hidden",
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        width: `${task.progress}%`,
+                                        height: "100%",
+                                        backgroundColor: "#3b82f6",
+                                        transition: "width 0.3s ease",
+                                    }}
+                                />
+                            </div>
+                            <div
+                                style={{
+                                    marginTop: "0.25rem",
+                                    fontSize: "11px",
+                                    color: "#9ca3af",
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                }}
+                            >
+                                <span>{task.progress.toFixed(0)}%</span>
+                                <span>{formatTime(timeElapsed)}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 错误信息 */}
+                    {task.status === "failed" && task.error && (
+                        <div
+                            style={{
+                                fontSize: "11px",
+                                color: "#ef4444",
+                                marginTop: "0.25rem",
+                                padding: "0.5rem",
+                                backgroundColor: "#fef2f2",
+                                borderRadius: "4px",
+                            }}
+                        >
+                            {task.error}
+                        </div>
+                    )}
+
+                    {/* 操作按钮 */}
+                    <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+                        {task.status === "running" && onCancel && (
+                            <button
+                                onClick={() => onCancel(task.id)}
+                                style={{
+                                    fontSize: "11px",
+                                    padding: "0.25rem 0.5rem",
+                                    border: "1px solid #d1d5db",
+                                    borderRadius: "4px",
+                                    backgroundColor: "white",
+                                    cursor: "pointer",
+                                    color: "#ef4444",
+                                }}
+                            >
+                                取消
+                            </button>
+                        )}
+                        {task.status === "failed" && onRetry && (
+                            <button
+                                onClick={() => onRetry(task.id)}
+                                style={{
+                                    fontSize: "11px",
+                                    padding: "0.25rem 0.5rem",
+                                    border: "1px solid #d1d5db",
+                                    borderRadius: "4px",
+                                    backgroundColor: "white",
+                                    cursor: "pointer",
+                                    color: "#3b82f6",
+                                }}
+                            >
+                                重试
+                            </button>
+                        )}
+                        {task.status === "completed" && task.completedAt && (
+                            <span style={{ fontSize: "11px", color: "#9ca3af" }}>
+                                {formatTime(Math.floor((task.completedAt - task.createdAt) / 1000))}
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <style>{`
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
+        </div>
+    );
+}
+
+function formatTime(seconds: number): string {
+    if (seconds < 60) return `${seconds}秒`;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}分${secs}秒`;
+}

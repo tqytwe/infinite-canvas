@@ -1,1 +1,172 @@
-LyoqCiAqIFZpZGVvIEZyYW1lIEV4dHJhY3RvcgogKgogKiBQaGFzZSAyLjM6IOinhumikeW4p+aPkOWPlgogKiAtIOaUr+aMgeS4iuS8oOinhumikeaWh+S7tgogKiAtIOaPkOWPluWFs+mUruW4py/lnYfljIDph4fmoLcKICogLSDnlJ/miJDnvKnnlaXlm77pooTop4gKICogLSDpgInmi6nluKfkvZzkuLrlj4LogIPlm74KICovCgpleHBvcnQgaW50ZXJmYWNlIFZpZGVvRnJhbWUgewogICAgaWQ6IHN0cmluZzsKICAgIGRhdGFVcmw6IHN0cmluZzsKICAgIHRpbWVzdGFtcDogbnVtYmVyOyAvLyDnp5IKICAgIHdpZHRoOiBudW1iZXI7CiAgICBoZWlnaHQ6IG51bWJlcjsKfQoKZXhwb3J0IGludGVyZmFjZSBFeHRyYWN0RnJhbWVzT3B0aW9ucyB7CiAgICBtb2RlOiAidW5pZm9ybSIgfCAia2V5ZnJhbWVzIjsKICAgIGNvdW50PzogbnVtYmVyOyAvLyB1bmlmb3Jt5qih5byP77ya5o+Q5Y+W5bin5pWwCiAgICBpbnRlcnZhbD86IG51bWJlcjsgLy8gdW5pZm9ybeaooeW8j++8mumXtOmalOenkuaVsAogICAgbWF4V2lkdGg/OiBudW1iZXI7IC8vIOe8qeeVpeWbvuacgOWkp+WuveW6pgogICAgbWF4SGVpZ2h0PzogbnVtYmVyOyAvLyDnvKnnlaXlm77mnIDlpKfpq5jluqYKfQoKLyoqCiAqIOS7juinhumikeaWh+S7tuaPkOWPluW4pwogKi8KZXhwb3J0IGFzeW5jIGZ1bmN0aW9uIGV4dHJhY3RGcmFtZXNGcm9tVmlkZW8oCiAgICBmaWxlOiBGaWxlLAogICAgb3B0aW9uczogRXh0cmFjdEZyYW1lc09wdGlvbnMgPSB7IG1vZGU6ICJ1bmlmb3JtIiwgY291bnQ6IDEwIH0KKTogUHJvbWlzZTxWaWRlb0ZyYW1lW10+IHsKICAgIHJldHVybiBuZXcgUHJvbWlzZSgocmVzb2x2ZSwgcmVqZWN0KSA9PiB7CiAgICAgICAgY29uc3QgdmlkZW8gPSBkb2N1bWVudC5jcmVhdGVFbGVtZW50KCJ2aWRlbyIpOwogICAgICAgIHZpZGVvLnByZWxvYWQgPSAibWV0YWRhdGEiOwogICAgICAgIHZpZGVvLm11dGVkID0gdHJ1ZTsKCiAgICAgICAgY29uc3QgdXJsID0gVVJMLmNyZWF0ZU9iamVjdFVSTChmaWxlKTsKICAgICAgICB2aWRlby5zcmMgPSB1cmw7CgogICAgICAgIHZpZGVvLm9ubG9hZGVkbWV0YWRhdGEgPSBhc3luYyAoKSA9PiB7CiAgICAgICAgICAgIHRyeSB7CiAgICAgICAgICAgICAgICBjb25zdCBkdXJhdGlvbiA9IHZpZGVvLmR1cmF0aW9uOwogICAgICAgICAgICAgICAgY29uc3QgZnJhbWVzOiBWaWRlb0ZyYW1lW10gPSBbXTsKCiAgICAgICAgICAgICAgICBpZiAob3B0aW9ucy5tb2RlID09PSAidW5pZm9ybSIpIHsKICAgICAgICAgICAgICAgICAgICBjb25zdCBjb3VudCA9IG9wdGlvbnMuY291bnQgfHwgMTA7CiAgICAgICAgICAgICAgICAgICAgY29uc3QgaW50ZXJ2YWwgPSBkdXJhdGlvbiAvIGNvdW50OwoKICAgICAgICAgICAgICAgICAgICBmb3IgKGxldCBpID0gMDsgaSA8IGNvdW50OyBpKyspIHsKICAgICAgICAgICAgICAgICAgICAgICAgY29uc3QgdGltZXN0YW1wID0gaSAqIGludGVydmFsOwogICAgICAgICAgICAgICAgICAgICAgICBjb25zdCBmcmFtZSA9IGF3YWl0IGV4dHJhY3RGcmFtZUF0VGltZSh2aWRlbywgdGltZXN0YW1wLCBvcHRpb25zKTsKICAgICAgICAgICAgICAgICAgICAgICAgZnJhbWVzLnB1c2goZnJhbWUpOwogICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIH0gZWxzZSB7CiAgICAgICAgICAgICAgICAgICAgLy8ga2V5ZnJhbWVz5qih5byP5pqC5pe26ZmN57qn5Li6dW5pZm9ybQogICAgICAgICAgICAgICAgICAgIGNvbnN0IGNvdW50ID0gb3B0aW9ucy5jb3VudCB8fCAxMDsKICAgICAgICAgICAgICAgICAgICBjb25zdCBpbnRlcnZhbCA9IGR1cmF0aW9uIC8gY291bnQ7CgogICAgICAgICAgICAgICAgICAgIGZvciAobGV0IGkgPSAwOyBpIDwgY291bnQ7IGkrKykgewogICAgICAgICAgICAgICAgICAgICAgICBjb25zdCB0aW1lc3RhbXAgPSBpICogaW50ZXJ2YWw7CiAgICAgICAgICAgICAgICAgICAgICAgIGNvbnN0IGZyYW1lID0gYXdhaXQgZXh0cmFjdEZyYW1lQXRUaW1lKHZpZGVvLCB0aW1lc3RhbXAsIG9wdGlvbnMpOwogICAgICAgICAgICAgICAgICAgICAgICBmcmFtZXMucHVzaChmcmFtZSk7CiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgfQoKICAgICAgICAgICAgICAgIFVSTC5yZXZva2VPYmplY3RVUkwodXJsKTsKICAgICAgICAgICAgICAgIHJlc29sdmUoZnJhbWVzKTsKICAgICAgICAgICAgfSBjYXRjaCAoZXJyb3IpIHsKICAgICAgICAgICAgICAgIFVSTC5yZXZva2VPYmplY3RVUkwodXJsKTsKICAgICAgICAgICAgICAgIHJlamVjdChlcnJvcik7CiAgICAgICAgICAgIH0KICAgICAgICB9OwoKICAgICAgICB2aWRlby5vbmVycm9yID0gKCkgPT4gewogICAgICAgICAgICBVUkwucmV2b2tlT2JqZWN0VVJMKHVybCk7CiAgICAgICAgICAgIHJlamVjdChuZXcgRXJyb3IoIkZhaWxlZCB0byBsb2FkIHZpZGVvIikpOwogICAgICAgIH07CiAgICB9KTsKfQoKLyoqCiAqIOWcqOaMh+WumuaXtumXtOeCueaPkOWPluW4pwogKi8KYXN5bmMgZnVuY3Rpb24gZXh0cmFjdEZyYW1lQXRUaW1lKAogICAgdmlkZW86IEhUTUxWaWRlb0VsZW1lbnQsCiAgICB0aW1lc3RhbXA6IG51bWJlciwKICAgIG9wdGlvbnM6IEV4dHJhY3RGcmFtZXNPcHRpb25zCik6IFByb21pc2U8VmlkZW9GcmFtZT4gewogICAgcmV0dXJuIG5ldyBQcm9taXNlKChyZXNvbHZlLCByZWplY3QpID0+IHsKICAgICAgICBjb25zdCBzZWVrSGFuZGxlciA9ICgpID0+IHsKICAgICAgICAgICAgdHJ5IHsKICAgICAgICAgICAgICAgIGNvbnN0IGNhbnZhcyA9IGRvY3VtZW50LmNyZWF0ZUVsZW1lbnQoImNhbnZhcyIpOwogICAgICAgICAgICAgICAgY29uc3QgY3R4ID0gY2FudmFzLmdldENvbnRleHQoIjJkIik7CiAgICAgICAgICAgICAgICBpZiAoIWN0eCkgewogICAgICAgICAgICAgICAgICAgIHJlamVjdChuZXcgRXJyb3IoIkZhaWxlZCB0byBnZXQgY2FudmFzIGNvbnRleHQiKSk7CiAgICAgICAgICAgICAgICAgICAgcmV0dXJuOwogICAgICAgICAgICAgICAgfQoKICAgICAgICAgICAgICAgIC8vIOiuoeeul+e8qeeVpeWbvuWwuuWvuAogICAgICAgICAgICAgICAgY29uc3QgeyB3aWR0aCwgaGVpZ2h0IH0gPSBjYWxjdWxhdGVUaHVtYm5haWxTaXplKAogICAgICAgICAgICAgICAgICAgIHZpZGVvLnZpZGVvV2lkdGgsCiAgICAgICAgICAgICAgICAgICAgdmlkZW8udmlkZW9IZWlnaHQsCiAgICAgICAgICAgICAgICAgICAgb3B0aW9ucy5tYXhXaWR0aCB8fCA1MTIsCiAgICAgICAgICAgICAgICAgICAgb3B0aW9ucy5tYXhIZWlnaHQgfHwgNTEyCiAgICAgICAgICAgICAgICApOwoKICAgICAgICAgICAgICAgIGNhbnZhcy53aWR0aCA9IHdpZHRoOwogICAgICAgICAgICAgICAgY2FudmFzLmhlaWdodCA9IGhlaWdodDsKCiAgICAgICAgICAgICAgICBjdHguZHJhd0ltYWdlKHZpZGVvLCAwLCAwLCB3aWR0aCwgaGVpZ2h0KTsKCiAgICAgICAgICAgICAgICBjb25zdCBkYXRhVXJsID0gY2FudmFzLnRvRGF0YVVSTCgiaW1hZ2UvanBlZyIsIDAuODUpOwoKICAgICAgICAgICAgICAgIHJlc29sdmUoewogICAgICAgICAgICAgICAgICAgIGlkOiBgZnJhbWUtJHt0aW1lc3RhbXAudG9GaXhlZCgzKX1gLAogICAgICAgICAgICAgICAgICAgIGRhdGFVcmwsCiAgICAgICAgICAgICAgICAgICAgdGltZXN0YW1wLAogICAgICAgICAgICAgICAgICAgIHdpZHRoLAogICAgICAgICAgICAgICAgICAgIGhlaWdodCwKICAgICAgICAgICAgICAgIH0pOwoKICAgICAgICAgICAgICAgIHZpZGVvLnJlbW92ZUV2ZW50TGlzdGVuZXIoInNlZWtlZCIsIHNlZWtIYW5kbGVyKTsKICAgICAgICAgICAgfSBjYXRjaCAoZXJyb3IpIHsKICAgICAgICAgICAgICAgIHJlamVjdChlcnJvcik7CiAgICAgICAgICAgIH0KICAgICAgICB9OwoKICAgICAgICB2aWRlby5hZGRFdmVudExpc3RlbmVyKCJzZWVrZWQiLCBzZWVrSGFuZGxlcik7CiAgICAgICAgdmlkZW8uY3VycmVudFRpbWUgPSB0aW1lc3RhbXA7CiAgICB9KTsKfQoKLyoqCiAqIOiuoeeul+e8qeeVpeWbvuWwuuWvuO+8iOS/neaMgeWuvemrmOavlO+8iQogKi8KZnVuY3Rpb24gY2FsY3VsYXRlVGh1bWJuYWlsU2l6ZSgKICAgIG9yaWdpbmFsV2lkdGg6IG51bWJlciwKICAgIG9yaWdpbmFsSGVpZ2h0OiBudW1iZXIsCiAgICBtYXhXaWR0aDogbnVtYmVyLAogICAgbWF4SGVpZ2h0OiBudW1iZXIKKTogeyB3aWR0aDogbnVtYmVyOyBoZWlnaHQ6IG51bWJlciB9IHsKICAgIGNvbnN0IGFzcGVjdFJhdGlvID0gb3JpZ2luYWxXaWR0aCAvIG9yaWdpbmFsSGVpZ2h0OwoKICAgIGxldCB3aWR0aCA9IG9yaWdpbmFsV2lkdGg7CiAgICBsZXQgaGVpZ2h0ID0gb3JpZ2luYWxIZWlnaHQ7CgogICAgaWYgKHdpZHRoID4gbWF4V2lkdGgpIHsKICAgICAgICB3aWR0aCA9IG1heFdpZHRoOwogICAgICAgIGhlaWdodCA9IHdpZHRoIC8gYXNwZWN0UmF0aW87CiAgICB9CgogICAgaWYgKGhlaWdodCA+IG1heEhlaWdodCkgewogICAgICAgIGhlaWdodCA9IG1heEhlaWdodDsKICAgICAgICB3aWR0aCA9IGhlaWdodCAqIGFzcGVjdFJhdGlvOwogICAgfQoKICAgIHJldHVybiB7CiAgICAgICAgd2lkdGg6IE1hdGgucm91bmQod2lkdGgpLAogICAgICAgIGhlaWdodDogTWF0aC5yb3VuZChoZWlnaHQpLAogICAgfTsKfQoKLyoqCiAqIOagvOW8j+WMluaXtumXtOaIs+S4uiBNTTpTUwogKi8KZXhwb3J0IGZ1bmN0aW9uIGZvcm1hdFRpbWVzdGFtcChzZWNvbmRzOiBudW1iZXIpOiBzdHJpbmcgewogICAgY29uc3QgbWludXRlcyA9IE1hdGguZmxvb3Ioc2Vjb25kcyAvIDYwKTsKICAgIGNvbnN0IHNlY3MgPSBNYXRoLmZsb29yKHNlY29uZHMgJSA2MCk7CiAgICByZXR1cm4gYCR7bWludXRlcy50b1N0cmluZygpLnBhZFN0YXJ0KDIsICIwIil9OiR7c2Vjcy50b1N0cmluZygpLnBhZFN0YXJ0KDIsICIwIil9YDsKfQo=
+/**
+ * Video Frame Extractor
+ *
+ * Phase 2.3: 视频帧提取
+ * - 支持上传视频文件
+ * - 提取关键帧/均匀采样
+ * - 生成缩略图预览
+ * - 选择帧作为参考图
+ */
+
+export interface VideoFrame {
+    id: string;
+    dataUrl: string;
+    timestamp: number; // 秒
+    width: number;
+    height: number;
+}
+
+export interface ExtractFramesOptions {
+    mode: "uniform" | "keyframes";
+    count?: number; // uniform模式：提取帧数
+    interval?: number; // uniform模式：间隔秒数
+    maxWidth?: number; // 缩略图最大宽度
+    maxHeight?: number; // 缩略图最大高度
+}
+
+/**
+ * 从视频文件提取帧
+ */
+export async function extractFramesFromVideo(
+    file: File,
+    options: ExtractFramesOptions = { mode: "uniform", count: 10 }
+): Promise<VideoFrame[]> {
+    return new Promise((resolve, reject) => {
+        const video = document.createElement("video");
+        video.preload = "metadata";
+        video.muted = true;
+
+        const url = URL.createObjectURL(file);
+        video.src = url;
+
+        video.onloadedmetadata = async () => {
+            try {
+                const duration = video.duration;
+                const frames: VideoFrame[] = [];
+
+                if (options.mode === "uniform") {
+                    const count = options.count || 10;
+                    const interval = duration / count;
+
+                    for (let i = 0; i < count; i++) {
+                        const timestamp = i * interval;
+                        const frame = await extractFrameAtTime(video, timestamp, options);
+                        frames.push(frame);
+                    }
+                } else {
+                    // keyframes模式暂时降级为uniform
+                    const count = options.count || 10;
+                    const interval = duration / count;
+
+                    for (let i = 0; i < count; i++) {
+                        const timestamp = i * interval;
+                        const frame = await extractFrameAtTime(video, timestamp, options);
+                        frames.push(frame);
+                    }
+                }
+
+                URL.revokeObjectURL(url);
+                resolve(frames);
+            } catch (error) {
+                URL.revokeObjectURL(url);
+                reject(error);
+            }
+        };
+
+        video.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error("Failed to load video"));
+        };
+    });
+}
+
+/**
+ * 在指定时间点提取帧
+ */
+async function extractFrameAtTime(
+    video: HTMLVideoElement,
+    timestamp: number,
+    options: ExtractFramesOptions
+): Promise<VideoFrame> {
+    return new Promise((resolve, reject) => {
+        const seekHandler = () => {
+            try {
+                const canvas = document.createElement("canvas");
+                const ctx = canvas.getContext("2d");
+                if (!ctx) {
+                    reject(new Error("Failed to get canvas context"));
+                    return;
+                }
+
+                // 计算缩略图尺寸
+                const { width, height } = calculateThumbnailSize(
+                    video.videoWidth,
+                    video.videoHeight,
+                    options.maxWidth || 512,
+                    options.maxHeight || 512
+                );
+
+                canvas.width = width;
+                canvas.height = height;
+
+                ctx.drawImage(video, 0, 0, width, height);
+
+                const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+
+                resolve({
+                    id: `frame-${timestamp.toFixed(3)}`,
+                    dataUrl,
+                    timestamp,
+                    width,
+                    height,
+                });
+
+                video.removeEventListener("seeked", seekHandler);
+            } catch (error) {
+                reject(error);
+            }
+        };
+
+        video.addEventListener("seeked", seekHandler);
+        video.currentTime = timestamp;
+    });
+}
+
+/**
+ * 计算缩略图尺寸（保持宽高比）
+ */
+function calculateThumbnailSize(
+    originalWidth: number,
+    originalHeight: number,
+    maxWidth: number,
+    maxHeight: number
+): { width: number; height: number } {
+    const aspectRatio = originalWidth / originalHeight;
+
+    let width = originalWidth;
+    let height = originalHeight;
+
+    if (width > maxWidth) {
+        width = maxWidth;
+        height = width / aspectRatio;
+    }
+
+    if (height > maxHeight) {
+        height = maxHeight;
+        width = height * aspectRatio;
+    }
+
+    return {
+        width: Math.round(width),
+        height: Math.round(height),
+    };
+}
+
+/**
+ * 格式化时间戳为 MM:SS
+ */
+export function formatTimestamp(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+}

@@ -1,1 +1,280 @@
-LyoqCiAqIFZpZGVvIEZyYW1lIFBpY2tlciBDb21wb25lbnQKICoKICogUGhhc2UgMi4zOiDop4bpopHluKfmj5Dlj5ZVSQogKiAtIOS4iuS8oOinhumikeaWh+S7tgogKiAtIOaYvuekuuW4p+e8qeeVpeWbvue9keagvAogKiAtIOmAieaLqeW4p+S9nOS4uuWPguiAg+WbvgogKi8KCmltcG9ydCB7IHVzZVN0YXRlIH0gZnJvbSAicmVhY3QiOwppbXBvcnQgeyBVcGxvYWQsIExvYWRlcjIsIENoZWNrIH0gZnJvbSAibHVjaWRlLXJlYWN0IjsKaW1wb3J0IHsgZXh0cmFjdEZyYW1lc0Zyb21WaWRlbywgZm9ybWF0VGltZXN0YW1wLCB0eXBlIFZpZGVvRnJhbWUgfSBmcm9tICJAL3V0aWxzL3ZpZGVvLWZyYW1lLWV4dHJhY3RvciI7CgpleHBvcnQgaW50ZXJmYWNlIFZpZGVvRnJhbWVQaWNrZXJQcm9wcyB7CiAgICBvbkZyYW1lU2VsZWN0OiAoZnJhbWU6IFZpZGVvRnJhbWUpID0+IHZvaWQ7CiAgICBvbkNsb3NlPzogKCkgPT4gdm9pZDsKICAgIG1heEZyYW1lcz86IG51bWJlcjsKfQoKZXhwb3J0IGZ1bmN0aW9uIFZpZGVvRnJhbWVQaWNrZXIoewogICAgb25GcmFtZVNlbGVjdCwKICAgIG9uQ2xvc2UsCiAgICBtYXhGcmFtZXMgPSAxMiwKfTogVmlkZW9GcmFtZVBpY2tlclByb3BzKSB7CiAgICBjb25zdCBbaXNFeHRyYWN0aW5nLCBzZXRJc0V4dHJhY3RpbmddID0gdXNlU3RhdGUoZmFsc2UpOwogICAgY29uc3QgW2ZyYW1lcywgc2V0RnJhbWVzXSA9IHVzZVN0YXRlPFZpZGVvRnJhbWVbXT4oW10pOwogICAgY29uc3QgW3NlbGVjdGVkRnJhbWVJZCwgc2V0U2VsZWN0ZWRGcmFtZUlkXSA9IHVzZVN0YXRlPHN0cmluZyB8IG51bGw+KG51bGwpOwogICAgY29uc3QgW2Vycm9yLCBzZXRFcnJvcl0gPSB1c2VTdGF0ZTxzdHJpbmcgfCBudWxsPihudWxsKTsKCiAgICBjb25zdCBoYW5kbGVGaWxlU2VsZWN0ID0gYXN5bmMgKGU6IFJlYWN0LkNoYW5nZUV2ZW50PEhUTUxJbnB1dEVsZW1lbnQ+KSA9PiB7CiAgICAgICAgY29uc3QgZmlsZSA9IGUudGFyZ2V0LmZpbGVzPy5bMF07CiAgICAgICAgaWYgKCFmaWxlKSByZXR1cm47CgogICAgICAgIGlmICghZmlsZS50eXBlLnN0YXJ0c1dpdGgoInZpZGVvLyIpKSB7CiAgICAgICAgICAgIHNldEVycm9yKCLor7fpgInmi6nop4bpopHmlofku7YiKTsKICAgICAgICAgICAgcmV0dXJuOwogICAgICAgIH0KCiAgICAgICAgc2V0SXNFeHRyYWN0aW5nKHRydWUpOwogICAgICAgIHNldEVycm9yKG51bGwpOwogICAgICAgIHNldEZyYW1lcyhbXSk7CiAgICAgICAgc2V0U2VsZWN0ZWRGcmFtZUlkKG51bGwpOwoKICAgICAgICB0cnkgewogICAgICAgICAgICBjb25zdCBleHRyYWN0ZWRGcmFtZXMgPSBhd2FpdCBleHRyYWN0RnJhbWVzRnJvbVZpZGVvKGZpbGUsIHsKICAgICAgICAgICAgICAgIG1vZGU6ICJ1bmlmb3JtIiwKICAgICAgICAgICAgICAgIGNvdW50OiBtYXhGcmFtZXMsCiAgICAgICAgICAgICAgICBtYXhXaWR0aDogNTEyLAogICAgICAgICAgICAgICAgbWF4SGVpZ2h0OiA1MTIsCiAgICAgICAgICAgIH0pOwoKICAgICAgICAgICAgc2V0RnJhbWVzKGV4dHJhY3RlZEZyYW1lcyk7CiAgICAgICAgfSBjYXRjaCAoZXJyKSB7CiAgICAgICAgICAgIHNldEVycm9yKGVyciBpbnN0YW5jZW9mIEVycm9yID8gZXJyLm1lc3NhZ2UgOiAi5o+Q5Y+W5bin5aSx6LSlIik7CiAgICAgICAgfSBmaW5hbGx5IHsKICAgICAgICAgICAgc2V0SXNFeHRyYWN0aW5nKGZhbHNlKTsKICAgICAgICB9CiAgICB9OwoKICAgIGNvbnN0IGhhbmRsZUZyYW1lQ2xpY2sgPSAoZnJhbWU6IFZpZGVvRnJhbWUpID0+IHsKICAgICAgICBzZXRTZWxlY3RlZEZyYW1lSWQoZnJhbWUuaWQpOwogICAgfTsKCiAgICBjb25zdCBoYW5kbGVDb25maXJtID0gKCkgPT4gewogICAgICAgIGNvbnN0IHNlbGVjdGVkRnJhbWUgPSBmcmFtZXMuZmluZCgoZikgPT4gZi5pZCA9PT0gc2VsZWN0ZWRGcmFtZUlkKTsKICAgICAgICBpZiAoc2VsZWN0ZWRGcmFtZSkgewogICAgICAgICAgICBvbkZyYW1lU2VsZWN0KHNlbGVjdGVkRnJhbWUpOwogICAgICAgICAgICBvbkNsb3NlPy4oKTsKICAgICAgICB9CiAgICB9OwoKICAgIHJldHVybiAoCiAgICAgICAgPGRpdgogICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgcG9zaXRpb246ICJmaXhlZCIsCiAgICAgICAgICAgICAgICBpbnNldDogMCwKICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogInJnYmEoMCwgMCwgMCwgMC41KSIsCiAgICAgICAgICAgICAgICBkaXNwbGF5OiAiZmxleCIsCiAgICAgICAgICAgICAgICBhbGlnbkl0ZW1zOiAiY2VudGVyIiwKICAgICAgICAgICAgICAgIGp1c3RpZnlDb250ZW50OiAiY2VudGVyIiwKICAgICAgICAgICAgICAgIHpJbmRleDogMTAwMCwKICAgICAgICAgICAgfX0KICAgICAgICAgICAgb25DbGljaz17b25DbG9zZX0KICAgICAgICA+CiAgICAgICAgICAgIDxkaXYKICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgYmFja2dyb3VuZENvbG9yOiAid2hpdGUiLAogICAgICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjEycHgiLAogICAgICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIycmVtIiwKICAgICAgICAgICAgICAgICAgICB3aWR0aDogIjkwJSIsCiAgICAgICAgICAgICAgICAgICAgbWF4V2lkdGg6ICI5MDBweCIsCiAgICAgICAgICAgICAgICAgICAgbWF4SGVpZ2h0OiAiOTB2aCIsCiAgICAgICAgICAgICAgICAgICAgb3ZlcmZsb3dZOiAiYXV0byIsCiAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgb25DbGljaz17KGUpID0+IGUuc3RvcFByb3BhZ2F0aW9uKCl9CiAgICAgICAgICAgID4KICAgICAgICAgICAgICAgIDxoMiBzdHlsZT17eyBtYXJnaW5Cb3R0b206ICIxLjVyZW0iLCBmb250U2l6ZTogIjIwcHgiLCBmb250V2VpZ2h0OiAiNjAwIiB9fT4KICAgICAgICAgICAgICAgICAgICDop4bpopHluKfmj5Dlj5YKICAgICAgICAgICAgICAgIDwvaDI+CgogICAgICAgICAgICAgICAgey8qIOS4iuS8oOWMuuWfnyAqL30KICAgICAgICAgICAgICAgIHtmcmFtZXMubGVuZ3RoID09PSAwICYmICFpc0V4dHJhY3RpbmcgJiYgKAogICAgICAgICAgICAgICAgICAgIDxkaXYKICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlcjogIjJweCBkYXNoZWQgI2QxZDVkYiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXJSYWRpdXM6ICI4cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjNyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgdGV4dEFsaWduOiAiY2VudGVyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGN1cnNvcjogInBvaW50ZXIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYmFja2dyb3VuZENvbG9yOiAiI2Y5ZmFmYiIsCiAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgIG9uQ2xpY2s9eygpID0+IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCJ2aWRlby1maWxlLWlucHV0Iik/LmNsaWNrKCl9CiAgICAgICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICAgICAgICA8VXBsb2FkIHNpemU9ezQ4fSBzdHlsZT17eyBtYXJnaW46ICIwIGF1dG8gMXJlbSIsIGNvbG9yOiAiIzljYTNhZiIgfX0gLz4KICAgICAgICAgICAgICAgICAgICAgICAgPHAgc3R5bGU9e3sgbWFyZ2luQm90dG9tOiAiMC41cmVtIiwgY29sb3I6ICIjMzc0MTUxIiB9fT4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIOeCueWHu+aIluaLluaLveS4iuS8oOinhumikeaWh+S7tgogICAgICAgICAgICAgICAgICAgICAgICA8L3A+CiAgICAgICAgICAgICAgICAgICAgICAgIDxwIHN0eWxlPXt7IGZvbnRTaXplOiAiMTRweCIsIGNvbG9yOiAiIzZiNzI4MCIgfX0+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICDmlK/mjIEgTVA0LCBNT1YsIEFWSSDnrYnmoLzlvI8KICAgICAgICAgICAgICAgICAgICAgICAgPC9wPgogICAgICAgICAgICAgICAgICAgICAgICA8aW5wdXQKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGlkPSJ2aWRlby1maWxlLWlucHV0IgogICAgICAgICAgICAgICAgICAgICAgICAgICAgdHlwZT0iZmlsZSIKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGFjY2VwdD0idmlkZW8vKiIKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7IGRpc3BsYXk6ICJub25lIiB9fQogICAgICAgICAgICAgICAgICAgICAgICAgICAgb25DaGFuZ2U9e2hhbmRsZUZpbGVTZWxlY3R9CiAgICAgICAgICAgICAgICAgICAgICAgIC8+CiAgICAgICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgICAgICApfQoKICAgICAgICAgICAgICAgIHsvKiDmj5Dlj5bkuK0gKi99CiAgICAgICAgICAgICAgICB7aXNFeHRyYWN0aW5nICYmICgKICAgICAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IHRleHRBbGlnbjogImNlbnRlciIsIHBhZGRpbmc6ICIzcmVtIiB9fT4KICAgICAgICAgICAgICAgICAgICAgICAgPExvYWRlcjIgc2l6ZT17NDh9IHN0eWxlPXt7IG1hcmdpbjogIjAgYXV0byAxcmVtIiwgY29sb3I6ICIjM2I4MmY2IiwgYW5pbWF0aW9uOiAic3BpbiAxcyBsaW5lYXIgaW5maW5pdGUiIH19IC8+CiAgICAgICAgICAgICAgICAgICAgICAgIDxwIHN0eWxlPXt7IGNvbG9yOiAiIzZiNzI4MCIgfX0+5q2j5Zyo5o+Q5Y+W6KeG6aKR5binLi4uPC9wPgogICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgKX0KCiAgICAgICAgICAgICAgICB7Lyog6ZSZ6K+v5o+Q56S6ICovfQogICAgICAgICAgICAgICAge2Vycm9yICYmICgKICAgICAgICAgICAgICAgICAgICA8ZGl2CiAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBwYWRkaW5nOiAiMXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICIjZmVmMmYyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiAiI2RjMjYyNiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXJSYWRpdXM6ICI4cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgbWFyZ2luQm90dG9tOiAiMXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICAgICAgICB7ZXJyb3J9CiAgICAgICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgICAgICApfQoKICAgICAgICAgICAgICAgIHsvKiDluKfnvZHmoLwgKi99CiAgICAgICAgICAgICAgICB7ZnJhbWVzLmxlbmd0aCA+IDAgJiYgKAogICAgICAgICAgICAgICAgICAgIDw+CiAgICAgICAgICAgICAgICAgICAgICAgIDxkaXYKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZGlzcGxheTogImdyaWQiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGdyaWRUZW1wbGF0ZUNvbHVtbnM6ICJyZXBlYXQoYXV0by1maWxsLCBtaW5tYXgoMTgwcHgsIDFmcikpIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBnYXA6ICIxcmVtIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBtYXJnaW5Cb3R0b206ICIxLjVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICAgICAgICAgICAge2ZyYW1lcy5tYXAoKGZyYW1lKSA9PiAoCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgPGRpdgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBrZXk9e2ZyYW1lLmlkfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgcG9zaXRpb246ICJyZWxhdGl2ZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBjdXJzb3I6ICJwb2ludGVyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjhweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBvdmVyZmxvdzogImhpZGRlbiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXI6IHNlbGVjdGVkRnJhbWVJZCA9PT0gZnJhbWUuaWQgPyAiM3B4IHNvbGlkICMzYjgyZjYiIDogIjFweCBzb2xpZCAjZTVlN2ViIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHRyYW5zaXRpb246ICJhbGwgMC4ycyIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG9uQ2xpY2s9eygpID0+IGhhbmRsZUZyYW1lQ2xpY2soZnJhbWUpfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgPGltZwogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc3JjPXtmcmFtZS5kYXRhVXJsfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYWx0PXtgRnJhbWUgYXQgJHtmb3JtYXRUaW1lc3RhbXAoZnJhbWUudGltZXN0YW1wKX1gfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB3aWR0aDogIjEwMCUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGhlaWdodDogImF1dG8iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGRpc3BsYXk6ICJibG9jayIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAvPgoKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgey8qIOaXtumXtOaIsyAqL30KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgPGRpdgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBwb3NpdGlvbjogImFic29sdXRlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3R0b206ICIwLjVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHJpZ2h0OiAiMC41cmVtIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBwYWRkaW5nOiAiMC4yNXJlbSAwLjVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogInJnYmEoMCwgMCwgMCwgMC43KSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgY29sb3I6ICJ3aGl0ZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZm9udFNpemU6ICIxMnB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXJSYWRpdXM6ICI0cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAge2Zvcm1hdFRpbWVzdGFtcChmcmFtZS50aW1lc3RhbXApfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8L2Rpdj4KCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHsvKiDpgInkuK3moIforrAgKi99CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHtzZWxlY3RlZEZyYW1lSWQgPT09IGZyYW1lLmlkICYmICgKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxkaXYKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBwb3NpdGlvbjogImFic29sdXRlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgdG9wOiAiMC41cmVtIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgbGVmdDogIjAuNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogIiMzYjgyZjYiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBjb2xvcjogIndoaXRlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiNTAlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjAuMjVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBkaXNwbGF5OiAiZmxleCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGFsaWduSXRlbXM6ICJjZW50ZXIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBqdXN0aWZ5Q29udGVudDogImNlbnRlciIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8Q2hlY2sgc2l6ZT17MTZ9IC8+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgKX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICkpfQogICAgICAgICAgICAgICAgICAgICAgICA8L2Rpdj4KCiAgICAgICAgICAgICAgICAgICAgICAgIHsvKiDmk43kvZzmjInpkq4gKi99CiAgICAgICAgICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZGlzcGxheTogImZsZXgiLCBnYXA6ICIxcmVtIiwganVzdGlmeUNvbnRlbnQ6ICJmbGV4LWVuZCIgfX0+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8YnV0dG9uCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgb25DbGljaz17b25DbG9zZX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBwYWRkaW5nOiAiMC41cmVtIDFyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXJSYWRpdXM6ICI2cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXI6ICIxcHggc29saWQgI2QxZDVkYiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogIndoaXRlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgY3Vyc29yOiAicG9pbnRlciIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICDlj5bmtogKICAgICAgICAgICAgICAgICAgICAgICAgICAgIDwvYnV0dG9uPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgPGJ1dHRvbgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG9uQ2xpY2s9eygpID0+IGRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCJ2aWRlby1maWxlLWlucHV0Iik/LmNsaWNrKCl9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjAuNXJlbSAxcmVtIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiNnB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyOiAiMXB4IHNvbGlkICNkMWQ1ZGIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICJ3aGl0ZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGN1cnNvcjogInBvaW50ZXIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg6YCJ5oup5YW25LuW6KeG6aKRCiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8L2J1dHRvbj4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxidXR0b24KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBvbkNsaWNrPXtoYW5kbGVDb25maXJtfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGRpc2FibGVkPXshc2VsZWN0ZWRGcmFtZUlkfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIwLjVyZW0gMXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjZweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlcjogIm5vbmUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6IHNlbGVjdGVkRnJhbWVJZCA/ICIjM2I4MmY2IiA6ICIjZTVlN2ViIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgY29sb3I6IHNlbGVjdGVkRnJhbWVJZCA/ICJ3aGl0ZSIgOiAiIzljYTNhZiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGN1cnNvcjogc2VsZWN0ZWRGcmFtZUlkID8gInBvaW50ZXIiIDogIm5vdC1hbGxvd2VkIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIOS9v+eUqOmAieS4reW4pwogICAgICAgICAgICAgICAgICAgICAgICAgICAgPC9idXR0b24+CiAgICAgICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgICAgIDwvPgogICAgICAgICAgICAgICAgKX0KICAgICAgICAgICAgPC9kaXY+CgogICAgICAgICAgICA8c3R5bGU+e2AKICAgICAgICAgICAgICAgIEBrZXlmcmFtZXMgc3BpbiB7CiAgICAgICAgICAgICAgICAgICAgZnJvbSB7IHRyYW5zZm9ybTogcm90YXRlKDBkZWcpOyB9CiAgICAgICAgICAgICAgICAgICAgdG8geyB0cmFuc2Zvcm06IHJvdGF0ZSgzNjBkZWcpOyB9CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgIGB9PC9zdHlsZT4KICAgICAgICA8L2Rpdj4KICAgICk7Cn0K
+/**
+ * Video Frame Picker Component
+ *
+ * Phase 2.3: 视频帧提取UI
+ * - 上传视频文件
+ * - 显示帧缩略图网格
+ * - 选择帧作为参考图
+ */
+
+import { useState } from "react";
+import { Upload, Loader2, Check } from "lucide-react";
+import { extractFramesFromVideo, formatTimestamp, type VideoFrame } from "@/utils/video-frame-extractor";
+
+export interface VideoFramePickerProps {
+    onFrameSelect: (frame: VideoFrame) => void;
+    onClose?: () => void;
+    maxFrames?: number;
+}
+
+export function VideoFramePicker({
+    onFrameSelect,
+    onClose,
+    maxFrames = 12,
+}: VideoFramePickerProps) {
+    const [isExtracting, setIsExtracting] = useState(false);
+    const [frames, setFrames] = useState<VideoFrame[]>([]);
+    const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (!file.type.startsWith("video/")) {
+            setError("请选择视频文件");
+            return;
+        }
+
+        setIsExtracting(true);
+        setError(null);
+        setFrames([]);
+        setSelectedFrameId(null);
+
+        try {
+            const extractedFrames = await extractFramesFromVideo(file, {
+                mode: "uniform",
+                count: maxFrames,
+                maxWidth: 512,
+                maxHeight: 512,
+            });
+
+            setFrames(extractedFrames);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "提取帧失败");
+        } finally {
+            setIsExtracting(false);
+        }
+    };
+
+    const handleFrameClick = (frame: VideoFrame) => {
+        setSelectedFrameId(frame.id);
+    };
+
+    const handleConfirm = () => {
+        const selectedFrame = frames.find((f) => f.id === selectedFrameId);
+        if (selectedFrame) {
+            onFrameSelect(selectedFrame);
+            onClose?.();
+        }
+    };
+
+    return (
+        <div
+            style={{
+                position: "fixed",
+                inset: 0,
+                backgroundColor: "rgba(0, 0, 0, 0.5)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                zIndex: 1000,
+            }}
+            onClick={onClose}
+        >
+            <div
+                style={{
+                    backgroundColor: "white",
+                    borderRadius: "12px",
+                    padding: "2rem",
+                    width: "90%",
+                    maxWidth: "900px",
+                    maxHeight: "90vh",
+                    overflowY: "auto",
+                }}
+                onClick={(e) => e.stopPropagation()}
+            >
+                <h2 style={{ marginBottom: "1.5rem", fontSize: "20px", fontWeight: "600" }}>
+                    视频帧提取
+                </h2>
+
+                {/* 上传区域 */}
+                {frames.length === 0 && !isExtracting && (
+                    <div
+                        style={{
+                            border: "2px dashed #d1d5db",
+                            borderRadius: "8px",
+                            padding: "3rem",
+                            textAlign: "center",
+                            cursor: "pointer",
+                            backgroundColor: "#f9fafb",
+                        }}
+                        onClick={() => document.getElementById("video-file-input")?.click()}
+                    >
+                        <Upload size={48} style={{ margin: "0 auto 1rem", color: "#9ca3af" }} />
+                        <p style={{ marginBottom: "0.5rem", color: "#374151" }}>
+                            点击或拖拽上传视频文件
+                        </p>
+                        <p style={{ fontSize: "14px", color: "#6b7280" }}>
+                            支持 MP4, MOV, AVI 等格式
+                        </p>
+                        <input
+                            id="video-file-input"
+                            type="file"
+                            accept="video/*"
+                            style={{ display: "none" }}
+                            onChange={handleFileSelect}
+                        />
+                    </div>
+                )}
+
+                {/* 提取中 */}
+                {isExtracting && (
+                    <div style={{ textAlign: "center", padding: "3rem" }}>
+                        <Loader2 size={48} style={{ margin: "0 auto 1rem", color: "#3b82f6", animation: "spin 1s linear infinite" }} />
+                        <p style={{ color: "#6b7280" }}>正在提取视频帧...</p>
+                    </div>
+                )}
+
+                {/* 错误提示 */}
+                {error && (
+                    <div
+                        style={{
+                            padding: "1rem",
+                            backgroundColor: "#fef2f2",
+                            color: "#dc2626",
+                            borderRadius: "8px",
+                            marginBottom: "1rem",
+                        }}
+                    >
+                        {error}
+                    </div>
+                )}
+
+                {/* 帧网格 */}
+                {frames.length > 0 && (
+                    <>
+                        <div
+                            style={{
+                                display: "grid",
+                                gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
+                                gap: "1rem",
+                                marginBottom: "1.5rem",
+                            }}
+                        >
+                            {frames.map((frame) => (
+                                <div
+                                    key={frame.id}
+                                    style={{
+                                        position: "relative",
+                                        cursor: "pointer",
+                                        borderRadius: "8px",
+                                        overflow: "hidden",
+                                        border: selectedFrameId === frame.id ? "3px solid #3b82f6" : "1px solid #e5e7eb",
+                                        transition: "all 0.2s",
+                                    }}
+                                    onClick={() => handleFrameClick(frame)}
+                                >
+                                    <img
+                                        src={frame.dataUrl}
+                                        alt={`Frame at ${formatTimestamp(frame.timestamp)}`}
+                                        style={{
+                                            width: "100%",
+                                            height: "auto",
+                                            display: "block",
+                                        }}
+                                    />
+
+                                    {/* 时间戳 */}
+                                    <div
+                                        style={{
+                                            position: "absolute",
+                                            bottom: "0.5rem",
+                                            right: "0.5rem",
+                                            padding: "0.25rem 0.5rem",
+                                            backgroundColor: "rgba(0, 0, 0, 0.7)",
+                                            color: "white",
+                                            fontSize: "12px",
+                                            borderRadius: "4px",
+                                        }}
+                                    >
+                                        {formatTimestamp(frame.timestamp)}
+                                    </div>
+
+                                    {/* 选中标记 */}
+                                    {selectedFrameId === frame.id && (
+                                        <div
+                                            style={{
+                                                position: "absolute",
+                                                top: "0.5rem",
+                                                left: "0.5rem",
+                                                backgroundColor: "#3b82f6",
+                                                color: "white",
+                                                borderRadius: "50%",
+                                                padding: "0.25rem",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                            }}
+                                        >
+                                            <Check size={16} />
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* 操作按钮 */}
+                        <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
+                            <button
+                                onClick={onClose}
+                                style={{
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "6px",
+                                    border: "1px solid #d1d5db",
+                                    backgroundColor: "white",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={() => document.getElementById("video-file-input")?.click()}
+                                style={{
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "6px",
+                                    border: "1px solid #d1d5db",
+                                    backgroundColor: "white",
+                                    cursor: "pointer",
+                                }}
+                            >
+                                选择其他视频
+                            </button>
+                            <button
+                                onClick={handleConfirm}
+                                disabled={!selectedFrameId}
+                                style={{
+                                    padding: "0.5rem 1rem",
+                                    borderRadius: "6px",
+                                    border: "none",
+                                    backgroundColor: selectedFrameId ? "#3b82f6" : "#e5e7eb",
+                                    color: selectedFrameId ? "white" : "#9ca3af",
+                                    cursor: selectedFrameId ? "pointer" : "not-allowed",
+                                }}
+                            >
+                                使用选中帧
+                            </button>
+                        </div>
+                    </>
+                )}
+            </div>
+
+            <style>{`
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
+        </div>
+    );
+}

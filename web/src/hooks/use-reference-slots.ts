@@ -1,1 +1,109 @@
-LyoqCiAqIFJlZmVyZW5jZSBTbG90cyBIb29rCiAqCiAqIOeuoeeQhuWPguiAg+WbvuanveS9jeeahOeKtuaAgeWSjOaMgeS5heWMlgogKi8KCmltcG9ydCB7IHVzZVN0YXRlLCB1c2VFZmZlY3QgfSBmcm9tICJyZWFjdCI7CmltcG9ydCB0eXBlIHsgUmVmZXJlbmNlU2xvdCB9IGZyb20gIkAvY29tcG9uZW50cy9jYW52YXMvcmVmZXJlbmNlLWltYWdlLXNsb3RzIjsKaW1wb3J0IHsgY3JlYXRlRGVmYXVsdFNsb3RzIH0gZnJvbSAiQC9jb21wb25lbnRzL2NhbnZhcy9yZWZlcmVuY2UtaW1hZ2Utc2xvdHMiOwppbXBvcnQgdHlwZSB7IFJlZmVyZW5jZUltYWdlIH0gZnJvbSAiQC90eXBlcy9pbWFnZSI7Cgpjb25zdCBTVE9SQUdFX0tFWSA9ICJpbmZpbml0ZS1jYW52YXM6cmVmZXJlbmNlLXNsb3RzIjsKY29uc3QgQUNUSVZFX1NMT1RfS0VZID0gImluZmluaXRlLWNhbnZhczphY3RpdmUtc2xvdCI7CgpleHBvcnQgZnVuY3Rpb24gdXNlUmVmZXJlbmNlU2xvdHMoc2xvdENvdW50OiBudW1iZXIgPSAzKSB7CiAgICBjb25zdCBbc2xvdHMsIHNldFNsb3RzXSA9IHVzZVN0YXRlPFJlZmVyZW5jZVNsb3RbXT4oKCkgPT4gewogICAgICAgIHRyeSB7CiAgICAgICAgICAgIGNvbnN0IHNhdmVkID0gbG9jYWxTdG9yYWdlLmdldEl0ZW0oU1RPUkFHRV9LRVkpOwogICAgICAgICAgICBpZiAoc2F2ZWQpIHsKICAgICAgICAgICAgICAgIHJldHVybiBKU09OLnBhcnNlKHNhdmVkKTsKICAgICAgICAgICAgfQogICAgICAgIH0gY2F0Y2ggKGUpIHsKICAgICAgICAgICAgY29uc29sZS5lcnJvcigiRmFpbGVkIHRvIGxvYWQgcmVmZXJlbmNlIHNsb3RzOiIsIGUpOwogICAgICAgIH0KICAgICAgICByZXR1cm4gY3JlYXRlRGVmYXVsdFNsb3RzKHNsb3RDb3VudCk7CiAgICB9KTsKCiAgICBjb25zdCBbYWN0aXZlU2xvdElkLCBzZXRBY3RpdmVTbG90SWRdID0gdXNlU3RhdGU8c3RyaW5nIHwgdW5kZWZpbmVkPigoKSA9PiB7CiAgICAgICAgdHJ5IHsKICAgICAgICAgICAgY29uc3Qgc2F2ZWQgPSBsb2NhbFN0b3JhZ2UuZ2V0SXRlbShBQ1RJVkVfU0xPVF9LRVkpOwogICAgICAgICAgICByZXR1cm4gc2F2ZWQgfHwgdW5kZWZpbmVkOwogICAgICAgIH0gY2F0Y2ggKGUpIHsKICAgICAgICAgICAgcmV0dXJuIHVuZGVmaW5lZDsKICAgICAgICB9CiAgICB9KTsKCiAgICAvLyDmjIHkuYXljJbmp73kvY0KICAgIHVzZUVmZmVjdCgoKSA9PiB7CiAgICAgICAgdHJ5IHsKICAgICAgICAgICAgbG9jYWxTdG9yYWdlLnNldEl0ZW0oU1RPUkFHRV9LRVksIEpTT04uc3RyaW5naWZ5KHNsb3RzKSk7CiAgICAgICAgfSBjYXRjaCAoZSkgewogICAgICAgICAgICBjb25zb2xlLmVycm9yKCJGYWlsZWQgdG8gc2F2ZSByZWZlcmVuY2Ugc2xvdHM6IiwgZSk7CiAgICAgICAgfQogICAgfSwgW3Nsb3RzXSk7CgogICAgLy8g5oyB5LmF5YyW5r+A5rS75qe95L2NCiAgICB1c2VFZmZlY3QoKCkgPT4gewogICAgICAgIGlmIChhY3RpdmVTbG90SWQpIHsKICAgICAgICAgICAgbG9jYWxTdG9yYWdlLnNldEl0ZW0oQUNUSVZFX1NMT1RfS0VZLCBhY3RpdmVTbG90SWQpOwogICAgICAgIH0gZWxzZSB7CiAgICAgICAgICAgIGxvY2FsU3RvcmFnZS5yZW1vdmVJdGVtKEFDVElWRV9TTE9UX0tFWSk7CiAgICAgICAgfQogICAgfSwgW2FjdGl2ZVNsb3RJZF0pOwoKICAgIGNvbnN0IGhhbmRsZVNsb3RVcGRhdGUgPSAoc2xvdElkOiBzdHJpbmcsIGltYWdlOiBSZWZlcmVuY2VJbWFnZSB8IG51bGwpID0+IHsKICAgICAgICBzZXRTbG90cygocHJldikgPT4KICAgICAgICAgICAgcHJldi5tYXAoKHNsb3QpID0+CiAgICAgICAgICAgICAgICBzbG90LmlkID09PSBzbG90SWQgPyB7IC4uLnNsb3QsIGltYWdlIH0gOiBzbG90CiAgICAgICAgICAgICkKICAgICAgICApOwogICAgfTsKCiAgICBjb25zdCBoYW5kbGVTbG90QWN0aXZhdGUgPSAoc2xvdElkOiBzdHJpbmcpID0+IHsKICAgICAgICBzZXRBY3RpdmVTbG90SWQoc2xvdElkKTsKICAgIH07CgogICAgY29uc3QgaGFuZGxlU2xvdFBpbiA9IChzbG90SWQ6IHN0cmluZywgcGlubmVkOiBib29sZWFuKSA9PiB7CiAgICAgICAgc2V0U2xvdHMoKHByZXYpID0+CiAgICAgICAgICAgIHByZXYubWFwKChzbG90KSA9PgogICAgICAgICAgICAgICAgc2xvdC5pZCA9PT0gc2xvdElkID8geyAuLi5zbG90LCBwaW5uZWQgfSA6IHNsb3QKICAgICAgICAgICAgKQogICAgICAgICk7CiAgICB9OwoKICAgIGNvbnN0IGhhbmRsZVNsb3RMYWJlbENoYW5nZSA9IChzbG90SWQ6IHN0cmluZywgbGFiZWw6IHN0cmluZykgPT4gewogICAgICAgIHNldFNsb3RzKChwcmV2KSA9PgogICAgICAgICAgICBwcmV2Lm1hcCgoc2xvdCkgPT4KICAgICAgICAgICAgICAgIHNsb3QuaWQgPT09IHNsb3RJZCA/IHsgLi4uc2xvdCwgbGFiZWwgfSA6IHNsb3QKICAgICAgICAgICAgKQogICAgICAgICk7CiAgICB9OwoKICAgIC8vIOiOt+WPluW9k+WJjea/gOa0u+anveS9jeeahOWbvueJhwogICAgY29uc3QgZ2V0QWN0aXZlUmVmZXJlbmNlSW1hZ2UgPSAoKTogUmVmZXJlbmNlSW1hZ2UgfCBudWxsID0+IHsKICAgICAgICBpZiAoIWFjdGl2ZVNsb3RJZCkgcmV0dXJuIG51bGw7CiAgICAgICAgY29uc3QgYWN0aXZlU2xvdCA9IHNsb3RzLmZpbmQoKHMpID0+IHMuaWQgPT09IGFjdGl2ZVNsb3RJZCk7CiAgICAgICAgcmV0dXJuIGFjdGl2ZVNsb3Q/LmltYWdlIHx8IG51bGw7CiAgICB9OwoKICAgIC8vIOa4hemZpOaJgOaciemdnuWbuuWumuanveS9jQogICAgY29uc3QgY2xlYXJVbnBpbm5lZFNsb3RzID0gKCkgPT4gewogICAgICAgIHNldFNsb3RzKChwcmV2KSA9PgogICAgICAgICAgICBwcmV2Lm1hcCgoc2xvdCkgPT4KICAgICAgICAgICAgICAgIHNsb3QucGlubmVkID8gc2xvdCA6IHsgLi4uc2xvdCwgaW1hZ2U6IG51bGwsIGxhYmVsOiB1bmRlZmluZWQgfQogICAgICAgICAgICApCiAgICAgICAgKTsKICAgIH07CgogICAgcmV0dXJuIHsKICAgICAgICBzbG90cywKICAgICAgICBhY3RpdmVTbG90SWQsCiAgICAgICAgaGFuZGxlU2xvdFVwZGF0ZSwKICAgICAgICBoYW5kbGVTbG90QWN0aXZhdGUsCiAgICAgICAgaGFuZGxlU2xvdFBpbiwKICAgICAgICBoYW5kbGVTbG90TGFiZWxDaGFuZ2UsCiAgICAgICAgZ2V0QWN0aXZlUmVmZXJlbmNlSW1hZ2UsCiAgICAgICAgY2xlYXJVbnBpbm5lZFNsb3RzLAogICAgfTsKfQo=
+/**
+ * Reference Slots Hook
+ *
+ * 管理参考图槽位的状态和持久化
+ */
+
+import { useState, useEffect } from "react";
+import type { ReferenceSlot } from "@/components/canvas/reference-image-slots";
+import { createDefaultSlots } from "@/components/canvas/reference-image-slots";
+import type { ReferenceImage } from "@/types/image";
+
+const STORAGE_KEY = "infinite-canvas:reference-slots";
+const ACTIVE_SLOT_KEY = "infinite-canvas:active-slot";
+
+export function useReferenceSlots(slotCount: number = 3) {
+    const [slots, setSlots] = useState<ReferenceSlot[]>(() => {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                return JSON.parse(saved);
+            }
+        } catch (e) {
+            console.error("Failed to load reference slots:", e);
+        }
+        return createDefaultSlots(slotCount);
+    });
+
+    const [activeSlotId, setActiveSlotId] = useState<string | undefined>(() => {
+        try {
+            const saved = localStorage.getItem(ACTIVE_SLOT_KEY);
+            return saved || undefined;
+        } catch (e) {
+            return undefined;
+        }
+    });
+
+    // 持久化槽位
+    useEffect(() => {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(slots));
+        } catch (e) {
+            console.error("Failed to save reference slots:", e);
+        }
+    }, [slots]);
+
+    // 持久化激活槽位
+    useEffect(() => {
+        if (activeSlotId) {
+            localStorage.setItem(ACTIVE_SLOT_KEY, activeSlotId);
+        } else {
+            localStorage.removeItem(ACTIVE_SLOT_KEY);
+        }
+    }, [activeSlotId]);
+
+    const handleSlotUpdate = (slotId: string, image: ReferenceImage | null) => {
+        setSlots((prev) =>
+            prev.map((slot) =>
+                slot.id === slotId ? { ...slot, image } : slot
+            )
+        );
+    };
+
+    const handleSlotActivate = (slotId: string) => {
+        setActiveSlotId(slotId);
+    };
+
+    const handleSlotPin = (slotId: string, pinned: boolean) => {
+        setSlots((prev) =>
+            prev.map((slot) =>
+                slot.id === slotId ? { ...slot, pinned } : slot
+            )
+        );
+    };
+
+    const handleSlotLabelChange = (slotId: string, label: string) => {
+        setSlots((prev) =>
+            prev.map((slot) =>
+                slot.id === slotId ? { ...slot, label } : slot
+            )
+        );
+    };
+
+    // 获取当前激活槽位的图片
+    const getActiveReferenceImage = (): ReferenceImage | null => {
+        if (!activeSlotId) return null;
+        const activeSlot = slots.find((s) => s.id === activeSlotId);
+        return activeSlot?.image || null;
+    };
+
+    // 清除所有非固定槽位
+    const clearUnpinnedSlots = () => {
+        setSlots((prev) =>
+            prev.map((slot) =>
+                slot.pinned ? slot : { ...slot, image: null, label: undefined }
+            )
+        );
+    };
+
+    return {
+        slots,
+        activeSlotId,
+        handleSlotUpdate,
+        handleSlotActivate,
+        handleSlotPin,
+        handleSlotLabelChange,
+        getActiveReferenceImage,
+        clearUnpinnedSlots,
+    };
+}

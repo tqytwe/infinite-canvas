@@ -1,1 +1,299 @@
-LyoqCiAqIFJlZmVyZW5jZSBJbWFnZSBTbG90cyBDb21wb25lbnQKICoKICog5Y+C6ICD5Zu+5Yy65Z+f5Zu65a6a5YyWCiAqIC0g5bem5L6n5bi46am7My015Liq5Y+C6ICD5Zu+5qe95L2NCiAqIC0g5ouW5ou95Zu+54mH5Yiw5qe95L2NCiAqIC0g5oyB5LmF5YyW5L+d5a2YCiAqIC0g54K55Ye75qe95L2N5YiH5o2i5Li65b2T5YmN5Y+C6ICDCiAqLwoKaW1wb3J0IHsgdXNlU3RhdGUgfSBmcm9tICJyZWFjdCI7CmltcG9ydCB7IFgsIFBpbiwgVXBsb2FkIH0gZnJvbSAibHVjaWRlLXJlYWN0IjsKaW1wb3J0IHR5cGUgeyBSZWZlcmVuY2VJbWFnZSB9IGZyb20gIkAvdHlwZXMvaW1hZ2UiOwoKZXhwb3J0IGludGVyZmFjZSBSZWZlcmVuY2VTbG90IHsKICAgIGlkOiBzdHJpbmc7CiAgICBpbWFnZTogUmVmZXJlbmNlSW1hZ2UgfCBudWxsOwogICAgbGFiZWw/OiBzdHJpbmc7CiAgICBwaW5uZWQ6IGJvb2xlYW47Cn0KCmV4cG9ydCBpbnRlcmZhY2UgUmVmZXJlbmNlSW1hZ2VTbG90c1Byb3BzIHsKICAgIHNsb3RzOiBSZWZlcmVuY2VTbG90W107CiAgICBhY3RpdmVTbG90SWQ/OiBzdHJpbmc7CiAgICBvblNsb3RVcGRhdGU6IChzbG90SWQ6IHN0cmluZywgaW1hZ2U6IFJlZmVyZW5jZUltYWdlIHwgbnVsbCkgPT4gdm9pZDsKICAgIG9uU2xvdEFjdGl2YXRlOiAoc2xvdElkOiBzdHJpbmcpID0+IHZvaWQ7CiAgICBvblNsb3RQaW46IChzbG90SWQ6IHN0cmluZywgcGlubmVkOiBib29sZWFuKSA9PiB2b2lkOwogICAgb25TbG90TGFiZWxDaGFuZ2U6IChzbG90SWQ6IHN0cmluZywgbGFiZWw6IHN0cmluZykgPT4gdm9pZDsKICAgIGNsYXNzTmFtZT86IHN0cmluZzsKfQoKZXhwb3J0IGZ1bmN0aW9uIFJlZmVyZW5jZUltYWdlU2xvdHMoewogICAgc2xvdHMsCiAgICBhY3RpdmVTbG90SWQsCiAgICBvblNsb3RVcGRhdGUsCiAgICBvblNsb3RBY3RpdmF0ZSwKICAgIG9uU2xvdFBpbiwKICAgIG9uU2xvdExhYmVsQ2hhbmdlLAogICAgY2xhc3NOYW1lID0gIiIsCn06IFJlZmVyZW5jZUltYWdlU2xvdHNQcm9wcykgewogICAgY29uc3QgW2RyYWdPdmVyU2xvdElkLCBzZXREcmFnT3ZlclNsb3RJZF0gPSB1c2VTdGF0ZTxzdHJpbmcgfCBudWxsPihudWxsKTsKICAgIGNvbnN0IFtlZGl0aW5nTGFiZWxJZCwgc2V0RWRpdGluZ0xhYmVsSWRdID0gdXNlU3RhdGU8c3RyaW5nIHwgbnVsbD4obnVsbCk7CgogICAgY29uc3QgaGFuZGxlRHJvcCA9IGFzeW5jIChzbG90SWQ6IHN0cmluZywgZTogUmVhY3QuRHJhZ0V2ZW50KSA9PiB7CiAgICAgICAgZS5wcmV2ZW50RGVmYXVsdCgpOwogICAgICAgIHNldERyYWdPdmVyU2xvdElkKG51bGwpOwoKICAgICAgICBjb25zdCBmaWxlcyA9IEFycmF5LmZyb20oZS5kYXRhVHJhbnNmZXIuZmlsZXMpOwogICAgICAgIGNvbnN0IGltYWdlRmlsZSA9IGZpbGVzLmZpbmQoZiA9PiBmLnR5cGUuc3RhcnRzV2l0aCgiaW1hZ2UvIikpOwoKICAgICAgICBpZiAoaW1hZ2VGaWxlKSB7CiAgICAgICAgICAgIGNvbnN0IGRhdGFVcmwgPSBhd2FpdCBmaWxlVG9EYXRhVXJsKGltYWdlRmlsZSk7CiAgICAgICAgICAgIG9uU2xvdFVwZGF0ZShzbG90SWQsIHsKICAgICAgICAgICAgICAgIGlkOiBgcmVmLSR7RGF0ZS5ub3coKX1gLAogICAgICAgICAgICAgICAgZGF0YVVybCwKICAgICAgICAgICAgICAgIHdpZHRoOiAwLAogICAgICAgICAgICAgICAgaGVpZ2h0OiAwLAogICAgICAgICAgICB9KTsKICAgICAgICB9CiAgICB9OwoKICAgIGNvbnN0IGhhbmRsZUZpbGVTZWxlY3QgPSBhc3luYyAoc2xvdElkOiBzdHJpbmcsIGU6IFJlYWN0LkNoYW5nZUV2ZW50PEhUTUxJbnB1dEVsZW1lbnQ+KSA9PiB7CiAgICAgICAgY29uc3QgZmlsZSA9IGUudGFyZ2V0LmZpbGVzPy5bMF07CiAgICAgICAgaWYgKGZpbGUgJiYgZmlsZS50eXBlLnN0YXJ0c1dpdGgoImltYWdlLyIpKSB7CiAgICAgICAgICAgIGNvbnN0IGRhdGFVcmwgPSBhd2FpdCBmaWxlVG9EYXRhVXJsKGZpbGUpOwogICAgICAgICAgICBvblNsb3RVcGRhdGUoc2xvdElkLCB7CiAgICAgICAgICAgICAgICBpZDogYHJlZi0ke0RhdGUubm93KCl9YCwKICAgICAgICAgICAgICAgIGRhdGFVcmwsCiAgICAgICAgICAgICAgICB3aWR0aDogMCwKICAgICAgICAgICAgICAgIGhlaWdodDogMCwKICAgICAgICAgICAgfSk7CiAgICAgICAgfQogICAgfTsKCiAgICByZXR1cm4gKAogICAgICAgIDxkaXYgY2xhc3NOYW1lPXtgcmVmZXJlbmNlLWltYWdlLXNsb3RzICR7Y2xhc3NOYW1lfWB9IHN0eWxlPXt7IHBhZGRpbmc6ICIxcmVtIiB9fT4KICAgICAgICAgICAgPGgzIHN0eWxlPXt7IG1hcmdpbkJvdHRvbTogIjFyZW0iLCBmb250U2l6ZTogIjE0cHgiLCBmb250V2VpZ2h0OiAiNjAwIiwgY29sb3I6ICIjMzc0MTUxIiB9fT4KICAgICAgICAgICAgICAgIOWPguiAg+WbvuanveS9jQogICAgICAgICAgICA8L2gzPgoKICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBkaXNwbGF5OiAiZmxleCIsIGZsZXhEaXJlY3Rpb246ICJjb2x1bW4iLCBnYXA6ICIwLjc1cmVtIiB9fT4KICAgICAgICAgICAgICAgIHtzbG90cy5tYXAoKHNsb3QpID0+ICgKICAgICAgICAgICAgICAgICAgICA8ZGl2CiAgICAgICAgICAgICAgICAgICAgICAgIGtleT17c2xvdC5pZH0KICAgICAgICAgICAgICAgICAgICAgICAgY2xhc3NOYW1lPSJyZWZlcmVuY2Utc2xvdCIKICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBvc2l0aW9uOiAicmVsYXRpdmUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgd2lkdGg6ICIxMDAlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGFzcGVjdFJhdGlvOiAiMSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXJSYWRpdXM6ICI4cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyOiBhY3RpdmVTbG90SWQgPT09IHNsb3QuaWQgPyAiMnB4IHNvbGlkICMzYjgyZjYiIDogIjFweCBkYXNoZWQgI2QxZDVkYiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6IGRyYWdPdmVyU2xvdElkID09PSBzbG90LmlkID8gIiNlZmY2ZmYiIDogIiNmOWZhZmIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgY3Vyc29yOiAicG9pbnRlciIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBvdmVyZmxvdzogImhpZGRlbiIsCiAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgIG9uRHJhZ092ZXI9eyhlKSA9PiB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBlLnByZXZlbnREZWZhdWx0KCk7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBzZXREcmFnT3ZlclNsb3RJZChzbG90LmlkKTsKICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgb25EcmFnTGVhdmU9eygpID0+IHNldERyYWdPdmVyU2xvdElkKG51bGwpfQogICAgICAgICAgICAgICAgICAgICAgICBvbkRyb3A9eyhlKSA9PiBoYW5kbGVEcm9wKHNsb3QuaWQsIGUpfQogICAgICAgICAgICAgICAgICAgICAgICBvbkNsaWNrPXsoKSA9PiB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBpZiAoc2xvdC5pbWFnZSkgewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG9uU2xvdEFjdGl2YXRlKHNsb3QuaWQpOwogICAgICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAgey8qIOWbvueJh+aIluWNoOS9jeespiAqL30KICAgICAgICAgICAgICAgICAgICAgICAge3Nsb3QuaW1hZ2UgPyAoCiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8aW1nCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc3JjPXtzbG90LmltYWdlLmRhdGFVcmx9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYWx0PXtzbG90LmxhYmVsIHx8ICLlj4LogIPlm74ifQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHdpZHRoOiAiMTAwJSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGhlaWdodDogIjEwMCUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBvYmplY3RGaXQ6ICJjb3ZlciIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgIC8+CiAgICAgICAgICAgICAgICAgICAgICAgICkgOiAoCiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8ZGl2CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZGlzcGxheTogImZsZXgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBmbGV4RGlyZWN0aW9uOiAiY29sdW1uIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYWxpZ25JdGVtczogImNlbnRlciIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGp1c3RpZnlDb250ZW50OiAiY2VudGVyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgaGVpZ2h0OiAiMTAwJSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiAiIzljYTNhZiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGZvbnRTaXplOiAiMTJweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8VXBsb2FkIHNpemU9ezI0fSBzdHlsZT17eyBtYXJnaW5Cb3R0b206ICIwLjVyZW0iIH19IC8+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgPHNwYW4+5ouW5ou95Zu+54mHPC9zcGFuPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxpbnB1dAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB0eXBlPSJmaWxlIgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBhY2NlcHQ9ImltYWdlLyoiCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBwb3NpdGlvbjogImFic29sdXRlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGluc2V0OiAwLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgb3BhY2l0eTogMCwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGN1cnNvcjogInBvaW50ZXIiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBvbkNoYW5nZT17KGUpID0+IGhhbmRsZUZpbGVTZWxlY3Qoc2xvdC5pZCwgZSl9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgLz4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgICAgICAgICApfQoKICAgICAgICAgICAgICAgICAgICAgICAgey8qIOagh+etviAqL30KICAgICAgICAgICAgICAgICAgICAgICAge3Nsb3QuaW1hZ2UgJiYgKAogICAgICAgICAgICAgICAgICAgICAgICAgICAgPGRpdgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBvc2l0aW9uOiAiYWJzb2x1dGUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3R0b206IDAsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGxlZnQ6IDAsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHJpZ2h0OiAwLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kOiAibGluZWFyLWdyYWRpZW50KHRyYW5zcGFyZW50LCByZ2JhKDAsMCwwLDAuNykpIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjAuNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiAid2hpdGUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBmb250U2l6ZTogIjEycHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAge2VkaXRpbmdMYWJlbElkID09PSBzbG90LmlkID8gKAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8aW5wdXQKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHR5cGU9InRleHQiCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB2YWx1ZT17c2xvdC5sYWJlbCB8fCAiIn0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG9uQ2hhbmdlPXsoZSkgPT4gb25TbG90TGFiZWxDaGFuZ2Uoc2xvdC5pZCwgZS50YXJnZXQudmFsdWUpfQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgb25CbHVyPXsoKSA9PiBzZXRFZGl0aW5nTGFiZWxJZChudWxsKX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG9uS2V5RG93bj17KGUpID0+IHsKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBpZiAoZS5rZXkgPT09ICJFbnRlciIpIHNldEVkaXRpbmdMYWJlbElkKG51bGwpOwogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGF1dG9Gb2N1cwogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB3aWR0aDogIjEwMCUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJhY2tncm91bmQ6ICJ0cmFuc3BhcmVudCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyOiAibm9uZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgY29sb3I6ICJ3aGl0ZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgb3V0bGluZTogIm5vbmUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgLz4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICApIDogKAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8ZGl2CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBvbkNsaWNrPXsoZSkgPT4gewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGUuc3RvcFByb3BhZ2F0aW9uKCk7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc2V0RWRpdGluZ0xhYmVsSWQoc2xvdC5pZCk7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sgY3Vyc29yOiAidGV4dCIgfX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAge3Nsb3QubGFiZWwgfHwgIueCueWHu+WRveWQjSJ9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICl9CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgICAgICAgICAgICAgKX0KCiAgICAgICAgICAgICAgICAgICAgICAgIHsvKiDmk43kvZzmjInpkq4gKi99CiAgICAgICAgICAgICAgICAgICAgICAgIHtzbG90LmltYWdlICYmICgKICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxkaXYKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBwb3NpdGlvbjogImFic29sdXRlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgdG9wOiAiMC41cmVtIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgcmlnaHQ6ICIwLjVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBkaXNwbGF5OiAiZmxleCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGdhcDogIjAuMjVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgICAgICA+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgey8qIOWbuuWumuaMiemSriAqL30KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA8YnV0dG9uCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG9uQ2xpY2s9eyhlKSA9PiB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBlLnN0b3BQcm9wYWdhdGlvbigpOwogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgb25TbG90UGluKHNsb3QuaWQsICFzbG90LnBpbm5lZCk7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBwYWRkaW5nOiAiMC4yNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXJSYWRpdXM6ICI0cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyOiAibm9uZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6IHNsb3QucGlubmVkID8gIiMzYjgyZjYiIDogInJnYmEoMjU1LDI1NSwyNTUsMC44KSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBjb2xvcjogc2xvdC5waW5uZWQgPyAid2hpdGUiIDogIiMzNzQxNTEiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgY3Vyc29yOiAicG9pbnRlciIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBkaXNwbGF5OiAiZmxleCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBhbGlnbkl0ZW1zOiAiY2VudGVyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGp1c3RpZnlDb250ZW50OiAiY2VudGVyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgdGl0bGU9e3Nsb3QucGlubmVkID8gIuWPlua2iOWbuuWumiIgOiAi5Zu65a6aIn0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxQaW4gc2l6ZT17MTR9IC8+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgPC9idXR0b24+CgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHsvKiDliKDpmaTmjInpkq4gKi99CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgPGJ1dHRvbgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBvbkNsaWNrPXsoZSkgPT4gewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZS5zdG9wUHJvcGFnYXRpb24oKTsKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGlmIChjb25maXJtKCLnoa7lrprmuIXpmaTov5nkuKrmp73kvY3vvJ8iKSkgewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG9uU2xvdFVwZGF0ZShzbG90LmlkLCBudWxsKTsKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIwLjI1cmVtIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjRweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXI6ICJub25lIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogInJnYmEoMjU1LDI1NSwyNTUsMC44KSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBjb2xvcjogIiNlZjQ0NDQiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgY3Vyc29yOiAicG9pbnRlciIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBkaXNwbGF5OiAiZmxleCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBhbGlnbkl0ZW1zOiAiY2VudGVyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGp1c3RpZnlDb250ZW50OiAiY2VudGVyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgdGl0bGU9Iua4hemZpCIKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA+CiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxYIHNpemU9ezE0fSAvPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIDwvYnV0dG9uPgogICAgICAgICAgICAgICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgICAgICAgICAgICAgICl9CgogICAgICAgICAgICAgICAgICAgICAgICB7Lyog5r+A5rS75oyH56S65ZmoICovfQogICAgICAgICAgICAgICAgICAgICAgICB7YWN0aXZlU2xvdElkID09PSBzbG90LmlkICYmICgKICAgICAgICAgICAgICAgICAgICAgICAgICAgIDxkaXYKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBwb3NpdGlvbjogImFic29sdXRlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgdG9wOiAiMC41cmVtIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgbGVmdDogIjAuNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIwLjI1cmVtIDAuNXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjRweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogIiMzYjgyZjYiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBjb2xvcjogIndoaXRlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZm9udFNpemU6ICIxMHB4IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgZm9udFdlaWdodDogIjYwMCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICDlvZPliY3lj4LogIMKICAgICAgICAgICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgICAgICAgICApfQogICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgKSl9CiAgICAgICAgICAgIDwvZGl2PgogICAgICAgIDwvZGl2PgogICAgKTsKfQoKLyoqCiAqIOaWh+S7tui9rERhdGFVUkwKICovCmFzeW5jIGZ1bmN0aW9uIGZpbGVUb0RhdGFVcmwoZmlsZTogRmlsZSk6IFByb21pc2U8c3RyaW5nPiB7CiAgICByZXR1cm4gbmV3IFByb21pc2UoKHJlc29sdmUsIHJlamVjdCkgPT4gewogICAgICAgIGNvbnN0IHJlYWRlciA9IG5ldyBGaWxlUmVhZGVyKCk7CiAgICAgICAgcmVhZGVyLm9ubG9hZGVuZCA9ICgpID0+IHJlc29sdmUocmVhZGVyLnJlc3VsdCBhcyBzdHJpbmcpOwogICAgICAgIHJlYWRlci5vbmVycm9yID0gcmVqZWN0OwogICAgICAgIHJlYWRlci5yZWFkQXNEYXRhVVJMKGZpbGUpOwogICAgfSk7Cn0KCi8qKgogKiDliJvlu7rpu5jorqTmp73kvY0KICovCmV4cG9ydCBmdW5jdGlvbiBjcmVhdGVEZWZhdWx0U2xvdHMoY291bnQ6IG51bWJlciA9IDMpOiBSZWZlcmVuY2VTbG90W10gewogICAgcmV0dXJuIEFycmF5LmZyb20oeyBsZW5ndGg6IGNvdW50IH0sIChfLCBpKSA9PiAoewogICAgICAgIGlkOiBgc2xvdC0ke2kgKyAxfWAsCiAgICAgICAgaW1hZ2U6IG51bGwsCiAgICAgICAgbGFiZWw6IHVuZGVmaW5lZCwKICAgICAgICBwaW5uZWQ6IGZhbHNlLAogICAgfSkpOwp9Cg==
+/**
+ * Reference Image Slots Component
+ *
+ * 参考图区域固定化
+ * - 左侧常驻3-5个参考图槽位
+ * - 拖拽图片到槽位
+ * - 持久化保存
+ * - 点击槽位切换为当前参考
+ */
+
+import { useState } from "react";
+import { X, Pin, Upload } from "lucide-react";
+import type { ReferenceImage } from "@/types/image";
+
+export interface ReferenceSlot {
+    id: string;
+    image: ReferenceImage | null;
+    label?: string;
+    pinned: boolean;
+}
+
+export interface ReferenceImageSlotsProps {
+    slots: ReferenceSlot[];
+    activeSlotId?: string;
+    onSlotUpdate: (slotId: string, image: ReferenceImage | null) => void;
+    onSlotActivate: (slotId: string) => void;
+    onSlotPin: (slotId: string, pinned: boolean) => void;
+    onSlotLabelChange: (slotId: string, label: string) => void;
+    className?: string;
+}
+
+export function ReferenceImageSlots({
+    slots,
+    activeSlotId,
+    onSlotUpdate,
+    onSlotActivate,
+    onSlotPin,
+    onSlotLabelChange,
+    className = "",
+}: ReferenceImageSlotsProps) {
+    const [dragOverSlotId, setDragOverSlotId] = useState<string | null>(null);
+    const [editingLabelId, setEditingLabelId] = useState<string | null>(null);
+
+    const handleDrop = async (slotId: string, e: React.DragEvent) => {
+        e.preventDefault();
+        setDragOverSlotId(null);
+
+        const files = Array.from(e.dataTransfer.files);
+        const imageFile = files.find(f => f.type.startsWith("image/"));
+
+        if (imageFile) {
+            const dataUrl = await fileToDataUrl(imageFile);
+            onSlotUpdate(slotId, {
+                id: `ref-${Date.now()}`,
+                dataUrl,
+                width: 0,
+                height: 0,
+            });
+        }
+    };
+
+    const handleFileSelect = async (slotId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && file.type.startsWith("image/")) {
+            const dataUrl = await fileToDataUrl(file);
+            onSlotUpdate(slotId, {
+                id: `ref-${Date.now()}`,
+                dataUrl,
+                width: 0,
+                height: 0,
+            });
+        }
+    };
+
+    return (
+        <div className={`reference-image-slots ${className}`} style={{ padding: "1rem" }}>
+            <h3 style={{ marginBottom: "1rem", fontSize: "14px", fontWeight: "600", color: "#374151" }}>
+                参考图槽位
+            </h3>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {slots.map((slot) => (
+                    <div
+                        key={slot.id}
+                        className="reference-slot"
+                        style={{
+                            position: "relative",
+                            width: "100%",
+                            aspectRatio: "1",
+                            borderRadius: "8px",
+                            border: activeSlotId === slot.id ? "2px solid #3b82f6" : "1px dashed #d1d5db",
+                            backgroundColor: dragOverSlotId === slot.id ? "#eff6ff" : "#f9fafb",
+                            cursor: "pointer",
+                            overflow: "hidden",
+                        }}
+                        onDragOver={(e) => {
+                            e.preventDefault();
+                            setDragOverSlotId(slot.id);
+                        }}
+                        onDragLeave={() => setDragOverSlotId(null)}
+                        onDrop={(e) => handleDrop(slot.id, e)}
+                        onClick={() => {
+                            if (slot.image) {
+                                onSlotActivate(slot.id);
+                            }
+                        }}
+                    >
+                        {/* 图片或占位符 */}
+                        {slot.image ? (
+                            <img
+                                src={slot.image.dataUrl}
+                                alt={slot.label || "参考图"}
+                                style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                }}
+                            />
+                        ) : (
+                            <div
+                                style={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    height: "100%",
+                                    color: "#9ca3af",
+                                    fontSize: "12px",
+                                }}
+                            >
+                                <Upload size={24} style={{ marginBottom: "0.5rem" }} />
+                                <span>拖拽图片</span>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    style={{
+                                        position: "absolute",
+                                        inset: 0,
+                                        opacity: 0,
+                                        cursor: "pointer",
+                                    }}
+                                    onChange={(e) => handleFileSelect(slot.id, e)}
+                                />
+                            </div>
+                        )}
+
+                        {/* 标签 */}
+                        {slot.image && (
+                            <div
+                                style={{
+                                    position: "absolute",
+                                    bottom: 0,
+                                    left: 0,
+                                    right: 0,
+                                    background: "linear-gradient(transparent, rgba(0,0,0,0.7))",
+                                    padding: "0.5rem",
+                                    color: "white",
+                                    fontSize: "12px",
+                                }}
+                            >
+                                {editingLabelId === slot.id ? (
+                                    <input
+                                        type="text"
+                                        value={slot.label || ""}
+                                        onChange={(e) => onSlotLabelChange(slot.id, e.target.value)}
+                                        onBlur={() => setEditingLabelId(null)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter") setEditingLabelId(null);
+                                        }}
+                                        autoFocus
+                                        style={{
+                                            width: "100%",
+                                            background: "transparent",
+                                            border: "none",
+                                            color: "white",
+                                            outline: "none",
+                                        }}
+                                    />
+                                ) : (
+                                    <div
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setEditingLabelId(slot.id);
+                                        }}
+                                        style={{ cursor: "text" }}
+                                    >
+                                        {slot.label || "点击命名"}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* 操作按钮 */}
+                        {slot.image && (
+                            <div
+                                style={{
+                                    position: "absolute",
+                                    top: "0.5rem",
+                                    right: "0.5rem",
+                                    display: "flex",
+                                    gap: "0.25rem",
+                                }}
+                            >
+                                {/* 固定按钮 */}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onSlotPin(slot.id, !slot.pinned);
+                                    }}
+                                    style={{
+                                        padding: "0.25rem",
+                                        borderRadius: "4px",
+                                        border: "none",
+                                        backgroundColor: slot.pinned ? "#3b82f6" : "rgba(255,255,255,0.8)",
+                                        color: slot.pinned ? "white" : "#374151",
+                                        cursor: "pointer",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                    }}
+                                    title={slot.pinned ? "取消固定" : "固定"}
+                                >
+                                    <Pin size={14} />
+                                </button>
+
+                                {/* 删除按钮 */}
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (confirm("确定清除这个槽位？")) {
+                                            onSlotUpdate(slot.id, null);
+                                        }
+                                    }}
+                                    style={{
+                                        padding: "0.25rem",
+                                        borderRadius: "4px",
+                                        border: "none",
+                                        backgroundColor: "rgba(255,255,255,0.8)",
+                                        color: "#ef4444",
+                                        cursor: "pointer",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                    }}
+                                    title="清除"
+                                >
+                                    <X size={14} />
+                                </button>
+                            </div>
+                        )}
+
+                        {/* 激活指示器 */}
+                        {activeSlotId === slot.id && (
+                            <div
+                                style={{
+                                    position: "absolute",
+                                    top: "0.5rem",
+                                    left: "0.5rem",
+                                    padding: "0.25rem 0.5rem",
+                                    borderRadius: "4px",
+                                    backgroundColor: "#3b82f6",
+                                    color: "white",
+                                    fontSize: "10px",
+                                    fontWeight: "600",
+                                }}
+                            >
+                                当前参考
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+/**
+ * 文件转DataURL
+ */
+async function fileToDataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+/**
+ * 创建默认槽位
+ */
+export function createDefaultSlots(count: number = 3): ReferenceSlot[] {
+    return Array.from({ length: count }, (_, i) => ({
+        id: `slot-${i + 1}`,
+        image: null,
+        label: undefined,
+        pinned: false,
+    }));
+}

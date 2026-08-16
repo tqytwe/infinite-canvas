@@ -1,1 +1,253 @@
-LyoqCiAqIE1vZGVsIFNlbGVjdG9yIENvbXBvbmVudAogKgogKiBQaGFzZSAzLjE6IOaooeWei+mAieaLqeWZqFVJCiAqIC0g5YiG57G75bGV56S65qih5Z6LCiAqIC0g5pi+56S65qih5Z6L6IO95Yqb5qCH562+CiAqIC0g5pS26JeP5bi455So5qih5Z6LCiAqLwoKaW1wb3J0IHsgdXNlU3RhdGUgfSBmcm9tICJyZWFjdCI7CmltcG9ydCB7IFN0YXIsIEluZm8gfSBmcm9tICJsdWNpZGUtcmVhY3QiOwppbXBvcnQgewogICAgQVZBSUxBQkxFX01PREVMUywKICAgIE1PREVMX0NBVEVHT1JJRVMsCiAgICBnZXRNb2RlbHNCeUNhdGVnb3J5LAogICAgdHlwZSBNb2RlbEluZm8sCn0gZnJvbSAiQC9jb25maWcvbW9kZWxzIjsKCmV4cG9ydCBpbnRlcmZhY2UgTW9kZWxTZWxlY3RvclByb3BzIHsKICAgIHNlbGVjdGVkTW9kZWxJZDogc3RyaW5nOwogICAgb25Nb2RlbFNlbGVjdDogKG1vZGVsSWQ6IHN0cmluZykgPT4gdm9pZDsKICAgIGNhdGVnb3J5PzogImFsbCIgfCAiaW1hZ2UiIHwgInZpZGVvIiB8ICJhdWRpbyIgfCAibXVsdGltb2RhbCI7CiAgICBzaG93Q2FwYWJpbGl0aWVzPzogYm9vbGVhbjsKfQoKZXhwb3J0IGZ1bmN0aW9uIE1vZGVsU2VsZWN0b3IoewogICAgc2VsZWN0ZWRNb2RlbElkLAogICAgb25Nb2RlbFNlbGVjdCwKICAgIGNhdGVnb3J5ID0gImFsbCIsCiAgICBzaG93Q2FwYWJpbGl0aWVzID0gdHJ1ZSwKfTogTW9kZWxTZWxlY3RvclByb3BzKSB7CiAgICBjb25zdCBbYWN0aXZlQ2F0ZWdvcnksIHNldEFjdGl2ZUNhdGVnb3J5XSA9IHVzZVN0YXRlKGNhdGVnb3J5KTsKICAgIGNvbnN0IFtmYXZvcml0ZXMsIHNldEZhdm9yaXRlc10gPSB1c2VTdGF0ZTxTZXQ8c3RyaW5nPj4oCiAgICAgICAgbmV3IFNldChKU09OLnBhcnNlKGxvY2FsU3RvcmFnZS5nZXRJdGVtKCJmYXZvcml0ZS1tb2RlbHMiKSB8fCAiW10iKSkKICAgICk7CgogICAgY29uc3QgbW9kZWxzID0KICAgICAgICBhY3RpdmVDYXRlZ29yeSA9PT0gImFsbCIKICAgICAgICAgICAgPyBBVkFJTEFCTEVfTU9ERUxTCiAgICAgICAgICAgIDogZ2V0TW9kZWxzQnlDYXRlZ29yeShhY3RpdmVDYXRlZ29yeSk7CgogICAgY29uc3QgdG9nZ2xlRmF2b3JpdGUgPSAobW9kZWxJZDogc3RyaW5nKSA9PiB7CiAgICAgICAgY29uc3QgbmV3RmF2b3JpdGVzID0gbmV3IFNldChmYXZvcml0ZXMpOwogICAgICAgIGlmIChuZXdGYXZvcml0ZXMuaGFzKG1vZGVsSWQpKSB7CiAgICAgICAgICAgIG5ld0Zhdm9yaXRlcy5kZWxldGUobW9kZWxJZCk7CiAgICAgICAgfSBlbHNlIHsKICAgICAgICAgICAgbmV3RmF2b3JpdGVzLmFkZChtb2RlbElkKTsKICAgICAgICB9CiAgICAgICAgc2V0RmF2b3JpdGVzKG5ld0Zhdm9yaXRlcyk7CiAgICAgICAgbG9jYWxTdG9yYWdlLnNldEl0ZW0oImZhdm9yaXRlLW1vZGVscyIsIEpTT04uc3RyaW5naWZ5KFsuLi5uZXdGYXZvcml0ZXNdKSk7CiAgICB9OwoKICAgIHJldHVybiAoCiAgICAgICAgPGRpdiBzdHlsZT17eyBkaXNwbGF5OiAiZmxleCIsIGZsZXhEaXJlY3Rpb246ICJjb2x1bW4iLCBnYXA6ICIxcmVtIiB9fT4KICAgICAgICAgICAgey8qIOWIhuexu+agh+etviAqL30KICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBkaXNwbGF5OiAiZmxleCIsIGdhcDogIjAuNXJlbSIsIG92ZXJmbG93WDogImF1dG8iIH19PgogICAgICAgICAgICAgICAge01PREVMX0NBVEVHT1JJRVMubWFwKChjYXQpID0+ICgKICAgICAgICAgICAgICAgICAgICA8YnV0dG9uCiAgICAgICAgICAgICAgICAgICAgICAgIGtleT17Y2F0LmlkfQogICAgICAgICAgICAgICAgICAgICAgICBvbkNsaWNrPXsoKSA9PiBzZXRBY3RpdmVDYXRlZ29yeShjYXQuaWQgYXMgYW55KX0KICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIwLjVyZW0gMXJlbSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBib3JkZXJSYWRpdXM6ICI2cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyOiBhY3RpdmVDYXRlZ29yeSA9PT0gY2F0LmlkID8gIjJweCBzb2xpZCAjM2I4MmY2IiA6ICIxcHggc29saWQgI2QxZDVkYiIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6IGFjdGl2ZUNhdGVnb3J5ID09PSBjYXQuaWQgPyAiI2VmZjZmZiIgOiAid2hpdGUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgY29sb3I6IGFjdGl2ZUNhdGVnb3J5ID09PSBjYXQuaWQgPyAiIzNiODJmNiIgOiAiIzM3NDE1MSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBmb250U2l6ZTogIjE0cHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgZm9udFdlaWdodDogYWN0aXZlQ2F0ZWdvcnkgPT09IGNhdC5pZCA/ICI2MDAiIDogIjQwMCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBjdXJzb3I6ICJwb2ludGVyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHdoaXRlU3BhY2U6ICJub3dyYXAiLAogICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAge2NhdC5pY29ufSB7Y2F0LmxhYmVsfQogICAgICAgICAgICAgICAgICAgIDwvYnV0dG9uPgogICAgICAgICAgICAgICAgKSl9CiAgICAgICAgICAgIDwvZGl2PgoKICAgICAgICAgICAgey8qIOaooeWei+e9keagvCAqL30KICAgICAgICAgICAgPGRpdgogICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICBkaXNwbGF5OiAiZ3JpZCIsCiAgICAgICAgICAgICAgICAgICAgZ3JpZFRlbXBsYXRlQ29sdW1uczogInJlcGVhdChhdXRvLWZpbGwsIG1pbm1heCgyODBweCwgMWZyKSkiLAogICAgICAgICAgICAgICAgICAgIGdhcDogIjFyZW0iLAogICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgPgogICAgICAgICAgICAgICAge21vZGVscy5tYXAoKG1vZGVsKSA9PiAoCiAgICAgICAgICAgICAgICAgICAgPE1vZGVsQ2FyZAogICAgICAgICAgICAgICAgICAgICAgICBrZXk9e21vZGVsLmlkfQogICAgICAgICAgICAgICAgICAgICAgICBtb2RlbD17bW9kZWx9CiAgICAgICAgICAgICAgICAgICAgICAgIGlzU2VsZWN0ZWQ9e3NlbGVjdGVkTW9kZWxJZCA9PT0gbW9kZWwuaWR9CiAgICAgICAgICAgICAgICAgICAgICAgIGlzRmF2b3JpdGU9e2Zhdm9yaXRlcy5oYXMobW9kZWwuaWQpfQogICAgICAgICAgICAgICAgICAgICAgICBvblNlbGVjdD17b25Nb2RlbFNlbGVjdH0KICAgICAgICAgICAgICAgICAgICAgICAgb25Ub2dnbGVGYXZvcml0ZT17dG9nZ2xlRmF2b3JpdGV9CiAgICAgICAgICAgICAgICAgICAgICAgIHNob3dDYXBhYmlsaXRpZXM9e3Nob3dDYXBhYmlsaXRpZXN9CiAgICAgICAgICAgICAgICAgICAgLz4KICAgICAgICAgICAgICAgICkpfQogICAgICAgICAgICA8L2Rpdj4KICAgICAgICA8L2Rpdj4KICAgICk7Cn0KCmludGVyZmFjZSBNb2RlbENhcmRQcm9wcyB7CiAgICBtb2RlbDogTW9kZWxJbmZvOwogICAgaXNTZWxlY3RlZDogYm9vbGVhbjsKICAgIGlzRmF2b3JpdGU6IGJvb2xlYW47CiAgICBvblNlbGVjdDogKG1vZGVsSWQ6IHN0cmluZykgPT4gdm9pZDsKICAgIG9uVG9nZ2xlRmF2b3JpdGU6IChtb2RlbElkOiBzdHJpbmcpID0+IHZvaWQ7CiAgICBzaG93Q2FwYWJpbGl0aWVzOiBib29sZWFuOwp9CgpmdW5jdGlvbiBNb2RlbENhcmQoewogICAgbW9kZWwsCiAgICBpc1NlbGVjdGVkLAogICAgaXNGYXZvcml0ZSwKICAgIG9uU2VsZWN0LAogICAgb25Ub2dnbGVGYXZvcml0ZSwKICAgIHNob3dDYXBhYmlsaXRpZXMsCn06IE1vZGVsQ2FyZFByb3BzKSB7CiAgICBjb25zdCBbc2hvd0RldGFpbHMsIHNldFNob3dEZXRhaWxzXSA9IHVzZVN0YXRlKGZhbHNlKTsKCiAgICByZXR1cm4gKAogICAgICAgIDxkaXYKICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgIGJvcmRlcjogaXNTZWxlY3RlZCA/ICIycHggc29saWQgIzNiODJmNiIgOiAiMXB4IHNvbGlkICNlNWU3ZWIiLAogICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiOHB4IiwKICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIxcmVtIiwKICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogaXNTZWxlY3RlZCA/ICIjZWZmNmZmIiA6ICJ3aGl0ZSIsCiAgICAgICAgICAgICAgICBjdXJzb3I6ICJwb2ludGVyIiwKICAgICAgICAgICAgICAgIHRyYW5zaXRpb246ICJhbGwgMC4ycyIsCiAgICAgICAgICAgIH19CiAgICAgICAgICAgIG9uQ2xpY2s9eygpID0+IG9uU2VsZWN0KG1vZGVsLmlkKX0KICAgICAgICA+CiAgICAgICAgICAgIHsvKiDlpLTpg6ggKi99CiAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZGlzcGxheTogImZsZXgiLCBhbGlnbkl0ZW1zOiAiZmxleC1zdGFydCIsIGp1c3RpZnlDb250ZW50OiAic3BhY2UtYmV0d2VlbiIsIG1hcmdpbkJvdHRvbTogIjAuNzVyZW0iIH19PgogICAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBmbGV4OiAxIH19PgogICAgICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZm9udFNpemU6ICIxNXB4IiwgZm9udFdlaWdodDogIjYwMCIsIGNvbG9yOiAiIzM3NDE1MSIsIG1hcmdpbkJvdHRvbTogIjAuMjVyZW0iIH19PgogICAgICAgICAgICAgICAgICAgICAgICB7bW9kZWwuZGlzcGxheU5hbWV9CiAgICAgICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgICAgICAgICAgPGRpdiBzdHlsZT17eyBmb250U2l6ZTogIjEycHgiLCBjb2xvcjogIiM2YjcyODAiIH19PgogICAgICAgICAgICAgICAgICAgICAgICB7bW9kZWwucHJvdmlkZXJ9CiAgICAgICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgICAgICA8L2Rpdj4KCiAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGRpc3BsYXk6ICJmbGV4IiwgZ2FwOiAiMC4yNXJlbSIgfX0+CiAgICAgICAgICAgICAgICAgICAgPGJ1dHRvbgogICAgICAgICAgICAgICAgICAgICAgICBvbkNsaWNrPXsoZSkgPT4gewogICAgICAgICAgICAgICAgICAgICAgICAgICAgZS5zdG9wUHJvcGFnYXRpb24oKTsKICAgICAgICAgICAgICAgICAgICAgICAgICAgIG9uVG9nZ2xlRmF2b3JpdGUobW9kZWwuaWQpOwogICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjAuMjVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYm9yZGVyOiAibm9uZSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICJ0cmFuc3BhcmVudCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBjdXJzb3I6ICJwb2ludGVyIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiBpc0Zhdm9yaXRlID8gIiNmNTllMGIiIDogIiNkMWQ1ZGIiLAogICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICB0aXRsZT17aXNGYXZvcml0ZSA/ICLlj5bmtojmlLbol48iIDogIuaUtuiXjyJ9CiAgICAgICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICAgICAgICA8U3RhciBzaXplPXsxNn0gZmlsbD17aXNGYXZvcml0ZSA/ICJjdXJyZW50Q29sb3IiIDogIm5vbmUifSAvPgogICAgICAgICAgICAgICAgICAgIDwvYnV0dG9uPgoKICAgICAgICAgICAgICAgICAgICA8YnV0dG9uCiAgICAgICAgICAgICAgICAgICAgICAgIG9uQ2xpY2s9eyhlKSA9PiB7CiAgICAgICAgICAgICAgICAgICAgICAgICAgICBlLnN0b3BQcm9wYWdhdGlvbigpOwogICAgICAgICAgICAgICAgICAgICAgICAgICAgc2V0U2hvd0RldGFpbHMoIXNob3dEZXRhaWxzKTsKICAgICAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgICAgICAgICAgc3R5bGU9e3sKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHBhZGRpbmc6ICIwLjI1cmVtIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlcjogIm5vbmUiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgYmFja2dyb3VuZENvbG9yOiAidHJhbnNwYXJlbnQiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgY3Vyc29yOiAicG9pbnRlciIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBjb2xvcjogIiM2YjcyODAiLAogICAgICAgICAgICAgICAgICAgICAgICB9fQogICAgICAgICAgICAgICAgICAgICAgICB0aXRsZT0i6K+m57uG5L+h5oGvIgogICAgICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICAgICAgPEluZm8gc2l6ZT17MTZ9IC8+CiAgICAgICAgICAgICAgICAgICAgPC9idXR0b24+CiAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgPC9kaXY+CgogICAgICAgICAgICB7Lyog5o+P6L+wICovfQogICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGZvbnRTaXplOiAiMTNweCIsIGNvbG9yOiAiIzZiNzI4MCIsIG1hcmdpbkJvdHRvbTogIjAuNzVyZW0iLCBsaW5lSGVpZ2h0OiAiMS40IiB9fT4KICAgICAgICAgICAgICAgIHttb2RlbC5kZXNjcmlwdGlvbn0KICAgICAgICAgICAgPC9kaXY+CgogICAgICAgICAgICB7Lyog5qCH562+ICovfQogICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IGRpc3BsYXk6ICJmbGV4IiwgZmxleFdyYXA6ICJ3cmFwIiwgZ2FwOiAiMC41cmVtIiwgbWFyZ2luQm90dG9tOiAiMC43NXJlbSIgfX0+CiAgICAgICAgICAgICAgICB7bW9kZWwudGFncy5tYXAoKHRhZykgPT4gKAogICAgICAgICAgICAgICAgICAgIDxzcGFuCiAgICAgICAgICAgICAgICAgICAgICAgIGtleT17dGFnfQogICAgICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICAgICAgcGFkZGluZzogIjAuMjVyZW0gMC41cmVtIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGJvcmRlclJhZGl1czogIjRweCIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBiYWNrZ3JvdW5kQ29sb3I6ICIjZjNmNGY2IiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiAiIzM3NDE1MSIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBmb250U2l6ZTogIjExcHgiLAogICAgICAgICAgICAgICAgICAgICAgICAgICAgZm9udFdlaWdodDogIjUwMCIsCiAgICAgICAgICAgICAgICAgICAgICAgIH19CiAgICAgICAgICAgICAgICAgICAgPgogICAgICAgICAgICAgICAgICAgICAgICB7dGFnfQogICAgICAgICAgICAgICAgICAgIDwvc3Bhbj4KICAgICAgICAgICAgICAgICkpfQogICAgICAgICAgICA8L2Rpdj4KCiAgICAgICAgICAgIHsvKiDog73lipvmjIfnpLogKi99CiAgICAgICAgICAgIHtzaG93Q2FwYWJpbGl0aWVzICYmICgKICAgICAgICAgICAgICAgIDxkaXYgc3R5bGU9e3sgZGlzcGxheTogImZsZXgiLCBmbGV4V3JhcDogIndyYXAiLCBnYXA6ICIwLjVyZW0iLCBmb250U2l6ZTogIjExcHgiLCBjb2xvcjogIiM2YjcyODAiIH19PgogICAgICAgICAgICAgICAgICAgIHttb2RlbC5jYXBhYmlsaXRpZXMuc3VwcG9ydHNSZWZlcmVuY2VJbWFnZSAmJiA8Q2FwYWJpbGl0eUJhZGdlIGxhYmVsPSLlj4LogIPlm74iIC8+fQogICAgICAgICAgICAgICAgICAgIHttb2RlbC5jYXBhYmlsaXRpZXMuc3VwcG9ydHNCYXRjaEdlbmVyYXRpb24gJiYgPENhcGFiaWxpdHlCYWRnZSBsYWJlbD0i5om56YeP55Sf5oiQIiAvPn0KICAgICAgICAgICAgICAgICAgICB7bW9kZWwuY2FwYWJpbGl0aWVzLnN1cHBvcnRzTXVsdGltb2RhbCAmJiA8Q2FwYWJpbGl0eUJhZGdlIGxhYmVsPSLlpJrmqKHmgIEiIC8+fQogICAgICAgICAgICAgICAgICAgIHttb2RlbC5jYXBhYmlsaXRpZXMuc3VwcG9ydHNWaWRlb0dlbmVyYXRpb24gJiYgPENhcGFiaWxpdHlCYWRnZSBsYWJlbD0i6KeG6aKRIiAvPn0KICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICApfQoKICAgICAgICAgICAgey8qIOivpue7huS/oeaBryAqL30KICAgICAgICAgICAge3Nob3dEZXRhaWxzICYmICgKICAgICAgICAgICAgICAgIDxkaXYKICAgICAgICAgICAgICAgICAgICBzdHlsZT17ewogICAgICAgICAgICAgICAgICAgICAgICBtYXJnaW5Ub3A6ICIwLjc1cmVtIiwKICAgICAgICAgICAgICAgICAgICAgICAgcGFkZGluZ1RvcDogIjAuNzVyZW0iLAogICAgICAgICAgICAgICAgICAgICAgICBib3JkZXJUb3A6ICIxcHggc29saWQgI2U1ZTdlYiIsCiAgICAgICAgICAgICAgICAgICAgICAgIGZvbnRTaXplOiAiMTJweCIsCiAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yOiAiIzZiNzI4MCIsCiAgICAgICAgICAgICAgICAgICAgfX0KICAgICAgICAgICAgICAgID4KICAgICAgICAgICAgICAgICAgICA8ZGl2IHN0eWxlPXt7IG1hcmdpbkJvdHRvbTogIjAuNXJlbSIgfX0+CiAgICAgICAgICAgICAgICAgICAgICAgIOacgOWkp+WIhui+qOeOhzoge21vZGVsLmNhcGFiaWxpdGllcy5tYXhSZXNvbHV0aW9uLndpZHRofSDDlyB7bW9kZWwuY2FwYWJpbGl0aWVzLm1heFJlc29sdXRpb24uaGVpZ2h0fQogICAgICAgICAgICAgICAgICAgIDwvZGl2PgogICAgICAgICAgICAgICAgICAgIDxkaXY+CiAgICAgICAgICAgICAgICAgICAgICAgIOacgOWkp+aJueasoToge21vZGVsLmNhcGFiaWxpdGllcy5tYXhCYXRjaFNpemV9CiAgICAgICAgICAgICAgICAgICAgPC9kaXY+CiAgICAgICAgICAgICAgICA8L2Rpdj4KICAgICAgICAgICAgKX0KICAgICAgICA8L2Rpdj4KICAgICk7Cn0KCmZ1bmN0aW9uIENhcGFiaWxpdHlCYWRnZSh7IGxhYmVsIH06IHsgbGFiZWw6IHN0cmluZyB9KSB7CiAgICByZXR1cm4gKAogICAgICAgIDxzcGFuCiAgICAgICAgICAgIHN0eWxlPXt7CiAgICAgICAgICAgICAgICBwYWRkaW5nOiAiMC4xMjVyZW0gMC4zNzVyZW0iLAogICAgICAgICAgICAgICAgYm9yZGVyUmFkaXVzOiAiM3B4IiwKICAgICAgICAgICAgICAgIGJhY2tncm91bmRDb2xvcjogIiNkYmVhZmUiLAogICAgICAgICAgICAgICAgY29sb3I6ICIjMWU0MGFmIiwKICAgICAgICAgICAgICAgIGZvbnRTaXplOiAiMTBweCIsCiAgICAgICAgICAgICAgICBmb250V2VpZ2h0OiAiNTAwIiwKICAgICAgICAgICAgfX0KICAgICAgICA+CiAgICAgICAgICAgIHtsYWJlbH0KICAgICAgICA8L3NwYW4+CiAgICApOwp9Cg==
+/**
+ * Model Selector Component
+ *
+ * Phase 3.1: 模型选择器UI
+ * - 分类展示模型
+ * - 显示模型能力标签
+ * - 收藏常用模型
+ */
+
+import { useState } from "react";
+import { Star, Info } from "lucide-react";
+import {
+    AVAILABLE_MODELS,
+    MODEL_CATEGORIES,
+    getModelsByCategory,
+    type ModelInfo,
+} from "@/config/models";
+
+export interface ModelSelectorProps {
+    selectedModelId: string;
+    onModelSelect: (modelId: string) => void;
+    category?: "all" | "image" | "video" | "audio" | "multimodal";
+    showCapabilities?: boolean;
+}
+
+export function ModelSelector({
+    selectedModelId,
+    onModelSelect,
+    category = "all",
+    showCapabilities = true,
+}: ModelSelectorProps) {
+    const [activeCategory, setActiveCategory] = useState(category);
+    const [favorites, setFavorites] = useState<Set<string>>(
+        new Set(JSON.parse(localStorage.getItem("favorite-models") || "[]"))
+    );
+
+    const models =
+        activeCategory === "all"
+            ? AVAILABLE_MODELS
+            : getModelsByCategory(activeCategory);
+
+    const toggleFavorite = (modelId: string) => {
+        const newFavorites = new Set(favorites);
+        if (newFavorites.has(modelId)) {
+            newFavorites.delete(modelId);
+        } else {
+            newFavorites.add(modelId);
+        }
+        setFavorites(newFavorites);
+        localStorage.setItem("favorite-models", JSON.stringify([...newFavorites]));
+    };
+
+    return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            {/* 分类标签 */}
+            <div style={{ display: "flex", gap: "0.5rem", overflowX: "auto" }}>
+                {MODEL_CATEGORIES.map((cat) => (
+                    <button
+                        key={cat.id}
+                        onClick={() => setActiveCategory(cat.id as any)}
+                        style={{
+                            padding: "0.5rem 1rem",
+                            borderRadius: "6px",
+                            border: activeCategory === cat.id ? "2px solid #3b82f6" : "1px solid #d1d5db",
+                            backgroundColor: activeCategory === cat.id ? "#eff6ff" : "white",
+                            color: activeCategory === cat.id ? "#3b82f6" : "#374151",
+                            fontSize: "14px",
+                            fontWeight: activeCategory === cat.id ? "600" : "400",
+                            cursor: "pointer",
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        {cat.icon} {cat.label}
+                    </button>
+                ))}
+            </div>
+
+            {/* 模型网格 */}
+            <div
+                style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                    gap: "1rem",
+                }}
+            >
+                {models.map((model) => (
+                    <ModelCard
+                        key={model.id}
+                        model={model}
+                        isSelected={selectedModelId === model.id}
+                        isFavorite={favorites.has(model.id)}
+                        onSelect={onModelSelect}
+                        onToggleFavorite={toggleFavorite}
+                        showCapabilities={showCapabilities}
+                    />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+interface ModelCardProps {
+    model: ModelInfo;
+    isSelected: boolean;
+    isFavorite: boolean;
+    onSelect: (modelId: string) => void;
+    onToggleFavorite: (modelId: string) => void;
+    showCapabilities: boolean;
+}
+
+function ModelCard({
+    model,
+    isSelected,
+    isFavorite,
+    onSelect,
+    onToggleFavorite,
+    showCapabilities,
+}: ModelCardProps) {
+    const [showDetails, setShowDetails] = useState(false);
+
+    return (
+        <div
+            style={{
+                border: isSelected ? "2px solid #3b82f6" : "1px solid #e5e7eb",
+                borderRadius: "8px",
+                padding: "1rem",
+                backgroundColor: isSelected ? "#eff6ff" : "white",
+                cursor: "pointer",
+                transition: "all 0.2s",
+            }}
+            onClick={() => onSelect(model.id)}
+        >
+            {/* 头部 */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+                <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: "15px", fontWeight: "600", color: "#374151", marginBottom: "0.25rem" }}>
+                        {model.displayName}
+                    </div>
+                    <div style={{ fontSize: "12px", color: "#6b7280" }}>
+                        {model.provider}
+                    </div>
+                </div>
+
+                <div style={{ display: "flex", gap: "0.25rem" }}>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onToggleFavorite(model.id);
+                        }}
+                        style={{
+                            padding: "0.25rem",
+                            border: "none",
+                            backgroundColor: "transparent",
+                            cursor: "pointer",
+                            color: isFavorite ? "#f59e0b" : "#d1d5db",
+                        }}
+                        title={isFavorite ? "取消收藏" : "收藏"}
+                    >
+                        <Star size={16} fill={isFavorite ? "currentColor" : "none"} />
+                    </button>
+
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setShowDetails(!showDetails);
+                        }}
+                        style={{
+                            padding: "0.25rem",
+                            border: "none",
+                            backgroundColor: "transparent",
+                            cursor: "pointer",
+                            color: "#6b7280",
+                        }}
+                        title="详细信息"
+                    >
+                        <Info size={16} />
+                    </button>
+                </div>
+            </div>
+
+            {/* 描述 */}
+            <div style={{ fontSize: "13px", color: "#6b7280", marginBottom: "0.75rem", lineHeight: "1.4" }}>
+                {model.description}
+            </div>
+
+            {/* 标签 */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                {model.tags.map((tag) => (
+                    <span
+                        key={tag}
+                        style={{
+                            padding: "0.25rem 0.5rem",
+                            borderRadius: "4px",
+                            backgroundColor: "#f3f4f6",
+                            color: "#374151",
+                            fontSize: "11px",
+                            fontWeight: "500",
+                        }}
+                    >
+                        {tag}
+                    </span>
+                ))}
+            </div>
+
+            {/* 能力指示 */}
+            {showCapabilities && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", fontSize: "11px", color: "#6b7280" }}>
+                    {model.capabilities.supportsReferenceImage && <CapabilityBadge label="参考图" />}
+                    {model.capabilities.supportsBatchGeneration && <CapabilityBadge label="批量生成" />}
+                    {model.capabilities.supportsMultimodal && <CapabilityBadge label="多模态" />}
+                    {model.capabilities.supportsVideoGeneration && <CapabilityBadge label="视频" />}
+                </div>
+            )}
+
+            {/* 详细信息 */}
+            {showDetails && (
+                <div
+                    style={{
+                        marginTop: "0.75rem",
+                        paddingTop: "0.75rem",
+                        borderTop: "1px solid #e5e7eb",
+                        fontSize: "12px",
+                        color: "#6b7280",
+                    }}
+                >
+                    <div style={{ marginBottom: "0.5rem" }}>
+                        最大分辨率: {model.capabilities.maxResolution.width} × {model.capabilities.maxResolution.height}
+                    </div>
+                    <div>
+                        最大批次: {model.capabilities.maxBatchSize}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function CapabilityBadge({ label }: { label: string }) {
+    return (
+        <span
+            style={{
+                padding: "0.125rem 0.375rem",
+                borderRadius: "3px",
+                backgroundColor: "#dbeafe",
+                color: "#1e40af",
+                fontSize: "10px",
+                fontWeight: "500",
+            }}
+        >
+            {label}
+        </span>
+    );
+}
