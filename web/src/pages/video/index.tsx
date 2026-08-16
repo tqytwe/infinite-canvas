@@ -345,6 +345,9 @@ export default function VideoPage() {
 
     const saveLog = async (log: GenerationLog, resumePending = true) => {
         const serialized = serializeLog(log);
+        // Keep the active tab ahead of a delayed cloud read. A stale pending
+        // record must never replace a task that this tab has already finished.
+        setLogs((current) => mergeLogs([serialized], current));
         try {
             await logStore.setItem(log.id, serialized);
         } catch (error) {
@@ -435,6 +438,7 @@ export default function VideoPage() {
                         deliveryError: nextVideo.storageKey ? undefined : t("videoWorkbench.deliveryPending"),
                         error: undefined,
                     };
+                    if (currentLogIdRef.current === log.id) setPreviewLog(nextLog);
                     await saveLog(nextLog, false);
                     message.success(t("videoWorkbench.generated"));
                     void persistVideoDelivery(nextLog, state.result, nextVideo);
@@ -1186,9 +1190,17 @@ function mergeLogs(remote: GenerationLog[], local: GenerationLog[]) {
     const merged = new Map(remote.map((log) => [log.id, log]));
     for (const log of local) {
         const current = merged.get(log.id);
-        if (!current || (log.updatedAt || log.createdAt) > (current.updatedAt || current.createdAt)) merged.set(log.id, log);
+        if (!current || shouldReplaceLog(current, log)) merged.set(log.id, log);
     }
     return Array.from(merged.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+function shouldReplaceLog(current: GenerationLog, next: GenerationLog) {
+    if (current.status === "success") return false;
+    if (next.status === "success") return true;
+    if (current.status !== "pending" && next.status === "pending") return false;
+    if (current.status === "pending" && next.status !== "pending") return true;
+    return (next.updatedAt || next.createdAt) > (current.updatedAt || current.createdAt);
 }
 
 function sameLogSet(first: GenerationLog[], second: GenerationLog[]) {
