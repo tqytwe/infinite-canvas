@@ -12,6 +12,7 @@ type ModelPickerProps = {
     value?: string;
     onChange: (model: string) => void;
     capability?: ModelCapability;
+    channelId?: string;
     className?: string;
     fullWidth?: boolean;
     placeholder?: string;
@@ -19,11 +20,11 @@ type ModelPickerProps = {
     disabled?: boolean;
 };
 
-export function ModelPicker({ config, value, onChange, capability, className, fullWidth = false, placeholder, onMissingConfig, disabled = false }: ModelPickerProps) {
+export function ModelPicker({ config, value, onChange, capability, channelId, className, fullWidth = false, placeholder, onMissingConfig, disabled = false }: ModelPickerProps) {
     const { t } = useTranslation();
     const pickerId = useId();
     const [open, setOpen] = useState(false);
-    const options = useMemo(() => Array.from(new Set([...(config.channelMode === "local" && !capability ? [value] : []), ...selectableModelsByCapability(config, capability)].filter((model): model is string => Boolean(model)))), [capability, config, value]);
+    const options = useMemo(() => Array.from(new Set([...(config.channelMode === "local" && !capability ? [value] : []), ...selectableModelsByCapability(config, capability, channelId)].filter((model): model is string => Boolean(model)))), [capability, config, value, channelId]);
     const current = value || "";
     const pickerPlaceholder = placeholder || t("settingsPanels.model.select");
 
