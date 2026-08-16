@@ -770,46 +770,7 @@ function parseGeminiImagePayload(payload: GeminiPayload) {
     return images;
 }
 
-
-/** Check if a model does not support the n parameter (batch generation) */
-function modelSupportsNParameter(model: string): boolean {
-    const lowerModel = model.toLowerCase();
-    // Agnes models do not support n parameter according to official docs
-    // https://agnes-ai.com/en/docs/agnes-image-20-flash
-    if (lowerModel.includes("agnes")) return false;
-    // Add other models here if they do not support batch generation
-    return true;
-}
-
 async function requestManagedImageGeneration(config: AiConfig, prompt: string, references: ReferenceImage[], options?: RequestOptions) {
-    const selectedModel = selectImageModel(config);
-    const requestConfig = resolveModelRequestConfig(config, selectedModel);
-    const n = Math.max(1, Math.min(15, Math.floor(Math.abs(Number(config.count)) || 1)));
-    
-    // For models that do not support n parameter, send multiple single-image requests
-    if (!modelSupportsNParameter(requestConfig.model) && n > 1) {
-        const tasks = await Promise.all(
-            Array.from({ length: n }, async () => {
-                const singleConfig = { ...config, count: "1" };
-                const task = await createManagedImageGenerationTask(singleConfig, prompt, references, options);
-                if (!task) return null;
-                return task;
-            })
-        );
-        
-        const validTasks = tasks.filter((task): task is ManagedImageGenerationTask => task !== null);
-        if (validTasks.length === 0) return null;
-        
-        // Poll all tasks in parallel
-        const results = await Promise.all(
-            validTasks.map(task => pollManagedImageTask(resolveModelRequestConfig(config, task.model), task, options))
-        );
-        
-        // Flatten results into a single array
-        return results.flat();
-    }
-    
-    // For models that support n parameter, use the original flow
     const task = await createManagedImageGenerationTask(config, prompt, references, options);
     if (!task) return null;
     return pollManagedImageTask(resolveModelRequestConfig(config, task.model), task, options);
