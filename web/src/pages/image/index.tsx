@@ -330,23 +330,45 @@ export default function ImagePage() {
     };
 
     const addResultToReferences = async (image: GeneratedImage, index: number) => {
-        const stored = await uploadImage(image.dataUrl);
-        setReferences((value) => [...value, { id: nanoid(), name: `result-${index + 1}.png`, type: stored.mimeType, dataUrl: stored.url, storageKey: stored.storageKey }]);
-        message.success(t("imageWorkbench.addedReference"));
+        try {
+            console.log("[Canvas] addResultToReferences:", { hasDataUrl: !!image.dataUrl, index });
+            if (!image.dataUrl) {
+                console.error("[Canvas] No dataUrl in image");
+                message.error("图片数据缺失");
+                return;
+            }
+            const stored = await uploadImage(image.dataUrl);
+            console.log("[Canvas] Upload complete:", { url: stored.url, storageKey: stored.storageKey });
+            setReferences((value) => [...value, { id: nanoid(), name: `result-${index + 1}.png`, type: stored.mimeType, dataUrl: stored.url, storageKey: stored.storageKey }]);
+            message.success(t("imageWorkbench.addedReference"));
+        } catch (error) {
+            console.error("[Canvas] addResultToReferences failed:", error);
+            message.error("添加参考图失败: " + (error instanceof Error ? error.message : String(error)));
+        }
     };
 
     const saveResultToAssets = async (image: GeneratedImage, index: number) => {
-        const stored = await uploadImage(image.dataUrl);
-        addAsset({
-            kind: "image",
-            title: t("imageWorkbench.resultTitle", { count: index + 1 }),
-            coverUrl: stored.url,
-            tags: [],
-            source: t("imageWorkbench.source"),
-            data: { dataUrl: stored.url, sourceUrl: stored.sourceUrl || image.sourceUrl, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType },
-            metadata: { source: "image-page", prompt },
-        });
-        message.success(t("common.addedToAssets"));
+        try {
+            console.log("[Canvas] saveResultToAssets:", { hasDataUrl: !!image.dataUrl, index });
+            if (!image.dataUrl) {
+                message.error("图片数据缺失");
+                return;
+            }
+            const stored = await uploadImage(image.dataUrl);
+            addAsset({
+                kind: "image",
+                title: t("imageWorkbench.resultTitle", { count: index + 1 }),
+                coverUrl: stored.url,
+                tags: [],
+                source: t("imageWorkbench.source"),
+                data: { dataUrl: stored.url, sourceUrl: stored.sourceUrl || image.sourceUrl, storageKey: stored.storageKey, width: stored.width, height: stored.height, bytes: stored.bytes, mimeType: stored.mimeType },
+                metadata: { source: "image-page", prompt },
+            });
+            message.success(t("common.addedToAssets"));
+        } catch (error) {
+            console.error("[Canvas] saveResultToAssets failed:", error);
+            message.error("保存到资产失败: " + (error instanceof Error ? error.message : String(error)));
+        }
     };
 
     const insertPickedAsset = async (payload: InsertAssetPayload) => {
