@@ -16,7 +16,7 @@ import { boolConfig, isSeedanceVideoConfig, normalizeSeedanceRatio, seedanceRefe
 import { deleteStoredMedia, resolveMediaUrl, uploadMediaFile } from "@/services/file-storage";
 import { resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { readCloudWorkbenchLogs, replaceCloudWorkbenchLogs, upsertCloudWorkbenchLog } from "@/services/workbench-cloud";
-import { getCanvasSession, isCanvasAuthenticated, isCanvasManagedMode, useCanvasCanWrite, useCanvasSessionStore } from "@/services/canvas-cloud";
+import { getCanvasSession, isCanvasAuthenticated, isCanvasManagedMode, switchCanvasVideoGroup, useCanvasCanWrite, useCanvasSessionStore } from "@/services/canvas-cloud";
 import { createVideoGenerationTask, isRetryableVideoTaskError, pollVideoGenerationTask, previewGeneratedVideo, storeGeneratedVideo, type VideoGenerationResult, type VideoGenerationTask } from "@/services/api/video";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useWorkbenchAgentStore } from "@/stores/use-workbench-agent-store";
@@ -783,6 +783,7 @@ export default function VideoPage() {
 }
 
 function GenerationSettings({ config, model, updateConfig, openConfigDialog }: { config: AiConfig; model: string; updateConfig: UpdateAiConfig; openConfigDialog: (shouldPromptContinue?: boolean) => void }) {
+    const { message } = App.useApp();
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const { t } = useTranslation();
 
@@ -790,9 +791,17 @@ function GenerationSettings({ config, model, updateConfig, openConfigDialog }: {
     const decoded = decodeChannelModel(model);
     const currentChannelId = decoded?.channelId ?? (videoChannels[0]?.id || "");
 
-    const handleChannelChange = (channelId: string) => {
+    const handleChannelChange = async (channelId: string) => {
         const channel = config.channels.find((ch) => ch.id === channelId);
         const firstVideoModel = channel?.models.find((m) => m.capability === "video");
+        if (isCanvasManagedMode() && channel?.groupId) {
+            try {
+                await switchCanvasVideoGroup(channel.groupId);
+            } catch {
+                message.error(t("apiErrors.requestFailed"));
+                return;
+            }
+        }
         if (firstVideoModel) updateConfig("videoModel", encodeChannelModel(channelId, firstVideoModel.name));
     };
 
@@ -803,7 +812,7 @@ function GenerationSettings({ config, model, updateConfig, openConfigDialog }: {
                     <span className="mb-1.5 block text-sm font-semibold sm:mb-2 sm:text-base">{t("videoWorkbench.accountGroup")}</span>
                     <Select
                         value={currentChannelId}
-                        onChange={handleChannelChange}
+                        onChange={(value) => void handleChannelChange(value)}
                         className="w-full"
                         options={videoChannels.map((ch) => ({ value: ch.id, label: ch.name }))}
                     />

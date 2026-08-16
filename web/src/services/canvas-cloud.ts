@@ -143,6 +143,21 @@ export async function logoutCanvasSession() {
     useCanvasSessionStore.setState({ session, usage: null });
 }
 
+export async function switchCanvasVideoGroup(groupId: number) {
+    if (!CANVAS_MANAGED_MODE) return getCanvasSession();
+    if (!Number.isSafeInteger(groupId) || groupId <= 0) throw new Error("VIDEO_GROUP_REQUIRED");
+    await requireCanvasWriteAccess();
+    const response = await fetch("/api/platform/video/group", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ group_id: groupId }),
+    });
+    const value = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(value.error || "VIDEO_GROUP_SWITCH_FAILED");
+    return getCanvasSession(true);
+}
+
 export function canvasLoginUrl() {
     return session?.login_url || `${CANVAS_PLATFORM_WEB_URL}/login?redirect=${encodeURIComponent("/ai-creation-space")}`;
 }

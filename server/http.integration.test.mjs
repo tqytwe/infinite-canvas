@@ -451,17 +451,20 @@ test("HTTP platform gateway signs external async image asset URLs for same-origi
     assert.equal(await asset.text(), "png-bytes");
 });
 
-test("HTTP platform gateway uses scoped image session for image APIs", async (t) => {
+test("HTTP platform gateway uses scoped image and video sessions for their APIs", async (t) => {
     const dataDir = await mkdtemp(join(tmpdir(), "infinite-canvas-http-platform-image-session-"));
     let imageAuth = "";
     let videoAuth = "";
     let videoBody = "";
     let agnesAuth = "";
+    let videoGroupAuth = "";
+    let videoGroupKeyID = "";
+    let videoGroupBody = "";
     const platform = await startPlatformServer((req, res) => {
         if (req.method === "GET" && req.url === "/api/v1/nextchat/bootstrap") {
             const apiKeyId = String(req.headers["x-nextchat-api-key-id"] || "");
-            const model = apiKeyId === "209" ? "gpt-image-2" : "gpt-5.5";
-            const useCase = apiKeyId === "209" ? "image_studio" : "text";
+            const model = apiKeyId === "209" ? "gpt-image-2" : apiKeyId === "309" ? "agnes-video-v2.0" : "gpt-5.5";
+            const useCase = apiKeyId === "209" ? "image_studio" : apiKeyId === "309" ? "video" : "text";
             res.writeHead(200, { "content-type": "application/json" });
             res.end(JSON.stringify({ code: 0, data: { user: { id: 109 }, models: { source: "/v1/models", groups: [{ id: Number(apiKeyId), name: `group-${apiKeyId}`, models: [{ name: model, use_case: useCase }] }] } } }));
             return;
@@ -487,6 +490,18 @@ test("HTTP platform gateway uses scoped image session for image APIs", async (t)
             agnesAuth = req.headers.authorization || "";
             res.writeHead(200, { "content-type": "application/json" });
             res.end(JSON.stringify({ status: "processing" }));
+            return;
+        }
+        if (req.method === "POST" && req.url === "/api/v1/nextchat/group") {
+            videoGroupAuth = req.headers.authorization || "";
+            videoGroupKeyID = String(req.headers["x-nextchat-api-key-id"] || "");
+            req.on("data", (chunk) => {
+                videoGroupBody += chunk;
+            });
+            req.on("end", () => {
+                res.writeHead(200, { "content-type": "application/json" });
+                res.end(JSON.stringify({ code: 0, data: { managed_api_key: { id: 309 }, models: { groups: [] } } }));
+            });
             return;
         }
         res.writeHead(404, { "content-type": "application/json" });
@@ -521,12 +536,13 @@ test("HTTP platform gateway uses scoped image session for image APIs", async (t)
         sessions: {
             chat: { apiKey: "chat-key", apiKeyId: 109, purpose: "chat" },
             image: { apiKey: "image-key", apiKeyId: 209, purpose: "image" },
+            video: { apiKey: "video-key", apiKeyId: 309, purpose: "video" },
         },
     });
     const session = await fetch(`${baseUrl}/api/auth/session`, { headers: { cookie: cookie(token) } });
     const sessionPayload = await responseJson(session);
     const modelNames = sessionPayload.models.groups.flatMap((group) => group.models.map((model) => model.name));
-    assert.deepEqual(modelNames.sort(), ["gpt-5.5", "gpt-image-2"]);
+    assert.deepEqual(modelNames.sort(), ["agnes-video-v2.0", "gpt-5.5", "gpt-image-2"]);
 
     const response = await fetch(`${baseUrl}/api/platform/gateway/v1/images/generations/async`, {
         method: "POST",
@@ -542,14 +558,41 @@ test("HTTP platform gateway uses scoped image session for image APIs", async (t)
         body: JSON.stringify({ model: "agnes-video-v2.0", prompt: "test" }),
     });
     assert.equal(videoResponse.status, 200);
-    assert.equal(videoAuth, "Bearer image-key");
+    assert.equal(videoAuth, "Bearer video-key");
     assert.equal(JSON.parse(videoBody).model, "agnes-video-v2.0");
 
     const agnesResponse = await fetch(`${baseUrl}/api/platform/gateway/v1/agnesapi?video_id=videotask_scoped`, {
         headers: { cookie: cookie(token) },
     });
     assert.equal(agnesResponse.status, 200);
-    assert.equal(agnesAuth, "Bearer image-key");
+    assert.equal(agnesAuth, "Bearer video-key");
+
+    const groupResponse = await fetch(`${baseUrl}/api/platform/video/group`, {
+        method: "POST",
+        headers: { cookie: cookie(token), "content-type": "application/json" },
+        body: JSON.stringify({ group_id: 88 }),
+    });
+    assert.equal(groupResponse.status, 200);
+    assert.equal(videoGroupAuth, "Bearer video-key");
+    assert.equal(videoGroupKeyID, "309");
+    assert.deepEqual(JSON.parse(videoGroupBody), { group_id: 88 });
+
+    const legacyToken = await createSession(dataDir, 110, "no-video-session");
+    const legacyVideo = await fetch(`${baseUrl}/api/platform/gateway/v1/videos`, {
+        method: "POST",
+        headers: { cookie: cookie(legacyToken), "content-type": "application/json" },
+        body: JSON.stringify({ model: "agnes-video-v2.0", prompt: "test" }),
+    });
+    assert.equal(legacyVideo.status, 409);
+    assert.equal((await responseJson(legacyVideo)).error, "VIDEO_SESSION_REQUIRED");
+
+    const legacyGroup = await fetch(`${baseUrl}/api/platform/video/group`, {
+        method: "POST",
+        headers: { cookie: cookie(legacyToken), "content-type": "application/json" },
+        body: JSON.stringify({ group_id: 88 }),
+    });
+    assert.equal(legacyGroup.status, 409);
+    assert.equal((await responseJson(legacyGroup)).error, "VIDEO_SESSION_REQUIRED");
 });
 
 test("HTTP managed prompt handoff requires a Canvas session and uses the platform BFF", async (t) => {
