@@ -110,3 +110,58 @@
 3. **并行请求限制**：同时发送大量请求可能触发rate limit，建议n值限制在10以内
 4. **幂等性**：每个请求都有独立的idempotency key，确保重试安全
 
+
+## 2026-08-16 (续)
+
+### ✅ P0-1: Image Studio BFF架构重构
+
+**问题**：
+- 浏览器承担任务轮询（用户关闭页面任务就断了）
+- 未复用主平台Image Studio BFF（已有完整队列管理）
+
+**解决方案**：
+架构从"浏览器轮询"改为"服务端Worker + Image Studio BFF"
+
+**技术实现**：
+
+1. **Image Studio客户端** (`web/src/services/image-studio-client.ts`)
+   - 封装Image Studio BFF API
+   - 提供job管理、资产下载接口
+   - 规范化不同的响应格式
+
+2. **服务端镜像Worker** (`server/image-studio-worker.mjs`)
+   - 后台检查已完成任务
+   - 自动镜像文件到Canvas本地存储
+   - 持久化镜像状态
+
+3. **统一适配器** (`web/src/services/image-generation-adapter.ts`)
+   - Feature flag控制新旧实现
+   - 默认false保持旧行为
+   - 支持渐进式迁移
+
+4. **服务端集成** (`server/index.mjs`)
+   - 启动Worker
+   - 新增 `/api/image-studio/mirror` 触发端点
+
+**架构对比**：
+
+```
+旧: Canvas前端 → /v1/images/async → 浏览器轮询 → 浏览器中转文件
+
+新: Canvas前端 → Image Studio BFF → 服务端Worker镜像 → 前端查询状态
+```
+
+**优势**：
+- ✅ 浏览器不再轮询
+- ✅ 任务持久化到数据库
+- ✅ 刷新/关闭页面不影响任务
+- ✅ 统一的历史管理
+
+**提交**：`84014c7`
+
+**状态**：
+- ✅ 基础架构已实现
+- ⏳ Feature flag默认关闭
+- ⏳ 需要真实测试后开启
+
+---
