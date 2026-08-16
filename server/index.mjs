@@ -10,6 +10,12 @@ import { promisify } from "node:util";
 const ROOT_DIR = resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const STATIC_DIR = resolve(process.env.STATIC_DIR || join(ROOT_DIR, "web-dist"));
 const DATA_DIR = resolve(process.env.CANVAS_DATA_DIR || "/data/infinite-canvas");
+import { getImageStudioWorker } from "./image-studio-worker.mjs";
+
+// Initialize Image Studio Mirror Worker
+const imageStudioWorker = getImageStudioWorker(DATA_DIR);
+imageStudioWorker.start().catch(err => console.error("ImageStudioWorker start failed:", err));
+
 const USERS_DIR = join(DATA_DIR, "users");
 const SESSIONS_DIR = join(DATA_DIR, "sessions");
 const PORT = Number.parseInt(process.env.PORT || "8080", 10);
@@ -139,6 +145,11 @@ async function handleApi(req, res, url, method) {
 
     if (url.pathname === "/api/storage/ingest" && method === "POST") {
         await handleStorageIngest(req, res, session);
+        return;
+    }
+
+    if (url.pathname === "/api/image-studio/mirror" && method === "POST") {
+        await handleImageStudioMirror(req, res, session);
         return;
     }
     const objectMatch = url.pathname.match(/^\/api\/storage\/objects\/([^/]+)$/);
@@ -1529,3 +1540,26 @@ function mimeType(extension) {
     };
     return map[extension.toLowerCase()] || "application/octet-stream";
 }
+
+/** Handle Image Studio mirror trigger */
+async function handleImageStudioMirror(req, res, session) {
+    const body = await readJson(req, 16 * 1024);
+    const jobId = String(body?.jobId || "").trim();
+    const assets = Array.isArray(body?.assets) ? body.assets : [];
+    
+    if (!jobId || assets.length === 0) {
+        sendJson(res, 400, { ok: false, error: "JOB_ID_AND_ASSETS_REQUIRED" });
+        return;
+    }
+    
+    const userId = session.userId;
+    const sessionToken = req.headers.authorization || "";
+    
+    try {
+        const result = await imageStudioWorker.triggerMirror(userId, jobId, assets, sessionToken);
+        sendJson(res, 200, { ok: true, jobId, mirrorState: result });
+    } catch (err) {
+        sendJson(res, 500, { ok: false, error: "MIRROR_FAILED", detail: String(err) });
+    }
+}
+
