@@ -559,6 +559,7 @@ function adminDocsPayload() {
 async function handleStorageIngest(req, res, session) {
     const body = await readJson(req, 4 * 1024);
     const rawUrl = String(body?.url || "").trim();
+    console.log("[Server] ingest version: 2024-08-16-v3 - supports relative paths", { rawUrl });
     if (!rawUrl) { sendJson(res, 400, { ok: false, error: "URL_REQUIRED" }); return; }
 
     // Support both a raw CDN URL and a signed proxy URL (/api/platform/asset-proxy?url=...)

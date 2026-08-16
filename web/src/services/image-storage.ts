@@ -25,6 +25,7 @@ const CLOUD_SAVE_WAIT_MS = 30_000; // large images (2-10 MB) need > 3 s to uploa
 
 export async function uploadImage(input: string | Blob): Promise<UploadedImage> {
     console.log("[Canvas] uploadImage called:", { 
+    console.log("[Canvas] uploadImage version: 2024-08-16-v3 - supports relative paths");
         inputType: typeof input, 
         isString: typeof input === "string",
         startsWithData: typeof input === "string" ? input.startsWith("data:") : false,
