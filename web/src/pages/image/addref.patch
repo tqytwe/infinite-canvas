@@ -1,0 +1,34 @@
+--- a/web/src/pages/image/index.tsx
++++ b/web/src/pages/image/index.tsx
+@@ -332,14 +332,28 @@
+ 
+     const addResultToReferences = async (image: GeneratedImage, index: number) => {
+         try {
+-            console.log("[Canvas] addResultToReferences:", { hasDataUrl: !!image.dataUrl, index });
++            console.log("[Canvas] addResultToReferences:", { 
++                hasDataUrl: !!image.dataUrl, 
++                hasStorageKey: !!image.storageKey,
++                index 
++            });
++            
++            // If already uploaded (has storageKey), reuse it directly
++            if (image.storageKey) {
++                console.log("[Canvas] Reusing existing storageKey:", image.storageKey);
++                setReferences((value) => [...value, { 
++                    id: nanoid(), 
++                    name: `result-${index + 1}.png`, 
++                    type: image.mimeType, 
++                    dataUrl: image.dataUrl, 
++                    storageKey: image.storageKey 
++                }]);
++                message.success(t("imageWorkbench.addedReference"));
++                return;
++            }
++            
+             if (!image.dataUrl) {
+-                console.error("[Canvas] No dataUrl in image");
+-                message.error("图片数据缺失");
+-                return;
+-            }
+-            const stored = await uploadImage(image.dataUrl);
+-            console.log("[Canvas] Upload complete:", { url: stored.url, storageKey: stored.storageKey });

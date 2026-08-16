@@ -333,6 +333,20 @@ export default function ImagePage() {
 
     const addResultToReferences = async (image: GeneratedImage, index: number) => {
         try {
+            // If already uploaded (has storageKey), reuse it directly
+            if (image.storageKey) {
+                console.log("[Canvas] Reusing existing storageKey:", image.storageKey);
+                setReferences((value) => [...value, { 
+                    id: nanoid(), 
+                    name: `result-${index + 1}.png`, 
+                    type: image.mimeType, 
+                    dataUrl: image.dataUrl, 
+                    storageKey: image.storageKey 
+                }]);
+                message.success(t("imageWorkbench.addedReference"));
+                return;
+            }
+
             console.log("[Canvas] addResultToReferences:", { hasDataUrl: !!image.dataUrl, index });
             if (!image.dataUrl) {
                 console.error("[Canvas] No dataUrl in image");
@@ -351,6 +365,22 @@ export default function ImagePage() {
 
     const saveResultToAssets = async (image: GeneratedImage, index: number) => {
         try {
+            // If already uploaded (has storageKey), reuse it directly
+            if (image.storageKey) {
+                console.log("[Canvas] Reusing existing storageKey for assets:", image.storageKey);
+                addAsset({
+                    kind: "image",
+                    title: t("imageWorkbench.resultTitle", { count: index + 1 }),
+                    coverUrl: image.dataUrl,
+                    tags: [],
+                    source: t("imageWorkbench.source"),
+                    data: { dataUrl: image.dataUrl, sourceUrl: image.sourceUrl, storageKey: image.storageKey, width: image.width, height: image.height, bytes: image.bytes, mimeType: image.mimeType },
+                    metadata: { source: "image-page", prompt },
+                });
+                message.success(t("imageWorkbench.savedAsset"));
+                return;
+            }
+
             console.log("[Canvas] saveResultToAssets:", { hasDataUrl: !!image.dataUrl, index });
             if (!image.dataUrl) {
                 message.error("图片数据缺失");
