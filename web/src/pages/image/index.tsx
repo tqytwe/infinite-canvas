@@ -326,7 +326,9 @@ export default function ImagePage() {
     }, [autoRunToken]);
 
     const downloadImage = (image: GeneratedImage, index: number) => {
-        saveAs(image.dataUrl, `image-${index + 1}.png`);
+        const timestamp = new Date().getTime();
+        const filename = `image-${timestamp}-${index + 1}.png`;
+        saveAs(image.dataUrl, filename);
     };
 
     const addResultToReferences = async (image: GeneratedImage, index: number) => {
