@@ -1,0 +1,24 @@
+--- a/web/src/services/image-storage.ts
++++ b/web/src/services/image-storage.ts
+@@ -30,9 +30,10 @@ export async function uploadImage(input: string | Blob): Promise<UploadedImage>
+     const storageKey = `image:${nanoid()}`;
+     
+     // For managed mode with URL input: server-side ingest (intranet → disk, fast & reliable)
+-    // But data URLs and relative paths must be converted to Blob first (server ingest only supports full CDN URLs)
++    // But data URLs and relative paths must be converted to Blob first
++    // Gateway API returns relative paths like /api/platform/gateway/v1/images/task-assets/... - treat them as fetchable URLs
+     console.log("[Canvas] Checking ingest branch:", {
+-        isManaged: isCanvasManagedMode(),
++        isManaged: isCanvasManagedMode(), 
+         isString: typeof input === "string",
+         notDataUrl: typeof input === "string" && !input.startsWith("data:"),
+         notRelativePath: typeof input === "string" && !input.startsWith("/"),
+@@ -52,7 +53,7 @@ export async function uploadImage(input: string | Blob): Promise<UploadedImage>
+         return { url, sourceUrl, storageKey, width: meta.width, height: meta.height, bytes: result.bytes || blob.size, mimeType: result.mime_type || blob.type || meta.mimeType, cloudStatus: "stored" };
+     }
+     
+-    // For Blob input or non-managed mode: original client-side upload path
++    // For Blob input, data URLs, relative paths, or non-managed mode: client-side upload path
+     console.log("[Canvas] Using client-side Blob upload path");
+     const blob = typeof input === "string" ? await readBlobResponse(await fetchWithTimeout(input, 5 * 60_000)) : input;
+     await store.setItem(storageKey, blob);

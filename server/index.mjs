@@ -570,6 +570,14 @@ async function handleStorageIngest(req, res, session) {
             cdnUrl = params.get("url") || "";
         } catch { cdnUrl = ""; }
     }
+    
+    // Gateway API returns relative paths like /api/platform/gateway/v1/images/task-assets/...
+    // Convert to absolute URL for parseProxyableAssetUrl validation
+    if (cdnUrl.startsWith("/")) {
+        const protocol = req.headers["x-forwarded-proto"] || (req.socket.encrypted ? "https" : "http");
+        const host = req.headers["x-forwarded-host"] || req.headers.host || "localhost";
+        cdnUrl = `${protocol}://${host}${cdnUrl}`;
+    }
     const parsed = cdnUrl ? parseProxyableAssetUrl(cdnUrl) : null;
     if (!parsed) { sendJson(res, 400, { ok: false, error: "INVALID_INGEST_URL" }); return; }
 
@@ -1280,7 +1288,7 @@ function parseProxyableAssetUrl(value, allowSigned = false) {
     }
     if (parsed.protocol !== "https:" && !(parsed.protocol === "http:" && parsed.hostname === "127.0.0.1" && !IS_PRODUCTION)) return null;
     if (allowSigned && IS_PRODUCTION && isPrivateAssetProxyHost(parsed.hostname)) return null;
-    if (!allowSigned && !PLATFORM_ASSET_PROXY_ORIGINS.has(parsed.origin)) return null;
+    if (!allowSigned && !PLATFORM_ASSET_PROXY_ORIGINS.has(parsed.origin) && !parsed.pathname.startsWith("/api/platform/gateway/")) return null;
     return parsed;
 }
 
