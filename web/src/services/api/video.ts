@@ -337,6 +337,7 @@ async function pollGrokVideoTask(config: AiConfig, task: VideoGenerationTask, op
             headers: aiHeaders(config),
             signal: options?.signal,
             timeout: 30_000,
+            params: { model: modelOptionName(task.model) },
         });
         const video = unwrapVideoResponse(response.data);
         const errorMessage = readApiErrorMessage(video.error);
@@ -347,7 +348,7 @@ async function pollGrokVideoTask(config: AiConfig, task: VideoGenerationTask, op
         if (isVideoFailureStatus(status)) return { status: "failed", error: readApiErrorMessage(video.error) || apiText("videoGenerationFailed") };
         if (isVideoSuccessStatus(status)) {
             const contentUrl = aiApiUrl(config, `/videos/${encodeURIComponent(task.id)}/content`);
-            return { status: "completed", result: await videoResultFromUrl(config, contentUrl, options) };
+            return { status: "completed", result: await videoResultFromUrl(config, `${contentUrl}?model=${encodeURIComponent(modelOptionName(task.model))}`, options) };
         }
         return { status: "pending" };
     } catch (error) {
@@ -390,6 +391,7 @@ async function pollOpenAIVideoTask(config: AiConfig, task: VideoGenerationTask, 
                     headers: aiHeaders(config),
                     signal: options?.signal,
                     timeout: 30_000,
+                    params: { model: modelOptionName(task.model) },
                 })
             ).data,
         );
@@ -398,7 +400,7 @@ async function pollOpenAIVideoTask(config: AiConfig, task: VideoGenerationTask, 
         const url = videoResultUrl(video);
         if (url) return { status: "completed", result: await videoResultFromUrl(config, normalizeVideoResultUrl(config, url), options) };
         if (isVideoSuccessStatus(normalizeVideoStatus(video.status))) {
-            return { status: "completed", result: await videoResultFromUrl(config, aiApiUrl(config, `/videos/${task.id}/content`), options) };
+            return { status: "completed", result: await videoResultFromUrl(config, `${aiApiUrl(config, `/videos/${task.id}/content`)}?model=${encodeURIComponent(modelOptionName(task.model))}`, options) };
         }
         if (isVideoFailureStatus(normalizeVideoStatus(video.status))) return { status: "failed", error: readApiErrorMessage(video.error) || apiText("videoGenerationFailed") };
         return { status: "pending" };
@@ -450,6 +452,7 @@ async function pollSeedanceTask(config: AiConfig, task: VideoGenerationTask, opt
                     headers: aiHeaders(config),
                     signal: options?.signal,
                     timeout: 30_000,
+                    params: { model: modelOptionName(task.model) },
                 })
             ).data,
         );
