@@ -434,16 +434,13 @@ export default function VideoPage() {
         setStartedAt((value) => value || performance.now());
         if (currentLogIdRef.current === log.id) setResults((value) => (value.length ? value : [{ id: log.id, status: "pending" }]));
         const taskConfig = buildVideoConfig({ ...effectiveConfig, ...log.config }, log.task.model || log.model);
-        let lastTransientError: Error | undefined;
         try {
-            for (let attempt = 0; attempt < 240; attempt += 1) {
+            for (;;) {
                 let state: Awaited<ReturnType<typeof pollVideoGenerationTask>>;
                 try {
                     state = await pollVideoGenerationTask(configOverride || taskConfig, log.task);
-                    lastTransientError = undefined;
                 } catch (error) {
-                    if (!isRetryableVideoTaskError(error) || attempt === 239) throw error;
-                    lastTransientError = error instanceof Error ? error : new Error(t("videoWorkbench.timeout"));
+                    if (!isRetryableVideoTaskError(error)) throw error;
                     await delay(log.task.provider === "seedance" ? 5000 : 2500);
                     continue;
                 }
@@ -471,7 +468,6 @@ export default function VideoPage() {
                 if (state.status === "failed") {
                     throw new Error(state.error);
                 }
-                if (attempt === 239) throw lastTransientError || new Error(t("videoWorkbench.timeout"));
                 await delay(log.task.provider === "seedance" ? 5000 : 2500);
             }
         } catch (error) {
