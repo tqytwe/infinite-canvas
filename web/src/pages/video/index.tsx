@@ -403,10 +403,32 @@ export default function VideoPage() {
                 void pollGenerationLog(log);
                 continue;
             }
+            if (log.status === "failed" && log.task?.provider === "agnes" && log.durationMs >= 9 * 60_000) {
+                void recoverTimedOutAgnesLog(log);
+                continue;
+            }
             if (log.status === "success" && log.deliveryStatus === "pending" && log.task && log.video?.url) {
                 void retryPendingVideoDelivery(log);
             }
         }
+    };
+
+    const recoverTimedOutAgnesLog = async (log: GenerationLog) => {
+        if (!log.task || activeLogIdsRef.current.has(log.id)) return;
+        activeLogIdsRef.current.add(log.id);
+        let pendingLog: GenerationLog | undefined;
+        try {
+            const taskConfig = buildVideoConfig({ ...effectiveConfig, ...log.config }, log.task.model || log.model);
+            const state = await pollVideoGenerationTask(taskConfig, log.task);
+            if (state.status === "failed") return;
+            pendingLog = { ...log, status: "pending", error: undefined, updatedAt: Date.now() };
+            await saveLog(pendingLog, false);
+        } catch (error) {
+            console.warn("[canvas-cloud] timed-out Agnes task recovery failed", log.id, error);
+        } finally {
+            activeLogIdsRef.current.delete(log.id);
+        }
+        if (pendingLog) void pollGenerationLog(pendingLog);
     };
 
     const retryPendingVideoDelivery = async (log: GenerationLog) => {
