@@ -399,7 +399,31 @@ export default function VideoPage() {
 
     const resumePendingLogs = (items: GenerationLog[]) => {
         for (const log of items) {
-            if (log.status === "pending" && log.task) void pollGenerationLog(log);
+            if (log.status === "pending" && log.task) {
+                void pollGenerationLog(log);
+                continue;
+            }
+            if (log.status === "success" && log.deliveryStatus === "pending" && log.task && log.video?.url) {
+                void retryPendingVideoDelivery(log);
+            }
+        }
+    };
+
+    const retryPendingVideoDelivery = async (log: GenerationLog) => {
+        if (!log.task || !log.video || activeLogIdsRef.current.has(log.id)) return;
+        activeLogIdsRef.current.add(log.id);
+        try {
+            const taskConfig = buildVideoConfig({ ...effectiveConfig, ...log.config }, log.task.model || log.model);
+            const state = await pollVideoGenerationTask(taskConfig, log.task);
+            if (state.status === "completed") {
+                const preview = previewGeneratedVideo(state.result);
+                const nextVideo = buildGeneratedVideo(preview, log.durationMs || Date.now() - log.createdAt, log.video.id, log.video.sourceUrl);
+                if (nextVideo.url) await persistVideoDelivery(log, state.result, nextVideo);
+            }
+        } catch (error) {
+            console.warn("[canvas-cloud] video delivery retry failed", log.id, error);
+        } finally {
+            activeLogIdsRef.current.delete(log.id);
         }
     };
 
