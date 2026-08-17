@@ -147,10 +147,18 @@ const IMAGE_KEYWORDS = ["seedream", "gpt-image", "image", "dall-e", "dalle", "im
 /** Best-effort default capability for a freshly fetched model name; user can override in the channel editor. */
 export function guessCapability(name: string): ModelCapability {
     const value = name.toLowerCase();
+    // The managed model directory does not currently publish use_case for these
+    // providers. Keep the known video models visible even when a stale upstream
+    // record labels them as text.
+    if (isKnownVideoModel(value)) return "video";
     if (VIDEO_KEYWORDS.some((keyword) => value.includes(keyword))) return "video";
     if (AUDIO_KEYWORDS.some((keyword) => value.includes(keyword))) return "audio";
     if (IMAGE_KEYWORDS.some((keyword) => value.includes(keyword))) return "image";
     return "text";
+}
+
+function isKnownVideoModel(value: string) {
+    return /^(?:veo-3\.1(?:-|$)|seedance(?:[-_ ]?2(?:\.5)?)(?:[-_ :]|$)|agnes-video(?:[-_ :]|$))/.test(value);
 }
 
 function findChannelModel(config: AiConfig, value: string): { channel: ModelChannel; model: ChannelModel } | null {

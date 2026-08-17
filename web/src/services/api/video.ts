@@ -256,6 +256,8 @@ async function pollAgnesVideoTask(config: AiConfig, task: VideoGenerationTask, o
             timeout: 30_000,
         });
         const video = unwrapVideoResponse(response.data);
+        const errorMessage = readApiErrorMessage(video.error);
+        if (errorMessage) return { status: "failed", error: errorMessage };
         const url = videoResultUrl(video);
         if (url) return { status: "completed", result: await videoResultFromUrl(config, normalizeVideoResultUrl(config, url), options) };
         const status = normalizeVideoStatus(video.status);
@@ -305,9 +307,10 @@ async function createSeedanceOpenAIVideoTask(config: AiConfig, model: string, pr
     const payload = {
         model: modelOptionName(model),
         size: normalizeVideoSize(config.size) || "1280x720",
-        seconds: String(normalizeOpenAISeedanceSeconds(config.videoSeconds)),
+        ratio: normalizeSeedanceRatio(config.size),
         resolution: normalizeOpenAISeedanceResolution(config.vquality),
         generate_audio: boolConfig(config.videoGenerateAudio, true),
+        ...(isSeedance25Model(model) ? { seconds: String(normalizeOpenAISeedanceSeconds(config.videoSeconds)) } : { duration: normalizeSeedanceDuration(config.videoSeconds) }),
         ...(content.content?.length ? { content: content.content } : { prompt: content.prompt }),
     };
     try {
@@ -336,6 +339,8 @@ async function pollGrokVideoTask(config: AiConfig, task: VideoGenerationTask, op
             timeout: 30_000,
         });
         const video = unwrapVideoResponse(response.data);
+        const errorMessage = readApiErrorMessage(video.error);
+        if (errorMessage) return { status: "failed", error: errorMessage };
         const url = videoResultUrl(video);
         if (url) return { status: "completed", result: await videoResultFromUrl(config, normalizeVideoResultUrl(config, url), options) };
         const status = normalizeVideoStatus(video.status);
@@ -388,6 +393,8 @@ async function pollOpenAIVideoTask(config: AiConfig, task: VideoGenerationTask, 
                 })
             ).data,
         );
+        const errorMessage = readApiErrorMessage(video.error);
+        if (errorMessage) return { status: "failed", error: errorMessage };
         const url = videoResultUrl(video);
         if (url) return { status: "completed", result: await videoResultFromUrl(config, normalizeVideoResultUrl(config, url), options) };
         if (isVideoSuccessStatus(normalizeVideoStatus(video.status))) {
@@ -446,6 +453,8 @@ async function pollSeedanceTask(config: AiConfig, task: VideoGenerationTask, opt
                 })
             ).data,
         );
+        const errorMessage = readApiErrorMessage(state.error);
+        if (errorMessage) return { status: "failed", error: errorMessage };
         const url = videoResultUrl(state);
         if (url) return { status: "completed", result: await videoResultFromUrl(config, normalizeVideoResultUrl(config, url), options) };
         const status = normalizeVideoStatus(state.status);
@@ -588,6 +597,10 @@ function normalizeOpenAISeedanceResolution(value: string) {
     return resolution === "480p" ? "480p" : "720p";
 }
 
+function isSeedance25Model(model: string) {
+    return /^(?:seedance[-_ ]?2(?:\.5|_5))(?:$|[-_ :])/.test(modelOptionName(model).trim().toLowerCase());
+}
+
 function normalizeVideoSize(value: string) {
     if (value === "auto") return null;
     const size = value || "1280x720";
@@ -695,7 +708,7 @@ function videoProviderLabel(provider: VideoGenerationProvider) {
 }
 
 function isSeedanceOpenAIModel(model: string) {
-    return /^seedance[-_ ]?2(?:\.|_)?5(?:$|[-_ :])/.test(model) || model === "seedance2.5";
+    return /^seedance[-_ ]?2(?:\.5|_5)?(?:$|[-_ :])/.test(model);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -734,7 +747,7 @@ function readApiErrorMessage(value: unknown): string {
         }
     }
     if (typeof value !== "object") return "";
-    const payload = value as { msg?: unknown; message?: unknown; error?: unknown; detail?: unknown };
+    const payload = value as { code?: unknown; msg?: unknown; message?: unknown; error?: unknown; detail?: unknown };
     // error may be a string or an object containing a message.
     const errorMsg =
         typeof payload.error === "string"
@@ -745,6 +758,7 @@ function readApiErrorMessage(value: unknown): string {
         readApiErrorMessage(payload.message) ||
         readApiErrorMessage(errorMsg) ||
         readApiErrorMessage(payload.detail) ||
+        (payload.code !== undefined && String(payload.code) !== "0" ? String(payload.code) : "") ||
         ""
     );
 }

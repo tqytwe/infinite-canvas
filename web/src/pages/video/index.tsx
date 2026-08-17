@@ -456,6 +456,8 @@ export default function VideoPage() {
         setStartedAt((value) => value || performance.now());
         if (currentLogIdRef.current === log.id) setResults((value) => (value.length ? value : [{ id: log.id, status: "pending" }]));
         const taskConfig = buildVideoConfig({ ...effectiveConfig, ...log.config }, log.task.model || log.model);
+        let transientFailures = 0;
+        let lastTransientError = "";
         try {
             for (;;) {
                 let state: Awaited<ReturnType<typeof pollVideoGenerationTask>>;
@@ -463,9 +465,15 @@ export default function VideoPage() {
                     state = await pollVideoGenerationTask(configOverride || taskConfig, log.task);
                 } catch (error) {
                     if (!isRetryableVideoTaskError(error)) throw error;
+                    transientFailures += 1;
+                    lastTransientError = error instanceof Error ? error.message : "";
+                    if (transientFailures >= 12) {
+                        throw new Error(lastTransientError || t("apiErrors.videoTaskQueryFailed"));
+                    }
                     await delay(log.task.provider === "seedance" ? 5000 : 2500);
                     continue;
                 }
+                transientFailures = 0;
                 if (state.status === "completed") {
                     const preview = previewGeneratedVideo(state.result);
                     const nextVideo = buildGeneratedVideo(preview, Date.now() - log.createdAt);
