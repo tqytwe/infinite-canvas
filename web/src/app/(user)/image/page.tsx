@@ -487,10 +487,14 @@ export default function ImagePage() {
                     throw new Error("接口没有返回图片");
                 }
 
-                const durableImage = {
+                const durableImage = await persistGeneratedImage({
                     ...image,
-                    storageKey: "",
-                };
+                    durationMs: performance.now() - taskStartedAt,
+                    width: 0,
+                    height: 0,
+                    bytes: 0,
+                    mimeType: undefined,
+                });
                 
                 // 更新结果状态
                 setResults((value) => updateResult(value, id, { image: durableImage }));
@@ -796,9 +800,28 @@ export default function ImagePage() {
         try {
             const tasks = await listCanvasImageTasks(currentConfig, ["image-workbench", "workflow"]);
             const recoverableTasks = tasks.filter(isRecoverableImageTask);
-            if (!recoverableTasks.length) return baseLogs || logsRef.current;
             const currentLogs = baseLogs || (await readStoredLogs());
-            const mergedLogs = mergeBackendImageTasks(currentLogs, recoverableTasks, currentConfig);
+            let mergedLogs = recoverableTasks.length ? mergeBackendImageTasks(currentLogs, recoverableTasks, currentConfig) : currentLogs;
+            const repairCandidates = currentLogs.filter((log) => log.status === "成功" && !log.images.length && Boolean(log.task?.id));
+            if (repairCandidates.length) {
+                const repairedTasks = await batchCanvasImageTaskStatus(currentConfig, repairCandidates.map((log) => log.task?.id || ""));
+                const taskById = new Map(repairedTasks.map((task) => [task.id, task]));
+                const repairedLogs = await Promise.all(
+                    mergedLogs.map(async (log) => {
+                        const task = log.task?.id ? taskById.get(log.task.id) : undefined;
+                        if (!task || !isCompletedImageTask(task)) return log;
+                        const repaired = await persistGeneratedLogImages(imageLogFromTask(log, task));
+                        return repaired.images.length ? repaired : log;
+                    }),
+                );
+                const repaired = repairedLogs.some((log, index) => log !== mergedLogs[index]);
+                if (repaired) {
+                    mergedLogs = repairedLogs;
+                    await Promise.all(repairedLogs.filter((log) => log.images.length).map((log) => logStore.setItem(log.id, serializeLog(log))));
+                    await persistImageHistory(repairedLogs, categories);
+                }
+            }
+            if (!recoverableTasks.length && mergedLogs === currentLogs) return currentLogs;
             const taskIds = new Set(recoverableTasks.flatMap(imageTaskIdentityKeys));
             const recoveredLogs = mergedLogs.filter((log) => imageLogIdentityKeys(log).some((key) => taskIds.has(key)));
             await Promise.all(recoveredLogs.map((log) => logStore.setItem(log.id, serializeLog(log))));
@@ -827,13 +850,13 @@ export default function ImagePage() {
                         return;
                     }
                     if ((task.image_urls?.length || 0) > 1) {
-                        const nextLogs = imageLogsFromTask(log, task);
+                        const nextLogs = await Promise.all(imageLogsFromTask(log, task).map(persistGeneratedLogImages));
                         await Promise.all(nextLogs.map(saveLog));
                         setResults((value) => value.filter((item) => !imageResultMatchesLog(item, nextLogs[0])));
                         return;
                     }
 
-                    const nextLog = imageLogFromTask(log, task);
+                    const nextLog = await persistGeneratedLogImages(imageLogFromTask(log, task));
                     await saveLog(nextLog);
                     if (nextLog.status === "生成中") {
                         setResults((value) => updateResultByLogId(value, log.id, { task, progress: task.progress, durationMs: nextLog.durationMs, lastPolledAt: nextLog.lastPolledAt }));
@@ -2464,6 +2487,47 @@ function imageLogsFromTask(log: GenerationLog, task: CanvasImageTask): Generatio
     });
 }
 
+async function persistGeneratedImage(image: GeneratedImage): Promise<GeneratedImage> {
+    if (image.storageKey || !image.dataUrl) return image;
+    try {
+        const stored = await uploadImage(image.dataUrl);
+        return {
+            ...image,
+            dataUrl: stored.url,
+            storageKey: stored.storageKey,
+            width: stored.width || image.width,
+            height: stored.height || image.height,
+            bytes: stored.bytes || image.bytes,
+            mimeType: stored.mimeType || image.mimeType,
+        };
+    } catch (error) {
+        // A configured global provider can be temporarily unavailable. Keep the
+        // completed result durable in this browser instead of losing it during
+        // history serialization.
+        try {
+            const stored = await uploadImage(image.dataUrl, { localOnly: true });
+            return {
+                ...image,
+                dataUrl: stored.url,
+                storageKey: stored.storageKey,
+                width: stored.width || image.width,
+                height: stored.height || image.height,
+                bytes: stored.bytes || image.bytes,
+                mimeType: stored.mimeType || image.mimeType,
+            };
+        } catch (fallbackError) {
+            console.warn("[canvas-image] generated image persistence failed", { error, fallbackError });
+            return image;
+        }
+    }
+}
+
+async function persistGeneratedLogImages(log: GenerationLog): Promise<GenerationLog> {
+    if (log.status !== "成功" || !log.images.length) return log;
+    const images = await Promise.all(log.images.map(persistGeneratedImage));
+    return { ...log, images, thumbnails: images.map((image) => image.dataUrl) };
+}
+
 function imageLogFromTask(log: GenerationLog, task: CanvasImageTask): GenerationLog {
     const startedAt = parseImageTaskTime(task.started_at ?? task.startedAt ?? task.created_at ?? task.createdAt) || log.createdAt;
     const durationMs = Date.now() - startedAt;
@@ -2817,10 +2881,6 @@ function buildLog({
 function formatLogTime(value: number) {
     return new Date(value).toLocaleString("zh-CN", { hour12: false });
 }
-
-
-
-
 
 
 
