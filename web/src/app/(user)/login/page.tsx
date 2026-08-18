@@ -5,7 +5,7 @@ import { App, Button, Form, Input, Segmented, Space } from "antd";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
-import { fetchCurrentUser } from "@/services/api/auth";
+import { exchangePlatformLaunchToken, fetchCurrentUser } from "@/services/api/auth";
 import { useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
@@ -42,9 +42,29 @@ function LoginContent() {
     const setSession = useUserStore((state) => state.setSession);
     const isLoading = useUserStore((state) => state.isLoading);
     const linuxDoEnabled = useConfigStore((state) => state.publicSettings?.auth?.linuxDo?.enabled === true);
+    const platformAuth = useConfigStore((state) => state.publicSettings?.auth?.platform);
     const allowRegister = useConfigStore((state) => state.publicSettings?.auth?.allowRegister !== false);
     const [mode, setMode] = useState<"login" | "register">("login");
     const redirect = safeRedirect(searchParams.get("redirect"));
+    const launchToken = searchParams.get("launch_token")?.trim() || "";
+    const isAdminRedirect = redirect === "/admin" || redirect.startsWith("/admin/");
+    const [platformExchangeFailed, setPlatformExchangeFailed] = useState(false);
+
+    useEffect(() => {
+        if (!launchToken) return;
+        void exchangePlatformLaunchToken(launchToken)
+            .then((session) => {
+                setSession(session.token, session.user);
+                router.replace(redirect);
+                router.refresh();
+            })
+            .catch(() => setPlatformExchangeFailed(true));
+    }, [launchToken, redirect, router, setSession]);
+
+    useEffect(() => {
+        if (!platformAuth?.enabled || isAdminRedirect || launchToken || platformExchangeFailed || platformAuth.loginUrl === "") return;
+        window.location.replace(platformAuth.loginUrl);
+    }, [isAdminRedirect, launchToken, platformAuth, platformExchangeFailed]);
 
     useEffect(() => {
         const token = searchParams.get("token");
@@ -83,6 +103,18 @@ function LoginContent() {
             message.error(error instanceof Error ? error.message : "登录失败");
         }
     };
+
+    if (platformAuth?.enabled && !isAdminRedirect) {
+        return (
+            <main className="flex h-full min-h-0 items-center justify-center bg-background px-6 py-10">
+                <section className="w-full max-w-[420px] text-center">
+                    <h1 className="text-2xl font-semibold text-stone-950 dark:text-stone-100">{platformExchangeFailed ? "极速蹬登录未完成" : "正在跳转极速蹬登录"}</h1>
+                    <p className="mt-3 text-stone-500 dark:text-stone-400">{platformExchangeFailed ? "登录链接已失效，请返回极速蹬重新进入 AI 创作空间。" : "Canvas 使用极速蹬账号登录，不需要单独注册。"}</p>
+                    {platformAuth.loginUrl ? <Button className="mt-6" type="primary" href={platformAuth.loginUrl}>返回极速蹬登录</Button> : null}
+                </section>
+            </main>
+        );
+    }
 
     return (
         <main className="flex h-full min-h-0 items-center justify-center overflow-y-auto bg-background bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] px-6 py-10 [background-size:16px_16px] dark:bg-[radial-gradient(rgba(245,245,244,.16)_1px,transparent_1px)]">

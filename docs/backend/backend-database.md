@@ -54,6 +54,7 @@ description: 当前后端主要数据表与字段说明
 | `inviter_id` | string | 邀请人用户 ID |
 | `github_id` | string | GitHub 用户 ID |
 | `linux_do_id` | string | Linux.do 用户 ID |
+| `platform_user_id` | string, nullable unique | 极速蹬平台用户 ID；统一登录影子账号通过此字段稳定关联，不保存平台密码或平台 API Key |
 | `wechat_id` | string | 微信用户 ID |
 | `status` | string | 用户状态：`active`、`ban` |
 | `last_login_at` | string | 最近登录时间 |
@@ -322,6 +323,8 @@ S3/R2 与 WebDAV 共用的媒体文件索引表，不保存画布、素材列表
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
 | `enabled` | bool | 是否开启 Linux.do 登录 |
+
+`auth.platform` 是运行时派生的公开状态，不持久化在 `settings` 中：当 Canvas 同时配置 `CANVAS_PLATFORM_API_BASE_URL` 和 `CANVAS_EXCHANGE_SECRET` 时，接口返回 `{ enabled: true, loginUrl }`。此模式下普通用户注册、普通账号密码登录、Linux.do 登录和 Canvas 内置云端渠道都会关闭；用户只使用自己保存在 `user_configs.model_config` 中的本地模型渠道。
 
 `private.value` 当前字段：
 

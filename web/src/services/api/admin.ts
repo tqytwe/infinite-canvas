@@ -217,6 +217,10 @@ export type AdminPublicSettings = {
         linuxDo: {
             enabled: boolean;
         };
+        platform: {
+            enabled: boolean;
+            loginUrl: string;
+        };
     };
     storage: {
         mode: string;

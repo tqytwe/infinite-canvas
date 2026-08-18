@@ -161,7 +161,7 @@ func proxyAIVideoTaskRequest(w http.ResponseWriter, r *http.Request) {
 		ChannelName:     channel.Name,
 		Source:          readVideoTaskSource(r),
 		SourceID:        readVideoTaskSourceID(r),
-		ClientTaskID:     readClientVideoTaskID(r),
+		ClientTaskID:    readClientVideoTaskID(r),
 		UpstreamTaskID:  parsed.UpstreamTaskID,
 		UpstreamVideoID: parsed.UpstreamVideoID,
 		Status:          parsed.Status,
@@ -227,6 +227,11 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 	var err error
 	if strings.TrimSpace(task.UserChannelID) != "" {
 		channel, err = service.SelectUserLocalModelChannelForModel(task.UserID, task.Model, task.UserChannelID)
+	} else if service.PlatformAuthEnabled() {
+		return service.VideoTaskPollUpdate{
+			Status: "failed",
+			Error:  "任务无法继续：Canvas 已切换为用户自有密钥，请重新配置后创建任务",
+		}, nil
 	} else {
 		channel, err = service.SelectModelChannelForModel(task.Model, task.ChannelID)
 	}

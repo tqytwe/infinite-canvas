@@ -23,6 +23,16 @@ var adminModelHTTPClient = &http.Client{Timeout: 30 * time.Second}
 func PublicSettings() (model.PublicSetting, error) {
 	settings, err := repository.GetSettings()
 	settings = normalizeSettings(settings)
+	if PlatformAuthEnabled() {
+		settings.Public.ModelChannel.AvailableModels = []string{}
+		settings.Public.ModelChannel.ModelCosts = []model.ModelCost{}
+		settings.Public.ModelChannel.Channels = []model.PublicModelChannelInfo{}
+		settings.Public.ModelChannel.DefaultModel = ""
+		settings.Public.ModelChannel.DefaultImageModel = ""
+		settings.Public.ModelChannel.DefaultVideoModel = ""
+		settings.Public.ModelChannel.DefaultTextModel = ""
+		return settings.Public, err
+	}
 	settings.Public.ModelChannel.Channels = publicChannelInfos(settings.Private.Channels)
 	if len(settings.Public.ModelChannel.AvailableModels) == 0 {
 		settings.Public.ModelChannel.AvailableModels = enabledChannelModels(settings.Private.Channels)
@@ -31,6 +41,9 @@ func PublicSettings() (model.PublicSetting, error) {
 }
 
 func UserCanUseRemoteModelChannel(user model.AuthUser) bool {
+	if PlatformAuthEnabled() {
+		return false
+	}
 	if user.Role == model.UserRoleAdmin {
 		return true
 	}
@@ -183,6 +196,14 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 	if setting.Auth.AllowRegister == nil {
 		enabled := true
 		setting.Auth.AllowRegister = &enabled
+	}
+	setting.Auth.Platform = model.PublicPlatformAuthSetting{
+		Enabled:  PlatformAuthEnabled(),
+		LoginURL: PlatformLoginURL(),
+	}
+	if PlatformAuthEnabled() {
+		disabled := false
+		setting.Auth.AllowRegister = &disabled
 	}
 	setting.ModelChannel.AvailableModels = filterEnabledModels(setting.ModelChannel.AvailableModels, enabledChannelModels(channels))
 	setting.ModelChannel.DefaultTextModel = repairDefaultModel(setting.ModelChannel.DefaultTextModel, setting.ModelChannel.AvailableModels, isTextModelName)

@@ -80,12 +80,18 @@ type PublicStorageSetting struct {
 }
 
 type PublicAuthSetting struct {
-	AllowRegister *bool                    `json:"allowRegister"`
-	LinuxDo       PublicLinuxDoAuthSetting `json:"linuxDo"`
+	AllowRegister *bool                     `json:"allowRegister"`
+	LinuxDo       PublicLinuxDoAuthSetting  `json:"linuxDo"`
+	Platform      PublicPlatformAuthSetting `json:"platform"`
 }
 
 type PublicLinuxDoAuthSetting struct {
 	Enabled bool `json:"enabled"`
+}
+
+type PublicPlatformAuthSetting struct {
+	Enabled  bool   `json:"enabled"`
+	LoginURL string `json:"loginUrl"`
 }
 
 // PrivateSetting 私有配置。

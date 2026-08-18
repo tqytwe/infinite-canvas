@@ -20,6 +20,10 @@ type registerRequest struct {
 	Password string `json:"password"`
 }
 
+type platformExchangeRequest struct {
+	LaunchToken string `json:"launch_token"`
+}
+
 type saveUserRequest struct {
 	ID          string           `json:"id"`
 	Username    string           `json:"username"`
@@ -49,6 +53,17 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	var request loginRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)
 	session, err := service.Login(request.Username, request.Password)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, session)
+}
+
+func PlatformExchange(w http.ResponseWriter, r *http.Request) {
+	var request platformExchangeRequest
+	_ = json.NewDecoder(r.Body).Decode(&request)
+	session, err := service.LoginWithPlatformLaunchToken(r.Context(), request.LaunchToken)
 	if err != nil {
 		FailError(w, err)
 		return

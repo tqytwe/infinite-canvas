@@ -7,8 +7,22 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tigerowo/infinite-canvas/config"
 	"github.com/tigerowo/infinite-canvas/model"
 )
+
+func TestPlatformAuthDisablesRemoteModelChannels(t *testing.T) {
+	previous := config.Cfg
+	t.Cleanup(func() { config.Cfg = previous })
+	config.Cfg = config.Config{
+		PlatformAPIBaseURL:     "https://api.jisudeng.com",
+		PlatformExchangeSecret: "test-secret",
+	}
+
+	if UserCanUseRemoteModelChannel(model.AuthUser{Role: model.UserRoleAdmin}) {
+		t.Fatal("platform SSO must disable remote channels for administrators too")
+	}
+}
 
 func TestFetchAdminChannelModelsParsesOpenAIModels(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

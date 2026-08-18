@@ -3,22 +3,38 @@ package service
 import (
 	"encoding/base64"
 	"testing"
+
+	"github.com/tigerowo/infinite-canvas/config"
 )
+
+func TestPlatformLoginURLTargetsAICreationSpace(t *testing.T) {
+	previous := config.Cfg
+	t.Cleanup(func() { config.Cfg = previous })
+	config.Cfg = config.Config{
+		PlatformAPIBaseURL:     "https://api.jisudeng.com",
+		PlatformWebURL:         "https://www.jisudeng.com",
+		PlatformExchangeSecret: "test-secret",
+	}
+
+	if got, want := PlatformLoginURL(), "https://www.jisudeng.com/login?redirect=%2Fai-creation-space"; got != want {
+		t.Fatalf("PlatformLoginURL() = %q, want %q", got, want)
+	}
+}
 
 func TestSafeRedirectPath(t *testing.T) {
 	cases := map[string]string{
-		"/":                    "/",
-		"/canvas/abc":          "/canvas/abc",
-		"/login?redirect=/x":   "/login?redirect=/x",
-		"":                     "/",
-		"//evil.com":           "/",
-		"/\\evil.com":          "/",
-		"https://evil.com":     "/",
-		"http://evil.com":      "/",
-		"javascript:alert(1)":  "/",
-		"evil.com":             "/",
-		"/\t/evil.com":         "/", // browsers strip the tab → //evil.com
-		"/normal\tpath":        "/normalpath",
+		"/":                   "/",
+		"/canvas/abc":         "/canvas/abc",
+		"/login?redirect=/x":  "/login?redirect=/x",
+		"":                    "/",
+		"//evil.com":          "/",
+		"/\\evil.com":         "/",
+		"https://evil.com":    "/",
+		"http://evil.com":     "/",
+		"javascript:alert(1)": "/",
+		"evil.com":            "/",
+		"/\t/evil.com":        "/", // browsers strip the tab → //evil.com
+		"/normal\tpath":       "/normalpath",
 	}
 	for in, want := range cases {
 		if got := safeRedirectPath(in); got != want {

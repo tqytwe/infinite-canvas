@@ -32,6 +32,10 @@ description: settings 表中 public 和 private 配置结构说明
     "allowRegister": true,
     "linuxDo": {
       "enabled": false
+    },
+    "platform": {
+      "enabled": false,
+      "loginUrl": ""
     }
   }
 }
@@ -75,6 +79,14 @@ description: settings 表中 public 和 private 配置结构说明
 | --- | --- | --- |
 | `allowRegister` | boolean | 是否允许用户注册，默认允许；关闭后注册入口隐藏，注册接口拒绝新用户创建 |
 | `linuxDo.enabled` | boolean | 是否开启 Linux.do 登录 |
+| `platform.enabled` | boolean | Canvas 是否已通过运行时环境变量启用极速蹬统一登录；只读，不能由管理后台修改 |
+| `platform.loginUrl` | string | 极速蹬登录地址；只读，仅在统一登录启用时返回 |
+
+### 极速蹬统一登录模式
+
+同时配置 Canvas 的 `CANVAS_PLATFORM_API_BASE_URL` 与 `CANVAS_EXCHANGE_SECRET` 后，普通用户必须从极速蹬的 `/ai-creation-space` 进入。平台签发的短时、一次性 `launch_token` 仅兑换用户 ID；Canvas 以 `platform_user_id` 创建或复用本地影子账号并签发自己的 JWT。
+
+此模式不使用本节的“云端渠道”：Canvas 不读取或下发后台渠道、分组、模型价格，也不会接收平台 API Key 或平台计费会话。用户在 Canvas 配置页填写自己的 Base URL、API Key 和模型列表；登录后这些配置与画布、素材和历史一起保存到其 Canvas 账号配置。管理员仍通过 Canvas 本地管理员账号访问 `/admin`。
 
 ## private.value
 

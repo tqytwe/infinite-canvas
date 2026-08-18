@@ -39,7 +39,7 @@ const emptySettings: AdminSettings = {
             allowCustomChannel: true,
             allowUserRemoteChannel: false,
         },
-        auth: { allowRegister: true, linuxDo: { enabled: false } },
+        auth: { allowRegister: true, linuxDo: { enabled: false }, platform: { enabled: false, loginUrl: "" } },
         storage: { mode: "local_indexeddb", allowUserProvider: false },
     },
     private: { channels: [], promptSync: { enabled: true, cron: "0 0 * * *" }, aiLog: { localDirectReportEnabled: false, cleanup: { enabled: false, retentionDays: 14, cron: "0 3 * * *" } }, auth: { linuxDo: { clientId: "", clientSecret: "" } }, storage: { mode: "local_indexeddb", allowUserProvider: false, allowUserGlobalProvider: true, providers: [], roundRobinCursor: 0, capacityCheck: { enabled: false, cron: "0 */6 * * *" }, capacityLimitBytes: 9 * 1024 * 1024 * 1024 } },
@@ -1122,6 +1122,10 @@ function normalizePublicSetting(setting: Partial<AdminSettings["public"]> = {}):
             allowRegister: setting.auth?.allowRegister !== false,
             linuxDo: {
                 enabled: setting.auth?.linuxDo?.enabled === true,
+            },
+            platform: {
+                enabled: setting.auth?.platform?.enabled === true,
+                loginUrl: setting.auth?.platform?.loginUrl || "",
             },
         },
         storage: {

@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { App } from "antd";
 
 import { fetchUserConfig } from "@/services/api/user-config";
+import { exchangePlatformLaunchToken } from "@/services/api/auth";
 import { defaultUserStorageProvider, defaultUserWebDAVStorageProvider, saveUserStorageProvider, saveUserWebDAVStorageProvider } from "@/services/image-storage";
 import { useConfigStore, type AiConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
@@ -16,28 +17,54 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const pathname = usePathname();
     const token = useUserStore((state) => state.token);
     const user = useUserStore((state) => state.user);
+    const isReady = useUserStore((state) => state.isReady);
     const hydrateUser = useUserStore((state) => state.hydrateUser);
+    const setSession = useUserStore((state) => state.setSession);
     const loadPublicSettings = useConfigStore((state) => state.loadPublicSettings);
     const publicSettings = useConfigStore((state) => state.publicSettings);
     const channelMode = useConfigStore((state) => state.config.channelMode);
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
     const isLoginPage = pathname === "/login" || pathname === "/admin/login";
+    const platformAuthEnabled = publicSettings?.auth?.platform?.enabled === true;
+    const isAdminPath = pathname === "/admin" || pathname.startsWith("/admin/");
     const adminRemoteTokenRef = useRef("");
+    const platformLaunchHandledRef = useRef(false);
 
     useEffect(() => {
         void loadPublicSettings();
     }, [loadPublicSettings]);
 
     useEffect(() => {
-        if (!isLoginPage) void hydrateUser();
-    }, [hydrateUser, isLoginPage]);
+        const launchToken = new URLSearchParams(window.location.search).get("launch_token")?.trim();
+        if (launchToken && !isLoginPage && !platformLaunchHandledRef.current) {
+            platformLaunchHandledRef.current = true;
+            void exchangePlatformLaunchToken(launchToken)
+                .then((session) => {
+                    setSession(session.token, session.user);
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete("launch_token");
+                    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+                })
+                .catch(() => {
+                    window.location.replace("/login");
+                });
+            return;
+        }
+        if (!isLoginPage && !launchToken) void hydrateUser();
+    }, [hydrateUser, isLoginPage, setSession]);
 
     useEffect(() => {
-        if (!token || user?.role !== "admin" || adminRemoteTokenRef.current === token) return;
+        if (!platformAuthEnabled || !isReady || user || isLoginPage || isAdminPath) return;
+        const redirectTarget = `${pathname}${window.location.search}`;
+        window.location.replace(`/login?redirect=${encodeURIComponent(redirectTarget)}`);
+    }, [isAdminPath, isLoginPage, isReady, pathname, platformAuthEnabled, user]);
+
+    useEffect(() => {
+        if (!token || platformAuthEnabled || user?.role !== "admin" || adminRemoteTokenRef.current === token) return;
         adminRemoteTokenRef.current = token;
         if (channelMode !== "remote") updateConfig("channelMode", "remote");
-    }, [channelMode, token, updateConfig, user?.role]);
+    }, [channelMode, platformAuthEnabled, token, updateConfig, user?.role]);
 
     useEffect(() => {
         if (!token || !user?.id) return;

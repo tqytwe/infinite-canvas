@@ -5,22 +5,22 @@ import { usePathname, useRouter } from "next/navigation";
 
 import { AppTopNav } from "@/components/layout/app-top-nav";
 import { fetchUserConfig } from "@/services/api/user-config";
+import { useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
-
-const protectedPrefixes = ["/asset-library"];
 
 export default function UserLayout({ children }: { children: ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
     const user = useUserStore((state) => state.user);
     const isReady = useUserStore((state) => state.isReady);
+    const platformAuthEnabled = useConfigStore((state) => state.publicSettings?.auth?.platform?.enabled === true);
     const wasLoggedOutRef = useRef(false);
-    const isProtectedPage = protectedPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
+    const isProtectedPage = pathname !== "/login";
 
     useEffect(() => {
-        if (!isReady || !isProtectedPage || user) return;
+        if (!isReady || !isProtectedPage || user || !platformAuthEnabled) return;
         router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
-    }, [isProtectedPage, isReady, pathname, router, user]);
+    }, [isProtectedPage, isReady, pathname, platformAuthEnabled, router, user]);
 
     useEffect(() => {
         if (!isReady) return;

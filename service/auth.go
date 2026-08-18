@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -10,14 +11,15 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/tigerowo/infinite-canvas/config"
 	"github.com/tigerowo/infinite-canvas/model"
 	"github.com/tigerowo/infinite-canvas/repository"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -59,6 +61,9 @@ func EnsureDefaultAdmin() error {
 }
 
 func Register(username string, password string) (model.AuthSession, error) {
+	if PlatformAuthEnabled() {
+		return model.AuthSession{}, safeMessageError{message: "请使用极速蹬统一登录"}
+	}
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return model.AuthSession{}, err
@@ -111,12 +116,148 @@ func Login(username string, password string) (model.AuthSession, error) {
 	if user.Status == model.UserStatusBan {
 		return model.AuthSession{}, safeMessageError{message: "账号已被禁用"}
 	}
+	if PlatformAuthEnabled() && user.Role != model.UserRoleAdmin {
+		return model.AuthSession{}, safeMessageError{message: "请使用极速蹬统一登录"}
+	}
 	normalizeUserDefaults(&user)
 	user.LastLoginAt = now()
 	user.UpdatedAt = now()
 	user, err = repository.SaveUser(user)
 	if err != nil {
 		return model.AuthSession{}, err
+	}
+	return newSession(user)
+}
+
+var platformAuthHTTPClient = &http.Client{Timeout: 15 * time.Second}
+
+type platformIdentityExchangeResponse struct {
+	Code int `json:"code"`
+	Data struct {
+		UserID int64 `json:"user_id"`
+	} `json:"data"`
+}
+
+func PlatformAuthEnabled() bool {
+	return strings.TrimSpace(config.Cfg.PlatformAPIBaseURL) != "" && strings.TrimSpace(config.Cfg.PlatformExchangeSecret) != ""
+}
+
+func PlatformLoginURL() string {
+	if !PlatformAuthEnabled() {
+		return ""
+	}
+	base := strings.TrimSpace(config.Cfg.PlatformWebURL)
+	if base == "" {
+		base = "https://www.jisudeng.com"
+	}
+	parsed, err := url.Parse(base)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return ""
+	}
+	path := strings.TrimSpace(config.Cfg.PlatformLoginPath)
+	if path == "" {
+		path = "/login"
+	}
+	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/" + strings.TrimLeft(path, "/")
+	query := parsed.Query()
+	entryPath := strings.TrimSpace(config.Cfg.PlatformEntryPath)
+	if entryPath == "" {
+		entryPath = "/ai-creation-space"
+	}
+	query.Set("redirect", entryPath)
+	parsed.RawQuery = query.Encode()
+	return parsed.String()
+}
+
+func platformIdentityExchangeURL() (string, error) {
+	base := strings.TrimRight(strings.TrimSpace(config.Cfg.PlatformAPIBaseURL), "/")
+	if base == "" {
+		return "", safeMessageError{message: "极速蹬统一登录未配置"}
+	}
+	parsed, err := url.Parse(base)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", safeMessageError{message: "极速蹬统一登录地址无效"}
+	}
+	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/api/v1/nextchat/identity"
+	parsed.RawQuery = ""
+	return parsed.String(), nil
+}
+
+// LoginWithPlatformLaunchToken exchanges a single-use platform launch token
+// for a local Canvas session. It deliberately consumes only identity data;
+// model keys and platform billing sessions never cross this boundary.
+func LoginWithPlatformLaunchToken(ctx context.Context, launchToken string) (model.AuthSession, error) {
+	launchToken = strings.TrimSpace(launchToken)
+	if launchToken == "" {
+		return model.AuthSession{}, safeMessageError{message: "极速蹬登录令牌缺失"}
+	}
+	if !PlatformAuthEnabled() {
+		return model.AuthSession{}, safeMessageError{message: "极速蹬统一登录未配置"}
+	}
+	endpoint, err := platformIdentityExchangeURL()
+	if err != nil {
+		return model.AuthSession{}, err
+	}
+	body, err := json.Marshal(map[string]string{"launch_token": launchToken})
+	if err != nil {
+		return model.AuthSession{}, err
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return model.AuthSession{}, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-NextChat-Secret", strings.TrimSpace(config.Cfg.PlatformExchangeSecret))
+	resp, err := platformAuthHTTPClient.Do(req)
+	if err != nil {
+		return model.AuthSession{}, safeMessageError{message: "极速蹬登录服务暂时不可用"}
+	}
+	defer resp.Body.Close()
+	var payload platformIdentityExchangeResponse
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 256*1024)).Decode(&payload); err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 || payload.Code != 0 || payload.Data.UserID <= 0 {
+		return model.AuthSession{}, safeMessageError{message: "极速蹬登录令牌无效或已过期"}
+	}
+
+	platformUserID := strconv.FormatInt(payload.Data.UserID, 10)
+	user, ok, err := repository.GetUserByPlatformUserID(platformUserID)
+	if err != nil {
+		return model.AuthSession{}, err
+	}
+	if !ok {
+		platformUserIDValue := platformUserID
+		user = model.User{
+			ID:             newID("user"),
+			Username:       "jisudeng-" + platformUserID + "-" + uuid.NewString(),
+			DisplayName:    "极速蹬用户",
+			Role:           model.UserRoleUser,
+			AffCode:        newAffCode(),
+			PlatformUserID: &platformUserIDValue,
+			Status:         model.UserStatusActive,
+			CreatedAt:      now(),
+		}
+	} else if user.Status == model.UserStatusBan {
+		return model.AuthSession{}, safeMessageError{message: "Canvas 账号已被禁用"}
+	}
+	normalizeUserDefaults(&user)
+	user.LastLoginAt = now()
+	user.UpdatedAt = now()
+	user, err = repository.SaveUser(user)
+	if err != nil {
+		if !ok {
+			if existing, found, lookupErr := repository.GetUserByPlatformUserID(platformUserID); lookupErr != nil {
+				return model.AuthSession{}, lookupErr
+			} else if found {
+				if existing.Status == model.UserStatusBan {
+					return model.AuthSession{}, safeMessageError{message: "Canvas 账号已被禁用"}
+				}
+				user = existing
+			} else {
+				return model.AuthSession{}, err
+			}
+		} else {
+			return model.AuthSession{}, err
+		}
 	}
 	return newSession(user)
 }
@@ -144,6 +285,9 @@ func LinuxDoAuthorizeURL(r *http.Request, redirect string) (string, error) {
 }
 
 func LoginWithLinuxDo(r *http.Request, code string, state string) (model.AuthSession, string, error) {
+	if PlatformAuthEnabled() {
+		return model.AuthSession{}, decodeState(state), safeMessageError{message: "请使用极速蹬统一登录"}
+	}
 	redirect := decodeState(state)
 	settings, err := repository.GetSettings()
 	if err != nil {
@@ -226,6 +370,9 @@ func CurrentAuthUser(tokenText string) (model.AuthUser, bool) {
 		return model.AuthUser{}, false
 	}
 	if user.Status == model.UserStatusBan {
+		return model.AuthUser{}, false
+	}
+	if PlatformAuthEnabled() && user.Role != model.UserRoleAdmin && user.PlatformUserID == nil {
 		return model.AuthUser{}, false
 	}
 	return model.PublicUser(user), true
