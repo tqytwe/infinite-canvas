@@ -144,17 +144,25 @@ export async function logoutCanvasSession() {
 }
 
 export async function switchCanvasVideoGroup(groupId: number) {
+    return switchCanvasManagedGroup("video", groupId);
+}
+
+export async function switchCanvasImageGroup(groupId: number) {
+    return switchCanvasManagedGroup("image", groupId);
+}
+
+async function switchCanvasManagedGroup(purpose: "image" | "video", groupId: number) {
     if (!CANVAS_MANAGED_MODE) return getCanvasSession();
-    if (!Number.isSafeInteger(groupId) || groupId <= 0) throw new Error("VIDEO_GROUP_REQUIRED");
+    if (!Number.isSafeInteger(groupId) || groupId <= 0) throw new Error(`${purpose.toUpperCase()}_GROUP_REQUIRED`);
     await requireCanvasWriteAccess();
-    const response = await fetch("/api/platform/video/group", {
+    const response = await fetch(`/api/platform/${purpose}/group`, {
         method: "POST",
         credentials: "same-origin",
         headers: { "content-type": "application/json", accept: "application/json" },
         body: JSON.stringify({ group_id: groupId }),
     });
     const value = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(value.error || "VIDEO_GROUP_SWITCH_FAILED");
+    if (!response.ok) throw new Error(value.error || `${purpose.toUpperCase()}_GROUP_SWITCH_FAILED`);
     return getCanvasSession(true);
 }
 

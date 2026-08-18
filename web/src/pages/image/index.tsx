@@ -1,6 +1,6 @@
-import { ArrowLeft, ArrowRight, BookOpen, CheckSquare, ClipboardPaste, Download, FolderPlus, History, Image, ImagePlus, LoaderCircle, PenLine, Plus, RefreshCw, SlidersHorizontal, Sparkles, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, CheckSquare, ClipboardPaste, Download, FolderPlus, History, Image as ImageIcon, ImagePlus, LoaderCircle, PenLine, Plus, RefreshCw, SlidersHorizontal, Sparkles, Trash2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { App, Button, Checkbox, Drawer, Empty, Image, Input, Modal, Tag, Tooltip, Typography } from "antd";
+import { App, Button, Checkbox, Drawer, Empty, Image, Input, Modal, Select, Tag, Tooltip, Typography } from "antd";
 import localforage from "localforage";
 import { saveAs } from "file-saver";
 import { useTranslation } from "react-i18next";
@@ -12,14 +12,14 @@ import { AssetPickerModal, type InsertAssetPayload } from "@/components/canvas/a
 import { GenerationHistoryPanel } from "@/components/canvas/generation-history-panel";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { imageReferenceLabel } from "@/lib/image-reference-prompt";
-import { modelMatchesCapability, modelOptionLabel, selectableModelsByCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { decodeChannelModel, encodeChannelModel, modelMatchesCapability, modelOptionLabel, selectableModelsByCapability, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { nanoid } from "nanoid";
 import { formatBytes, formatDuration } from "@/lib/image-utils";
 import { createManagedImageGenerationTask, isRetryableManagedImageTaskError, pollManagedImageGenerationTask, requestEdit, requestGeneration, type ManagedImageGenerationTask } from "@/services/api/image";
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { readCloudWorkbenchLogs, replaceCloudWorkbenchLogs, upsertCloudWorkbenchLog } from "@/services/workbench-cloud";
-import { getCanvasSession, isCanvasAuthenticated, isCanvasManagedMode, useCanvasCanWrite, useCanvasSessionStore } from "@/services/canvas-cloud";
+import { getCanvasSession, isCanvasAuthenticated, isCanvasManagedMode, switchCanvasImageGroup, useCanvasCanWrite, useCanvasSessionStore } from "@/services/canvas-cloud";
 import { takeImagePromptHandoff } from "@/services/creation-intent";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { useWorkbenchAgentStore } from "@/stores/use-workbench-agent-store";
@@ -791,7 +791,7 @@ export default function ImagePage() {
                                     <Button icon={<History className="size-4" />} onClick={() => setLogsOpen(true)}>
                                         {t("workbench.logs")}
                                     </Button>
-                                    <Button icon={<Image className="size-4" />} onClick={() => setHistoryOpen(true)}>
+                                    <Button icon={<ImageIcon className="size-4" />} onClick={() => setHistoryOpen(true)}>
                                         {t("canvas.generationHistory.title")}
                                     </Button>
                                     <Button icon={<SlidersHorizontal className="size-4" />} onClick={() => setSettingsOpen(true)}>
@@ -975,11 +975,50 @@ export default function ImagePage() {
 }
 
 function GenerationSettings({ config, model, updateConfig, openConfigDialog }: { config: AiConfig; model: string; updateConfig: UpdateAiConfig; openConfigDialog: (shouldPromptContinue?: boolean) => void }) {
+    const { message } = App.useApp();
     const theme = canvasThemes[useThemeStore((state) => state.theme)];
     const { t } = useTranslation();
+    const imageChannels = config.channels.filter((channel) => channel.models.some((entry) => entry.capability === "image"));
+    const decoded = decodeChannelModel(model);
+    const currentChannelId = decoded?.channelId ?? (imageChannels[0]?.id || "");
+    const initialGroupBootstrappedRef = useRef(false);
+    const initialImageGroupId = imageChannels.find((channel) => channel.id === currentChannelId)?.groupId ?? imageChannels[0]?.groupId;
+
+    useEffect(() => {
+        if (!isCanvasManagedMode() || initialGroupBootstrappedRef.current || !initialImageGroupId) return;
+        initialGroupBootstrappedRef.current = true;
+        void switchCanvasImageGroup(initialImageGroupId).catch(() => {
+            initialGroupBootstrappedRef.current = false;
+        });
+    }, [initialImageGroupId]);
+
+    const handleChannelChange = async (channelId: string) => {
+        const channel = config.channels.find((item) => item.id === channelId);
+        const firstImageModel = channel?.models.find((entry) => entry.capability === "image");
+        if (isCanvasManagedMode() && channel?.groupId) {
+            try {
+                await switchCanvasImageGroup(channel.groupId);
+            } catch {
+                message.error(t("apiErrors.requestFailed"));
+                return;
+            }
+        }
+        if (firstImageModel) updateConfig("imageModel", encodeChannelModel(channelId, firstImageModel.name));
+    };
 
     return (
         <>
+            {imageChannels.length > 0 ? (
+                <label className="col-span-2 block min-w-0 sm:col-span-1">
+                    <span className="mb-1.5 block text-sm font-semibold sm:mb-2 sm:text-base">{t("videoWorkbench.accountGroup")}</span>
+                    <Select
+                        value={currentChannelId}
+                        onChange={(value) => void handleChannelChange(value)}
+                        className="w-full"
+                        options={imageChannels.map((channel) => ({ value: channel.id, label: channel.name }))}
+                    />
+                </label>
+            ) : null}
             <label className="col-span-2 block min-w-0 sm:col-span-1">
                 <span className="mb-1.5 block text-sm font-semibold sm:mb-2 sm:text-base">{t("workbench.model")}</span>
                 <ModelPicker config={config} value={model} onChange={(value) => updateConfig("imageModel", value)} capability="image" fullWidth onMissingConfig={() => openConfigDialog(false)} />

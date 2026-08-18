@@ -460,6 +460,9 @@ test("HTTP platform gateway uses scoped image and video sessions for their APIs"
     let videoGroupAuth = "";
     let videoGroupKeyID = "";
     let videoGroupBody = "";
+    let imageGroupAuth = "";
+    let imageGroupKeyID = "";
+    let imageGroupBody = "";
     const platform = await startPlatformServer((req, res) => {
         if (req.method === "GET" && req.url === "/api/v1/nextchat/bootstrap") {
             const apiKeyId = String(req.headers["x-nextchat-api-key-id"] || "");
@@ -493,10 +496,18 @@ test("HTTP platform gateway uses scoped image and video sessions for their APIs"
             return;
         }
         if (req.method === "POST" && req.url === "/api/v1/nextchat/group") {
-            videoGroupAuth = req.headers.authorization || "";
-            videoGroupKeyID = String(req.headers["x-nextchat-api-key-id"] || "");
+            const keyID = String(req.headers["x-nextchat-api-key-id"] || "");
+            const target = keyID === "209" ? "image" : "video";
+            if (target === "image") {
+                imageGroupAuth = req.headers.authorization || "";
+                imageGroupKeyID = keyID;
+            } else {
+                videoGroupAuth = req.headers.authorization || "";
+                videoGroupKeyID = keyID;
+            }
             req.on("data", (chunk) => {
-                videoGroupBody += chunk;
+                if (target === "image") imageGroupBody += chunk;
+                else videoGroupBody += chunk;
             });
             req.on("end", () => {
                 res.writeHead(200, { "content-type": "application/json" });
@@ -577,6 +588,16 @@ test("HTTP platform gateway uses scoped image and video sessions for their APIs"
     assert.equal(videoGroupKeyID, "309");
     assert.deepEqual(JSON.parse(videoGroupBody), { group_id: 88 });
 
+    const imageGroup = await fetch(`${baseUrl}/api/platform/image/group`, {
+        method: "POST",
+        headers: { cookie: cookie(token), "content-type": "application/json" },
+        body: JSON.stringify({ group_id: 77 }),
+    });
+    assert.equal(imageGroup.status, 200);
+    assert.equal(imageGroupAuth, "Bearer image-key");
+    assert.equal(imageGroupKeyID, "209");
+    assert.deepEqual(JSON.parse(imageGroupBody), { group_id: 77 });
+
     const legacyToken = await createSession(dataDir, 110, "no-video-session");
     const legacyVideo = await fetch(`${baseUrl}/api/platform/gateway/v1/videos`, {
         method: "POST",
@@ -593,6 +614,14 @@ test("HTTP platform gateway uses scoped image and video sessions for their APIs"
     });
     assert.equal(legacyGroup.status, 409);
     assert.equal((await responseJson(legacyGroup)).error, "VIDEO_SESSION_REQUIRED");
+
+    const legacyImageGroup = await fetch(`${baseUrl}/api/platform/image/group`, {
+        method: "POST",
+        headers: { cookie: cookie(legacyToken), "content-type": "application/json" },
+        body: JSON.stringify({ group_id: 77 }),
+    });
+    assert.equal(legacyImageGroup.status, 409);
+    assert.equal((await responseJson(legacyImageGroup)).error, "IMAGE_SESSION_REQUIRED");
 });
 
 test("HTTP managed prompt handoff requires a Canvas session and uses the platform BFF", async (t) => {

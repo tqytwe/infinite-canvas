@@ -119,6 +119,10 @@ async function handleApi(req, res, url, method) {
         await proxyPlatformVideoGroup(req, res);
         return;
     }
+    if (url.pathname === "/api/platform/image/group" && method === "POST") {
+        await proxyPlatformImageGroup(req, res);
+        return;
+    }
     if (url.pathname.startsWith("/api/platform/gateway/") || url.pathname === "/api/platform/gateway") {
         await proxyPlatformGateway(req, res, url);
         return;
@@ -336,6 +340,14 @@ async function proxyPlatformGateway(req, res, url) {
 }
 
 async function proxyPlatformVideoGroup(req, res) {
+    await proxyPlatformScopedGroup(req, res, "video");
+}
+
+async function proxyPlatformImageGroup(req, res) {
+    await proxyPlatformScopedGroup(req, res, "image");
+}
+
+async function proxyPlatformScopedGroup(req, res, purpose) {
     const session = await readSessionFromRequest(req);
     if (!session) {
         sendJson(res, 401, { ok: false, error: "AUTH_REQUIRED" });
@@ -345,16 +357,16 @@ async function proxyPlatformVideoGroup(req, res) {
         sendJson(res, 503, { ok: false, error: "PLATFORM_PROXY_NOT_CONFIGURED" });
         return;
     }
-    const videoSession = session.sessions?.video;
-    if (!videoSession?.apiKey || !Number.isSafeInteger(Number(videoSession.apiKeyId)) || Number(videoSession.apiKeyId) <= 0) {
-        sendJson(res, 409, { ok: false, error: "VIDEO_SESSION_REQUIRED" });
+    const scopedSession = session.sessions?.[purpose];
+    if (!scopedSession?.apiKey || !Number.isSafeInteger(Number(scopedSession.apiKeyId)) || Number(scopedSession.apiKeyId) <= 0) {
+        sendJson(res, 409, { ok: false, error: `${String(purpose).toUpperCase()}_SESSION_REQUIRED` });
         return;
     }
     await proxyRequest(req, res, `${PLATFORM_API_BASE_URL}/api/v1/nextchat/group`, {
         "x-nextchat-secret": EXCHANGE_SECRET,
         "x-nextchat-user-id": String(session.userId),
-        "x-nextchat-api-key-id": String(videoSession.apiKeyId),
-        authorization: `Bearer ${videoSession.apiKey}`,
+        "x-nextchat-api-key-id": String(scopedSession.apiKeyId),
+        authorization: `Bearer ${scopedSession.apiKey}`,
     }, { rewriteJson: true });
 }
 
