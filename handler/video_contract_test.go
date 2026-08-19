@@ -30,21 +30,19 @@ func TestSeedanceKeepsArkPlanTaskPath(t *testing.T) {
 
 func TestVideoPayloadUsesVideoIDForDocumentedPolling(t *testing.T) {
 	parsed := parseVideoTaskPayload([]byte(`{"id":"video_abc","task_id":"task_xyz","status":"queued"}`), "seedance2.5")
-	if parsed.UpstreamVideoID != "video_abc" {
-		t.Fatalf("video id = %q, want video_abc", parsed.UpstreamVideoID)
-	}
-	if parsed.UpstreamTaskID != "task_xyz" {
-		t.Fatalf("task id = %q, want task_xyz", parsed.UpstreamTaskID)
+	if parsed.UpstreamTaskID != "video_abc" {
+		t.Fatalf("poll id = %q, want video_abc", parsed.UpstreamTaskID)
 	}
 }
 
 func TestTransientDocumentedVideoTaskNotFound(t *testing.T) {
-	task := model.VideoTask{Model: "seedance2.5", CreatedAt: time.Now().UTC().Format(time.RFC3339Nano)}
-	if !isTransientVideoTaskNotFound(task, "task_not_exist") {
-		t.Fatal("fresh task_not_exist should be retried")
+	for _, modelName := range []string{"manxue2.5", "minimax_h3", "seedance2.5", "sd2.5", "veo-3.1", "veo-3.1-fast", "veo-3.1-i2v"} {
+		task := model.VideoTask{Model: modelName, CreatedAt: time.Now().UTC().Format(time.RFC3339Nano)}
+		if !isTransientVideoTaskNotFound(task, "task_not_exist") {
+			t.Fatalf("fresh task_not_exist for %s should be retried", modelName)
+		}
 	}
-	old := time.Now().Add(-21 * time.Minute).UTC().Format(time.RFC3339Nano)
-	task.CreatedAt = old
+	task := model.VideoTask{Model: "seedance2.5", CreatedAt: time.Now().Add(-21 * time.Minute).UTC().Format(time.RFC3339Nano)}
 	if isTransientVideoTaskNotFound(task, "task_not_exist") {
 		t.Fatal("stale task_not_exist should fail")
 	}

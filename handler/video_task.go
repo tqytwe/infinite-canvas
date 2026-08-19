@@ -312,7 +312,7 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 func isTransientVideoTaskNotFound(task model.VideoTask, message string) bool {
 	const taskVisibilityRetryWindow = 20 * time.Minute
 	modelName := strings.ToLower(strings.TrimSpace(task.Model))
-	if !strings.Contains(modelName, "seedance") && !strings.Contains(modelName, "veo") && !strings.HasPrefix(modelName, "sora-2") {
+	if !isDocumentedJSONVideoModelName(modelName) {
 		return false
 	}
 	normalized := strings.ToLower(strings.TrimSpace(message))
@@ -321,6 +321,16 @@ func isTransientVideoTaskNotFound(task model.VideoTask, message string) bool {
 	}
 	created, err := time.Parse(time.RFC3339Nano, task.CreatedAt)
 	return err == nil && time.Since(created) < taskVisibilityRetryWindow
+}
+
+func isDocumentedJSONVideoModelName(modelName string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(modelName))
+	switch normalized {
+	case "manxue2.5", "minimax_h3", "seedance2.5", "sd2.5", "veo-3.1", "veo-3.1-fast", "veo-3.1-i2v", "sora-2":
+		return true
+	default:
+		return strings.Contains(normalized, "seedance") || strings.Contains(normalized, "veo") || strings.HasPrefix(normalized, "sora-2")
+	}
 }
 
 func isRetryableVideoPollError(status int, message string) bool {
@@ -412,8 +422,15 @@ func parseVideoTaskPayload(payload []byte, modelName string) parsedVideoTaskPayl
 	}
 	data := normalizeVideoPayloadMap(root)
 	responseID := firstNonEmpty(readStringPath(data, "id"), readStringPath(data, "request_id"))
+	upstreamTaskID := firstNonEmpty(readStringPath(data, "task_id"), readStringPath(data, "taskId"), responseID)
+	// The documented JSON video API polls by the returned video id. Some gateway
+	// responses also expose an internal task_id; using that value causes a
+	// guaranteed task_not_exist on GET /v1/videos/{id}.
+	if isDocumentedJSONVideoModelName(modelName) && strings.HasPrefix(responseID, "video_") {
+		upstreamTaskID = responseID
+	}
 	result := parsedVideoTaskPayload{
-		UpstreamTaskID:  firstNonEmpty(readStringPath(data, "task_id"), readStringPath(data, "taskId"), responseID),
+		UpstreamTaskID:  upstreamTaskID,
 		UpstreamVideoID: firstNonEmpty(readStringPath(data, "video_id"), readStringPath(data, "videoId")),
 		Status:          service.NormalizeVideoTaskStatus(firstNonEmpty(readStringPath(data, "status"), readStringPath(data, "state"), readStringPath(data, "task_status"))),
 		Progress:        readIntPath(data, "progress"),
@@ -426,7 +443,7 @@ func parseVideoTaskPayload(payload []byte, modelName string) parsedVideoTaskPayl
 	if result.UpstreamVideoID == "" && strings.HasPrefix(responseID, "video_") {
 		result.UpstreamVideoID = responseID
 	}
-	if result.UpstreamTaskID == result.UpstreamVideoID && strings.HasPrefix(result.UpstreamVideoID, "video_") {
+	if !isDocumentedJSONVideoModelName(modelName) && result.UpstreamTaskID == result.UpstreamVideoID && strings.HasPrefix(result.UpstreamVideoID, "video_") {
 		result.UpstreamTaskID = ""
 	}
 	if result.Status == "" {
