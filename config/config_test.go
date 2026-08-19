@@ -39,8 +39,8 @@ func TestApplyLegacyCanvasStorageLimit(t *testing.T) {
 
 	applyLegacyCanvasStorageLimit()
 
-	if Cfg.CanvasStorageLimit != 32_212_254_720 {
-		t.Fatalf("CanvasStorageLimit = %d, want legacy environment value", Cfg.CanvasStorageLimit)
+	if Cfg.CanvasStorageLimit != 10_000_000_000 {
+		t.Fatalf("CanvasStorageLimit = %d, want capped legacy value", Cfg.CanvasStorageLimit)
 	}
 }
 

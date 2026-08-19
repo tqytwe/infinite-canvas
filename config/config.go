@@ -95,7 +95,11 @@ func applyLegacyCanvasStorageLimit() {
 	}
 	limit, err := strconv.ParseInt(strings.TrimSpace(legacy), 10, 64)
 	if err == nil && limit > 0 {
+		// The legacy variable must not silently restore the retired 30GB policy.
 		Cfg.CanvasStorageLimit = limit
+		if Cfg.CanvasStorageLimit > 10_000_000_000 {
+			Cfg.CanvasStorageLimit = 10_000_000_000
+		}
 	}
 }
 
