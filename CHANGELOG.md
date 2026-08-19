@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v0.5.9 - 2026-08-19
+
++ [修复] 将 Seedance/Veo/Sora-2 创建后的 `task_not_exist` 重试窗口和前端视频轮询超时统一提高到 20 分钟。
+
 ## v0.5.8 - 2026-08-19
 
 + [修复] 避免 Seedance/Veo 创建后短暂任务同步延迟被 `task_not_exist` 误判为失败，增加首次查询延迟和有限时间重试。

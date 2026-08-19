@@ -19,7 +19,7 @@ export type CreatedVideoGenerationTask = { task: VideoResponse; pollId: string; 
 export type VideoProgressHandler = (progress: number, task: VideoResponse) => void;
 export type VideoTaskCreateOptions = { clientTaskId?: string; source?: "video-workbench" | "canvas"; sourceId?: string };
 export const VIDEO_POLL_INTERVAL_MS = 5000;
-const VIDEO_TASK_MIN_TIMEOUT_MS = 10 * 60 * 1000;
+const VIDEO_TASK_MIN_TIMEOUT_MS = 20 * 60 * 1000;
 
 export class VideoRequestError extends Error {
     detail?: string;

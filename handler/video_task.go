@@ -310,6 +310,7 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 }
 
 func isTransientVideoTaskNotFound(task model.VideoTask, message string) bool {
+	const taskVisibilityRetryWindow = 20 * time.Minute
 	modelName := strings.ToLower(strings.TrimSpace(task.Model))
 	if !strings.Contains(modelName, "seedance") && !strings.Contains(modelName, "veo") && !strings.HasPrefix(modelName, "sora-2") {
 		return false
@@ -319,7 +320,7 @@ func isTransientVideoTaskNotFound(task model.VideoTask, message string) bool {
 		return false
 	}
 	created, err := time.Parse(time.RFC3339Nano, task.CreatedAt)
-	return err == nil && time.Since(created) < 2*time.Minute
+	return err == nil && time.Since(created) < taskVisibilityRetryWindow
 }
 
 func normalizeVideoCreateBody(body []byte, contentType string, modelName string, channel model.ModelChannel, upstreamPath string) ([]byte, string, error) {

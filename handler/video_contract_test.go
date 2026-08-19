@@ -42,7 +42,7 @@ func TestTransientDocumentedVideoTaskNotFound(t *testing.T) {
 	if !isTransientVideoTaskNotFound(task, "task_not_exist") {
 		t.Fatal("fresh task_not_exist should be retried")
 	}
-	old := time.Now().Add(-3 * time.Minute).UTC().Format(time.RFC3339Nano)
+	old := time.Now().Add(-21 * time.Minute).UTC().Format(time.RFC3339Nano)
 	task.CreatedAt = old
 	if isTransientVideoTaskNotFound(task, "task_not_exist") {
 		t.Fatal("stale task_not_exist should fail")
