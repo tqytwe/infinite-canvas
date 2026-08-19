@@ -25,3 +25,13 @@ func TestSeedanceKeepsArkPlanTaskPath(t *testing.T) {
 		t.Fatalf("Ark Seedance poll path = %q, want /contents/generations/tasks/task-123", got)
 	}
 }
+
+func TestVideoPayloadUsesVideoIDForDocumentedPolling(t *testing.T) {
+	parsed := parseVideoTaskPayload([]byte(`{"id":"video_abc","task_id":"task_xyz","status":"queued"}`), "seedance2.5")
+	if parsed.UpstreamVideoID != "video_abc" {
+		t.Fatalf("video id = %q, want video_abc", parsed.UpstreamVideoID)
+	}
+	if parsed.UpstreamTaskID != "task_xyz" {
+		t.Fatalf("task id = %q, want task_xyz", parsed.UpstreamTaskID)
+	}
+}

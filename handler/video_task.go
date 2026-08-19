@@ -239,7 +239,7 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 		return service.VideoTaskPollUpdate{}, err
 	}
 	pollID := firstNonEmpty(task.UpstreamTaskID, task.ID)
-	if isAgnesVideoModel(task.Model) && strings.HasPrefix(task.UpstreamVideoID, "video_") {
+	if strings.TrimSpace(task.UpstreamVideoID) != "" {
 		pollID = task.UpstreamVideoID
 	}
 	if strings.TrimSpace(pollID) == "" {
@@ -383,8 +383,9 @@ func parseVideoTaskPayload(payload []byte, modelName string) parsedVideoTaskPayl
 		return parsedVideoTaskPayload{Status: "processing"}
 	}
 	data := normalizeVideoPayloadMap(root)
+	responseID := firstNonEmpty(readStringPath(data, "id"), readStringPath(data, "request_id"))
 	result := parsedVideoTaskPayload{
-		UpstreamTaskID:  firstNonEmpty(readStringPath(data, "task_id"), readStringPath(data, "taskId"), readStringPath(data, "id"), readStringPath(data, "request_id")),
+		UpstreamTaskID:  firstNonEmpty(readStringPath(data, "task_id"), readStringPath(data, "taskId"), responseID),
 		UpstreamVideoID: firstNonEmpty(readStringPath(data, "video_id"), readStringPath(data, "videoId")),
 		Status:          service.NormalizeVideoTaskStatus(firstNonEmpty(readStringPath(data, "status"), readStringPath(data, "state"), readStringPath(data, "task_status"))),
 		Progress:        readIntPath(data, "progress"),
@@ -393,6 +394,9 @@ func parseVideoTaskPayload(payload []byte, modelName string) parsedVideoTaskPayl
 		VideoURL:        firstNonEmpty(readStringPath(data, "video_url"), readStringPath(data, "url"), readStringPath(data, "remixed_from_video_id"), readStringPath(data, "output_url"), readStringPath(data, "download_url"), findFirstHTTPURL(data)),
 		Error:           firstNonEmpty(readStringPath(data, "error.message"), readStringPath(data, "error")),
 		ErrorDetail:     "",
+	}
+	if result.UpstreamVideoID == "" && strings.HasPrefix(responseID, "video_") {
+		result.UpstreamVideoID = responseID
 	}
 	if result.UpstreamTaskID == result.UpstreamVideoID && strings.HasPrefix(result.UpstreamVideoID, "video_") {
 		result.UpstreamTaskID = ""

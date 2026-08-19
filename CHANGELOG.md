@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v0.5.7 - 2026-08-19
+
++ [修复] 视频创建响应同时返回 `id` 与 `task_id` 时，标准 `/v1/videos` 轮询改用文档规定的 `id`，避免 Seedance/Veo 返回 `task_not_exist`。
+
 ## v0.5.6 - 2026-08-19
 
 + [修复] 按接入文档统一 Seedance、Veo、Sora-2 的 `/v1/videos` JSON 请求、时长与参考图字段，并修正普通 Seedance 误走 Ark Plan 路径的问题。
