@@ -1,9 +1,9 @@
 import axios from "axios";
 
 import { dataUrlToFile } from "@/lib/image-utils";
-import { boolConfig, isSeedanceVideoConfig, normalizeSeedanceRatio } from "@/lib/seedance-video";
+import { boolConfig, isSeedanceVideoConfig, normalizeSeedanceRatio, normalizeSeedanceResolution } from "@/lib/seedance-video";
 import { isKIEGrokVideoModel, isKIEKlingV3Config, kieKlingOmniVariant } from "@/components/video-settings-panel";
-import { isCogVideoX3Model, modelKey, normalizeCogVideoX3Duration, supportsVideoAudioGeneration } from "@/lib/video-model-capabilities";
+import { isCogVideoX3Model, isDocumentedJSONVideoModel, isDocumentedSeedanceVideoModel, isSeedanceVideoModel, isSora2VideoModel, isVeoVideoModel, modelKey, normalizeCogVideoX3Duration, supportsVideoAudioGeneration } from "@/lib/video-model-capabilities";
 import { resolveMediaUrl, uploadMediaFile } from "@/services/file-storage";
 import { imageToDataUrl, resolveImageUrl } from "@/services/image-storage";
 import { buildApiUrl, channelIdForActiveModel, directAIProviderForConfig, localChannelForActiveModel, type AiConfig, type VideoElementReference } from "@/stores/use-config-store";
@@ -19,6 +19,7 @@ export type CreatedVideoGenerationTask = { task: VideoResponse; pollId: string; 
 export type VideoProgressHandler = (progress: number, task: VideoResponse) => void;
 export type VideoTaskCreateOptions = { clientTaskId?: string; source?: "video-workbench" | "canvas"; sourceId?: string };
 export const VIDEO_POLL_INTERVAL_MS = 5000;
+const VIDEO_TASK_MIN_TIMEOUT_MS = 10 * 60 * 1000;
 
 export class VideoRequestError extends Error {
     detail?: string;
@@ -128,7 +129,9 @@ export async function pollCreatedVideoGenerationTask(config: AiConfig, task: Vid
     let completed: VideoResponse | null = null;
     try {
         if (initialDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, initialDelayMs));
+        const timeoutMs = Math.max(VIDEO_TASK_MIN_TIMEOUT_MS, Number(config.timeout || 0) * 1000);
         for (; ;) {
+            if (Date.now() - startedAt >= timeoutMs) throw new VideoRequestError("视频生成超时，请稍后在视频任务记录中查看结果", { task: completed || task, timeoutMs });
             const video = await pollOnce();
             onPoll?.(video);
             if (isFailedVideoStatus(video.status)) throw new VideoRequestError(video.error?.message || "视频生成失败", video);
@@ -216,6 +219,7 @@ async function createVideoRequestBody(config: AiConfig, model: string, prompt: s
     const size = normalizeVideoSize(config.size);
     if (isGrok2APIVideoConfig(config, model)) return createGrok2APIVideoRequestBody(config, model, prompt, input);
     if (isCogVideoX3Model(model)) return createCogVideoX3RequestBody(config, model, prompt, input);
+    if (isDocumentedJSONVideoModel(model)) return createDocumentedJSONVideoRequestBody(config, model, prompt, input, size);
     if (isAgnesVideoModel(model)) {
         const references = input.references;
         const inputReferences = await Promise.all(references.slice(0, 7).map(imageToAgnesReference));
@@ -289,6 +293,37 @@ async function createVideoRequestBody(config: AiConfig, model: string, prompt: s
     videoFiles.forEach((file) => body.append("video_reference[]", file));
     const audioFiles = kling ? [] : await Promise.all(input.audioReferences.map(mediaReferenceToFormValue));
     audioFiles.forEach((file) => body.append("audio_reference[]", file));
+    return body;
+}
+
+async function createDocumentedJSONVideoRequestBody(config: AiConfig, model: string, prompt: string, input: Required<VideoReferenceInput>, size: string | null) {
+    const body: Record<string, unknown> = {
+        model,
+        prompt,
+        size: size || "1280x720",
+    };
+    const references = [input.firstFrame, ...input.references, input.lastFrame].filter((reference): reference is ReferenceImage => Boolean(reference));
+    const imageLimit = isSora2VideoModel(model) ? 1 : isVeoVideoModel(model) ? 2 : 30;
+    const imageUrls = await Promise.all(references.slice(0, imageLimit).map(imageToDataUrl));
+    if (isDocumentedSeedanceVideoModel(model)) {
+        body.seconds = normalizeVideoSecondsForModel(model, config.videoSeconds);
+        body.resolution = normalizeSeedanceVideoResolution(config.vquality, model);
+        body.generate_audio = boolConfig(config.videoGenerateAudio, true);
+        if (imageUrls.length) body.input_reference = imageUrls.length === 1 ? imageUrls[0] : imageUrls;
+        const mediaReferences = [...input.videoReferences, ...input.audioReferences];
+        if (mediaReferences.length) {
+            const content = [{ type: "text", text: prompt } as Record<string, unknown>];
+            imageUrls.forEach((url) => content.push({ type: "image_url", image_url: { url } }));
+            for (const media of input.videoReferences) content.push({ type: "video_url", video_url: { url: await mediaReferenceToJSONValue(media) } });
+            for (const media of input.audioReferences) content.push({ type: "audio_url", audio_url: { url: await mediaReferenceToJSONValue(media) } });
+            delete body.prompt;
+            delete body.input_reference;
+            body.content = content;
+        }
+        return body;
+    }
+    body.duration = Number(normalizeVideoSecondsForModel(model, config.videoSeconds));
+    if (imageUrls.length) body.images = imageUrls;
     return body;
 }
 
@@ -481,6 +516,21 @@ async function mediaReferenceToFormValue(media: ReferenceVideo | ReferenceAudio)
     return mediaReferenceToFile(media);
 }
 
+async function mediaReferenceToJSONValue(media: ReferenceVideo | ReferenceAudio) {
+    const value = await mediaReferenceToFormValue(media);
+    if (typeof value === "string") return value;
+    return blobToDataUrl(value);
+}
+
+function blobToDataUrl(blob: Blob) {
+    return new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(reader.error || new Error("参考素材读取失败"));
+        reader.readAsDataURL(blob);
+    });
+}
+
 async function imageToAgnesReference(image: ReferenceImage) {
     const resolvedUrl = await resolveImageUrl(image.storageKey, "");
     for (const url of [image.dataUrl, image.url, resolvedUrl]) {
@@ -533,14 +583,19 @@ function isGeminiOmniFlashVideoModel(model: string) {
 function normalizeVideoSecondsForModel(model: string, value: string) {
     const seconds = Number(normalizeVideoSeconds(value));
     const key = modelKey(model);
+    if (isSeedanceVideoModel(model)) return String(Math.max(4, Math.min(30, seconds)));
     if (key.includes("sora-2")) return closestAllowedSeconds(seconds, [4, 8, 12, 16, 20]);
-    if (key.includes("veo3-1") || key.includes("veo-3-1")) return "8";
+    if (key.includes("veo3-1") || key.includes("veo-3-1")) return closestAllowedSeconds(seconds, [4, 6, 8]);
     if (key.includes("minimax-hailuo-02")) return closestAllowedSeconds(seconds, [5, 10]);
     if (key.includes("minimax-hailuo-2-3")) return closestAllowedSeconds(seconds, [6, 10]);
     if (key.includes("omni-flash-ext")) return closestAllowedSeconds(seconds, [4, 6, 8, 10]);
     if (key.includes("wan2-5") || key.includes("wan2.5")) return closestAllowedSeconds(seconds, [5, 10]);
     if (key === "wan2-6") return closestAllowedSeconds(seconds, [5, 10, 15]);
     return String(seconds);
+}
+
+function normalizeSeedanceVideoResolution(value: string, model: string) {
+    return normalizeSeedanceResolution(value, model);
 }
 
 function closestAllowedSeconds(seconds: number, allowed: number[]) {

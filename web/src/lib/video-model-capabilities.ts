@@ -6,6 +6,27 @@ export function isCogVideoX3Model(modelName: string) {
     return modelKey(modelName) === "cogvideox-3";
 }
 
+export function isSeedanceVideoModel(modelName: string) {
+    return modelKey(modelName).includes("seedance");
+}
+
+export function isDocumentedSeedanceVideoModel(modelName: string) {
+    const model = modelKey(modelName);
+    return model === "seedance2-5" || model === "seedance-2-5";
+}
+
+export function isVeoVideoModel(modelName: string) {
+    return modelKey(modelName).includes("veo");
+}
+
+export function isSora2VideoModel(modelName: string) {
+    return modelKey(modelName).startsWith("sora-2");
+}
+
+export function isDocumentedJSONVideoModel(modelName: string) {
+    return isDocumentedSeedanceVideoModel(modelName) || isVeoVideoModel(modelName) || isSora2VideoModel(modelName);
+}
+
 export const COGVIDEOX3_DURATIONS = ["5", "10"] as const;
 
 export function normalizeCogVideoX3Duration(value: string) {
@@ -34,7 +55,8 @@ export function supportsVideoFrameReferences(modelName: string) {
         model.includes("doubao-seedance-1-5") ||
         model.includes("doubao-seedance-1-0") ||
         model === "happyhorse-1-1" ||
-        (model.includes("veo3-1") && model.includes("official")) ||
+        isSeedanceVideoModel(model) ||
+        isVeoVideoModel(model) ||
         model.includes("minimax-hailuo-02") ||
         model.includes("skyreels-v4") ||
         model.includes("pixverse-v6") ||
@@ -62,7 +84,8 @@ export function supportsVideoAudioGeneration(modelName: string) {
         model.includes("doubao-seedance-2-5") ||
         model.includes("doubao-seedance-2-0") ||
         model.includes("doubao-seedance-1-5") ||
-        (model.includes("veo") && model.includes("official")) ||
+        isSeedanceVideoModel(model) ||
+        isVeoVideoModel(model) && model.includes("official") ||
         model === "wan2-6" ||
         model === "wan2-6-i2v-flash" ||
         model.includes("kling-v2-6") ||
