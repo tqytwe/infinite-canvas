@@ -438,7 +438,10 @@ func repairDefaultModel(current string, models []string, preferred func(string) 
 
 func isVideoModelName(modelName string) bool {
 	name := strings.ToLower(strings.TrimSpace(modelName))
-	return strings.Contains(name, "seedance") || strings.Contains(name, "video")
+	normalized := strings.NewReplacer(".", "-", "_", "-", "/", "-").Replace(name)
+	return strings.Contains(name, "seedance") || strings.Contains(name, "video") || strings.Contains(name, "veo") ||
+		normalized == "sd2-5" || normalized == "sd-2-5" ||
+		normalized == "minimax-h3" || normalized == "manxue2-5" || normalized == "manxue-2-5"
 }
 
 func isImageModelName(modelName string) bool {

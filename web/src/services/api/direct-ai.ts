@@ -53,10 +53,11 @@ export async function pollDirectVideoTask(config: AiConfig, provider: DirectAIPr
         const data = asRecord(readPath(payload, "data"));
         const error = firstString(data.failMsg, data.failCode, readDirectError(payload));
         const videoUrl = firstHTTPURL(parseJSONValue(data.resultJson));
+        const status = normalizeDirectStatus(firstString(data.state, videoUrl ? "completed" : "processing"));
         return {
             id: firstString(data.taskId, pollId),
             task_id: firstString(data.taskId, pollId),
-            status: normalizeDirectStatus(firstString(data.state, videoUrl ? "completed" : "processing")),
+            status: error ? "failed" : status,
             progress: readNumber(data.progress),
             ...(videoUrl ? { video_url: videoUrl, url: videoUrl } : {}),
             ...(error ? { error: { message: error } } : {}),
@@ -67,10 +68,11 @@ export async function pollDirectVideoTask(config: AiConfig, provider: DirectAIPr
     const data = asRecord(readPath(payload, "data"));
     const error = firstString(readPath(data, "error.message"), readDirectError(payload));
     const videoUrl = firstHTTPURL(data.result);
+    const status = normalizeDirectStatus(firstString(data.status, videoUrl ? "completed" : "processing"));
     return {
         id: firstString(data.id, pollId),
         task_id: firstString(data.id, pollId),
-        status: normalizeDirectStatus(firstString(data.status, videoUrl ? "completed" : "processing")),
+        status: error ? "failed" : status,
         progress: readNumber(data.progress),
         ...(videoUrl ? { video_url: videoUrl, url: videoUrl } : {}),
         ...(error ? { error: { message: error } } : {}),
@@ -364,6 +366,16 @@ function normalizeDirectStatus(value: string) {
         case "failed":
         case "cancelled":
         case "canceled":
+		case "timeout":
+		case "timed_out":
+		case "timed-out":
+		case "timedout":
+		case "expired":
+		case "rejected":
+		case "blocked":
+		case "moderated":
+		case "incomplete":
+		case "aborted":
             return "failed";
         default:
             return "processing";

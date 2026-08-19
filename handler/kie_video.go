@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/tigerowo/infinite-canvas/model"
+	"github.com/tigerowo/infinite-canvas/service"
 )
 
 func isKIEChannel(channel model.ModelChannel, modelName string) bool {
@@ -921,7 +922,7 @@ func applyKIEVideoGenerateAudioInput(input map[string]any, modelName string) {
 	case "kling-3.0-omni/text-to-video", "kling-3.0-omni/image-to-video", "kling-3.0-omni/reference-to-video", "kling-3.0-omni/transformation":
 		input["audio"] = enabled
 	case "bytedance/seedance-2", "bytedance/seedance-2-fast", "bytedance/seedance-2-mini", "bytedance/seedance-1.5-pro", "bytedance/seedance-1-5-pro", "bytedance/seedance-2-5":
-    	input["generate_audio"] = enabled
+		input["generate_audio"] = enabled
 	case "wan/2-6-flash-image-to-video", "wan/2-6-flash-video-to-video":
 		input["audio"] = enabled
 	}
@@ -1563,15 +1564,7 @@ func transformKIETaskResponse(payload []byte, modelName string) ([]byte, bool) {
 		return nil, false
 	}
 
-	status := "processing"
-	switch strings.ToLower(strings.TrimSpace(result.Data.State)) {
-	case "waiting", "queuing", "generating":
-		status = "processing"
-	case "success", "succeeded", "completed":
-		status = "completed"
-	case "fail", "failed", "cancelled":
-		status = "failed"
-	}
+	status := service.NormalizeVideoTaskStatus(result.Data.State)
 
 	converted := map[string]any{
 		"id":       result.Data.TaskID,

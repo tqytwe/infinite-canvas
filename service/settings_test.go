@@ -24,6 +24,19 @@ func TestPlatformAuthDisablesRemoteModelChannels(t *testing.T) {
 	}
 }
 
+func TestVideoModelNameRecognizesConfiguredAliasesWithoutClassifyingMinimaxText(t *testing.T) {
+	for _, name := range []string{"manxue2.5", "minimax_h3", "seedance2.5", "sd2.5", "veo-3.1", "veo-3.1-fast", "veo-3.1-i2v"} {
+		if !isVideoModelName(name) {
+			t.Fatalf("%q should be classified as video", name)
+		}
+	}
+	for _, name := range []string{"minimax-text-01", "minimax-chat", "minimax-01"} {
+		if isVideoModelName(name) {
+			t.Fatalf("%q should not be classified as video", name)
+		}
+	}
+}
+
 func TestFetchAdminChannelModelsParsesOpenAIModels(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/models" {

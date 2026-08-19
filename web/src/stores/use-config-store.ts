@@ -217,15 +217,21 @@ function preferredModel(models: string[], predicate: (model: string) => boolean)
 }
 
 function isVideoModelName(model: string) {
-    const value = model.toLowerCase();
+    const value = model.toLowerCase().trim();
+    const normalized = value.replace(/[._/]+/g, "-");
     return (
         value.includes("video") ||
         value.includes("seedance") ||
+        normalized === "sd2-5" ||
+        normalized === "sd-2-5" ||
         value.includes("sora") ||
         value.includes("veo") ||
         value.includes("kling") ||
         value.includes("hailuo") ||
-        value.includes("minimax") ||
+        normalized === "minimax-h3" ||
+        (value.includes("minimax") && (value.includes("video") || value.includes("text-to-video") || value.includes("image-to-video"))) ||
+        normalized === "manxue2-5" ||
+        normalized === "manxue-2-5" ||
         value.includes("skyreels") ||
         value.includes("happyhorse") ||
         value.includes("runway") ||

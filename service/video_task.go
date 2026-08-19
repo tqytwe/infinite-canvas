@@ -15,6 +15,7 @@ import (
 const videoTaskPollInterval = 5 * time.Second
 const videoTaskInitialPollDelay = 5 * time.Second
 const videoTaskMaxPollingDuration = 20 * time.Minute
+const videoTaskResultURLGraceDuration = 2 * time.Minute
 const videoTaskFinishedRetention = 10 * time.Minute
 const videoTaskCleanupInterval = 10 * time.Minute
 
@@ -100,10 +101,15 @@ func CreateVideoTask(input VideoTaskCreateInput) (model.VideoTask, error) {
 		CreatedAt:       current,
 		UpdatedAt:       current,
 	}
-	if IsCompletedVideoTaskStatus(task.Status) || task.VideoURL != "" {
+	if task.VideoURL != "" {
 		task.Status = "completed"
 		task.Progress = 100
 		task.CompletedAt = current
+	} else if IsCompletedVideoTaskStatus(task.Status) {
+		task.Status = "processing"
+		task.Progress = minVideoProgress(task.Progress, 99)
+		task.ResultPendingSince = current
+		task.ErrorDetail = "上游已报告视频完成，但结果地址尚未返回"
 	} else if IsFailedVideoTaskStatus(task.Status) || task.Error != "" {
 		task.Status = "failed"
 		task.CompletedAt = current
@@ -278,7 +284,7 @@ func runVideoTaskPoller() {
 					}
 					update, err := poll(task)
 					if err != nil {
-						update = VideoTaskPollUpdate{Status: task.Status, ErrorDetail: err.Error()}
+						update = videoTaskPollErrorUpdate(task, err)
 					}
 					if err := UpdateVideoTaskFromPoll(task, update); err != nil {
 						log.Printf("update video task failed id=%s err=%v", task.ID, err)
@@ -343,7 +349,7 @@ func UpdateVideoTaskFromPoll(task model.VideoTask, update VideoTaskPollUpdate) e
 	}
 	task.UpdatedAt = current
 	task.LastPolledAt = videoTaskTime(time.Now())
-	if task.VideoURL != "" || IsCompletedVideoTaskStatus(task.Status) {
+	if task.VideoURL != "" {
 		task.Status = "completed"
 		task.Progress = 100
 		task.CompletedAt = current
@@ -363,9 +369,25 @@ func UpdateVideoTaskFromPoll(task model.VideoTask, update VideoTaskPollUpdate) e
 				task.Bytes = stored.Bytes
 			}
 		}
+	} else if IsCompletedVideoTaskStatus(task.Status) {
+		if task.ResultPendingSince == "" {
+			task.ResultPendingSince = current
+		}
+		pendingSince, parseErr := time.Parse(time.RFC3339Nano, task.ResultPendingSince)
+		if parseErr == nil && time.Now().UTC().Sub(pendingSince) >= videoTaskResultURLGraceDuration {
+			task.Status = "failed"
+			task.CompletedAt = current
+			task.Error = "视频任务已完成但上游没有返回视频地址"
+			task.ErrorDetail = firstVideoTaskValue(task.ErrorDetail, "上游状态为 completed，但在结果地址补偿窗口内仍未返回视频地址")
+		} else {
+			task.Status = "processing"
+			task.Progress = minVideoProgress(task.Progress, 99)
+			task.ErrorDetail = firstVideoTaskValue(task.ErrorDetail, "上游已报告视频完成，等待视频地址")
+		}
 	} else if task.Error != "" || IsFailedVideoTaskStatus(task.Status) {
 		task.Status = "failed"
 		task.CompletedAt = current
+		task.ResultPendingSince = ""
 	}
 	_, err := repository.SaveVideoTask(task)
 	return err
@@ -383,14 +405,14 @@ func NormalizeVideoTaskStatus(status string) string {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "completed", "complete", "done", "succeeded", "success":
 		return "completed"
-	case "failed", "fail", "error", "cancelled", "canceled":
+	case "failed", "fail", "error", "cancelled", "canceled", "timeout", "timed_out", "timed-out", "timedout", "expired", "rejected", "blocked", "moderated", "incomplete", "aborted":
 		return "failed"
 	case "running", "processing", "in_progress", "in-progress":
 		return "processing"
 	case "queued", "queue", "pending", "":
 		return "queued"
 	default:
-		return strings.ToLower(strings.TrimSpace(status))
+		return "processing"
 	}
 }
 
@@ -434,4 +456,36 @@ func clampProgress(value int) int {
 		return 100
 	}
 	return value
+}
+
+func minVideoProgress(value int, maximum int) int {
+	value = clampProgress(value)
+	if value > maximum {
+		return maximum
+	}
+	return value
+}
+
+func videoTaskPollErrorUpdate(task model.VideoTask, err error) VideoTaskPollUpdate {
+	message := strings.TrimSpace(err.Error())
+	if message == "" {
+		message = "视频任务查询失败"
+	}
+	if isPermanentVideoTaskPollError(message) {
+		return VideoTaskPollUpdate{Status: "failed", Error: message, ErrorDetail: message}
+	}
+	return VideoTaskPollUpdate{Status: task.Status, Progress: task.Progress, ErrorDetail: message}
+}
+
+func isPermanentVideoTaskPollError(message string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(message))
+	for _, marker := range []string{
+		"没有可用模型渠道", "指定模型渠道不可用", "本地渠道不存在", "本地渠道配置不完整", "本地渠道不支持该模型",
+		"缺少模型名称", "缺少模型渠道", "视频任务缺少上游任务 id", "任务无法继续", "invalid url", "禁止访问本地或内网地址",
+	} {
+		if strings.Contains(normalized, strings.ToLower(marker)) {
+			return true
+		}
+	}
+	return false
 }

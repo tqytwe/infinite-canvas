@@ -7,12 +7,13 @@ export function isCogVideoX3Model(modelName: string) {
 }
 
 export function isSeedanceVideoModel(modelName: string) {
-    return modelKey(modelName).includes("seedance");
+    const model = modelKey(modelName);
+    return model.includes("seedance") || model === "sd2-5" || model === "sd-2-5";
 }
 
 export function isDocumentedSeedanceVideoModel(modelName: string) {
     const model = modelKey(modelName);
-    return model === "seedance2-5" || model === "seedance-2-5";
+    return model === "seedance2-5" || model === "seedance-2-5" || model === "sd2-5" || model === "sd-2-5";
 }
 
 export function isVeoVideoModel(modelName: string) {
@@ -24,7 +25,8 @@ export function isSora2VideoModel(modelName: string) {
 }
 
 export function isDocumentedJSONVideoModel(modelName: string) {
-    return isDocumentedSeedanceVideoModel(modelName) || isVeoVideoModel(modelName) || isSora2VideoModel(modelName);
+    const model = modelKey(modelName);
+    return isDocumentedSeedanceVideoModel(model) || isVeoVideoModel(model) || isSora2VideoModel(model) || model === "minimax-h3" || model === "manxue2-5" || model === "manxue-2-5";
 }
 
 export const COGVIDEOX3_DURATIONS = ["5", "10"] as const;

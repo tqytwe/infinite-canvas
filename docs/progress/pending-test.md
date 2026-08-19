@@ -13,6 +13,19 @@ description: 当前版本已实现但仍需人工验证的变更项
 - 上游返回 `insufficient credits`、`video generation timed out` 等明确失败信息时，Canvas 必须立即同步为失败并停止轮询；只有明确限流信息才允许重试。
 - 生产环境需使用真实测试账号分别验证 Seedance 2.5、Veo 3.1、Veo 3.1 Fast、Veo 3.1 I2V 以及 Sora-2 的文生视频、参考图和失败状态。
 
+## 视频异步任务状态机
+
+- 上游返回 `timeout`、`timed_out`、`expired`、`rejected`、`blocked`、`moderated` 或 `incomplete` 时，任务应立即显示失败并停止轮询。
+- 上游返回 `completed` 但暂时没有视频地址时，任务最多等待 2 分钟补偿结果；仍没有地址时应显示协议错误，不得显示成功。
+- 渠道不存在、渠道不支持模型、密钥配置失效等确定性轮询错误应立即失败；网络暂时故障可以重试，但不能超过 20 分钟。
+- KIE、APIMart、本地直连和平台代理应对同一组终态显示一致。
+
+## 视频模型目录与 Seedance 双版本
+
+- 视频模型列表应保留 `manxue2.5`、`minimax_h3`、`seedance2.5`、`sd2.5`、`veo-3.1`、`veo-3.1-fast`、`veo-3.1-i2v` 这 7 个独立模型名。
+- `sd2.5` 与 `seedance2.5` 请求协议相同，但模型 ID 不得合并；两者都必须能单独选择、提交和轮询。
+- MiniMax 文本模型不得因为名称包含 `minimax` 而出现在视频模型列表。
+
 ## 图片生成结果持久化
 
 - 仅返回 `b64_json` 的图片模型，生成成功后结果应立即显示，不再出现“没有可显示的图片”。

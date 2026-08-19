@@ -20,6 +20,7 @@ export type VideoProgressHandler = (progress: number, task: VideoResponse) => vo
 export type VideoTaskCreateOptions = { clientTaskId?: string; source?: "video-workbench" | "canvas"; sourceId?: string };
 export const VIDEO_POLL_INTERVAL_MS = 5000;
 const VIDEO_TASK_MIN_TIMEOUT_MS = 20 * 60 * 1000;
+const VIDEO_RESULT_URL_GRACE_MS = 2 * 60 * 1000;
 
 export class VideoRequestError extends Error {
     detail?: string;
@@ -127,6 +128,7 @@ export async function pollCreatedVideoGenerationTask(config: AiConfig, task: Vid
         ? () => directPoll(config, directProvider, pollId)
         : async () => unwrapVideoResponse((await axios.get<ApiVideoResponse>(aiVideoPollUrl(config, model, pollId), { headers: aiHeaders(config), params: usesAccountProxy(config) ? { model } : undefined })).data);
     let completed: VideoResponse | null = null;
+    let completedWithoutURLAt = 0;
     try {
         if (initialDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, initialDelayMs));
         const timeoutMs = Math.max(VIDEO_TASK_MIN_TIMEOUT_MS, Number(config.timeout || 0) * 1000);
@@ -136,9 +138,15 @@ export async function pollCreatedVideoGenerationTask(config: AiConfig, task: Vid
             onPoll?.(video);
             if (isFailedVideoStatus(video.status)) throw new VideoRequestError(video.error?.message || "视频生成失败", video);
             if (typeof video.progress === "number") onProgress?.(video.progress, video);
-            if (isCompletedVideoStatus(video.status) || ((video.video_url || video.url) && "storageKey" in video && video.storageKey)) {
-                completed = video;
-                break;
+            if (isCompletedVideoStatus(video.status)) {
+                if (video.video_url || video.url || ("storageKey" in video && video.storageKey)) {
+                    completed = video;
+                    break;
+                }
+                if (!completedWithoutURLAt) completedWithoutURLAt = Date.now();
+                if (Date.now() - completedWithoutURLAt >= VIDEO_RESULT_URL_GRACE_MS) {
+                    throw new VideoRequestError("视频任务已完成但上游没有返回视频地址", video);
+                }
             }
             await new Promise((resolve) => setTimeout(resolve, VIDEO_POLL_INTERVAL_MS));
         }
@@ -767,7 +775,7 @@ function isCompletedVideoStatus(status?: string) {
 }
 
 function isFailedVideoStatus(status?: string) {
-    return ["failed", "fail", "error", "cancelled", "canceled"].includes((status || "").toLowerCase());
+    return ["failed", "fail", "error", "cancelled", "canceled", "timeout", "timed_out", "timed-out", "timedout", "expired", "rejected", "blocked", "moderated", "incomplete", "aborted"].includes((status || "").toLowerCase());
 }
 
 function videoPayloadErrorMessage(value: unknown): string {

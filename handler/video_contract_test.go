@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/tigerowo/infinite-canvas/model"
+	"github.com/tigerowo/infinite-canvas/service"
 )
 
 func TestSeedanceUsesOpenAIVideoPathOutsideArkPlan(t *testing.T) {
@@ -58,5 +59,13 @@ func TestRetryableVideoPollErrorOnlyRetriesActualRateLimits(t *testing.T) {
 	}
 	if isRetryableVideoPollError(429, "video generation timed out") {
 		t.Fatal("upstream timeout must fail")
+	}
+}
+
+func TestVideoStatusAliasesBecomeTerminalFailures(t *testing.T) {
+	for _, status := range []string{"timeout", "timed_out", "timed-out", "expired", "rejected", "blocked", "moderated", "incomplete", "aborted"} {
+		if got := service.NormalizeVideoTaskStatus(status); got != "failed" {
+			t.Fatalf("status %q = %q, want failed", status, got)
+		}
 	}
 }

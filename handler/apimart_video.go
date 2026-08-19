@@ -1994,7 +1994,7 @@ func normalizeAPIMartTaskStatus(status string) string {
 		if strings.TrimSpace(status) == "" {
 			return "processing"
 		}
-		return status
+		return service.NormalizeVideoTaskStatus(status)
 	}
 }
 
