@@ -2,10 +2,13 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
+	"github.com/tigerowo/infinite-canvas/config"
 	"github.com/tigerowo/infinite-canvas/model"
 	"github.com/tigerowo/infinite-canvas/service"
 )
@@ -56,18 +59,34 @@ func MeasureUserStorageProvider(w http.ResponseWriter, r *http.Request) {
 
 // UploadFile 上传文件到对象存储。
 func UploadFile(w http.ResponseWriter, r *http.Request) {
+	if service.LocalStorageEnabled() {
+		maxBytes := config.Cfg.CanvasMaxObjectBytes
+		if maxBytes <= 0 {
+			maxBytes = 2 * 1024 * 1024 * 1024
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, maxBytes+16*1024)
+	}
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		Fail(w, "请选择要上传的文件")
 		return
 	}
 	defer file.Close()
+	contentType := header.Header.Get("Content-Type")
+	if service.LocalStorageEnabled() && strings.TrimSpace(r.FormValue("provider")) == "" {
+		object, uploadErr := service.UploadLocalObject(r.Context(), header.Filename, contentType, file, "file", "")
+		if uploadErr != nil {
+			FailError(w, uploadErr)
+			return
+		}
+		OK(w, object)
+		return
+	}
 	data, err := io.ReadAll(file)
 	if err != nil {
 		FailError(w, err)
 		return
 	}
-	contentType := header.Header.Get("Content-Type")
 	if strings.TrimSpace(contentType) == "" {
 		contentType = http.DetectContentType(data)
 	}
@@ -105,28 +124,47 @@ func DeleteFile(w http.ResponseWriter, r *http.Request, id string) {
 
 // FileContent 获取文件内容。
 func FileContent(w http.ResponseWriter, r *http.Request, id string) {
-	download, err := service.DownloadStorageObject(id)
+	object, err := service.StorageObjectForRequest(r.Context(), id, r.URL.Query().Get("expires"), r.URL.Query().Get("signature"))
 	if err != nil {
-		FailError(w, err)
+		http.NotFound(w, r)
 		return
 	}
-	if download.RedirectURL != "" {
-		http.Redirect(w, r, download.RedirectURL, http.StatusTemporaryRedirect)
+	if object.Backend == service.LocalStorageBackend {
+		file, info, openErr := service.LocalStorageFile(object)
+		if openErr != nil {
+			http.NotFound(w, r)
+			return
+		}
+		defer file.Close()
+		w.Header().Set("Content-Type", object.MimeType)
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", info.Size()))
+		w.Header().Set("ETag", fmt.Sprintf("\"%s\"", object.SHA256))
+		w.Header().Set("Cache-Control", "private, max-age=300")
+		http.ServeContent(w, r, object.ID, info.ModTime(), file)
+		return
+	}
+	download, err := service.DownloadStorageObject(id)
+	if err != nil {
+		http.NotFound(w, r)
 		return
 	}
 	w.Header().Set("Content-Type", download.Object.MimeType)
-	w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	w.Header().Set("Cache-Control", "private, max-age=300")
 	_, _ = w.Write(download.Data)
 }
 
 // FileInfo 获取文件元数据。
 func FileInfo(w http.ResponseWriter, r *http.Request, id string) {
-	object, err := service.StorageObjectInfo(id)
+	object, err := service.StorageObjectForRequest(r.Context(), id, r.URL.Query().Get("expires"), r.URL.Query().Get("signature"))
 	if err != nil {
-		FailError(w, err)
+		http.NotFound(w, r)
 		return
 	}
-	OK(w, object)
+	OK(w, map[string]any{
+		"id": object.ID, "storageKey": "server:" + object.ID, "mimeType": object.MimeType,
+		"bytes": object.Bytes, "width": object.Width, "height": object.Height,
+		"contentUrl": service.SignedStorageURL(object.ID, object.CreatedBy),
+	})
 }
 
 // AdminMeasureStorageProvider 管理员统计存储容量。
@@ -145,6 +183,76 @@ func AdminMeasureStorageProvider(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	OK(w, result)
+}
+
+func AdminLocalStorageStatus(w http.ResponseWriter, r *http.Request) {
+	result, err := service.LocalStorageStatusSnapshot()
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
+func AdminLocalStorageObjects(w http.ResponseWriter, r *http.Request) {
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	result, err := service.AdminLocalStorageObjects(r.URL.Query().Get("userId"), r.URL.Query().Get("status"), page, limit)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
+func AdminDeleteLocalStorageObject(w http.ResponseWriter, r *http.Request, id string) {
+	if err := service.DeleteLocalStorageObject(id); err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, true)
+}
+
+func AdminReclaimLocalStorage(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		TargetBytes int64 `json:"targetBytes"`
+		AllEligible bool  `json:"allEligible"`
+	}
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&request)
+	}
+	if request.TargetBytes < 0 && !request.AllEligible {
+		Fail(w, "回收目标无效")
+		return
+	}
+	if request.AllEligible {
+		request.TargetBytes = -1
+	}
+	result, err := service.ReclaimLocalStorage(r.Context(), "", request.TargetBytes)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
+func AdminReconcileLocalStorage(w http.ResponseWriter, r *http.Request) {
+	service.ReconcileLocalStorage()
+	result, err := service.LocalStorageStatusSnapshot()
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, result)
+}
+
+func AdminPurgeLocalStorageQuarantine(w http.ResponseWriter, r *http.Request) {
+	bytes, count, err := service.PurgeLocalStorageQuarantine()
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, map[string]any{"bytes": bytes, "count": count})
 }
 
 // ProxyImage 代理图片请求（解决跨域和机器人检测问题）。

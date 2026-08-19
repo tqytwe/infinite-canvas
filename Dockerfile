@@ -40,8 +40,10 @@ ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=8080
 ENV PROMPT_DATA_DIR=/app/data/prompts
+ENV CANVAS_DATA_DIR=/data/infinite-canvas
+ENV DATABASE_DSN=/data/infinite-canvas/infinite-canvas.db
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
-RUN mkdir -p /app/data/prompts
+RUN mkdir -p /app/data/prompts /data/infinite-canvas/media /data/infinite-canvas/tmp /data/infinite-canvas/quarantine
 
 EXPOSE 8080
 # 先启动内部 Go API，再由 Next.js 提供页面并代理 /api/*。

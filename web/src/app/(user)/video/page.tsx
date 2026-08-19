@@ -2507,7 +2507,7 @@ function parseTaskVideoSize(value: unknown) {
 }
 
 function isCompletedVideoTask(task: VideoResponse) {
-    return Boolean(task.video_url || task.url) || ["completed", "complete", "done", "succeeded", "success"].includes((task.status || "").toLowerCase());
+    return Boolean(task.video_url || task.url) && Boolean(task.storageKey) || ["completed", "complete", "done", "succeeded", "success"].includes((task.status || "").toLowerCase());
 }
 
 function isFailedVideoTask(task: VideoResponse) {

@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/tigerowo/infinite-canvas/service"
 )
@@ -86,6 +87,7 @@ func UserAssetData(w http.ResponseWriter, r *http.Request) {
 }
 
 func SaveUserAssetData(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, 64<<20)
 	var request struct {
 		Data json.RawMessage `json:"data"`
 	}
@@ -99,4 +101,15 @@ func SaveUserAssetData(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	OK(w, json.RawMessage(data))
+}
+
+func UserAssets(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+	limit, _ := strconv.Atoi(query.Get("limit"))
+	page, err := service.CurrentUserAssets(r.Context(), query.Get("kind"), query.Get("q"), query.Get("cursor"), limit)
+	if err != nil {
+		FailError(w, err)
+		return
+	}
+	OK(w, page)
 }

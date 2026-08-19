@@ -81,6 +81,9 @@
 
 ## 发版本流程
 
+- Infinite Canvas 正式发布固定以 Tigerowo 官方 Go + Next.js 基线（根目录 `go.mod`、`web/package.json` 的 `next`）二开；不得把历史 Node/Vite `v0.15.x` 工作区、分支或镜像部署到 `canvas.jisudeng.com`。
+- 部署前必须同时核对：待发布提交的 `VERSION` 与架构、Zeabur 服务跟踪的 Git 分支/提交、生产环境变量名称是否被当前代码读取。三项有任一不符时停止发布，先向用户报告，不得以“构建成功”代替版本验收。
+- 必须在正确版本已上线并通过健康检查后，才可清理旧工作区、旧本地标签或旧分支；清理前保留可定位的远端归档提交，避免失去回退证据。
 - 发版本时，先把 `CHANGELOG.md` 的 `Unreleased` 变更整理成新的版本记录，并保留空的 `Unreleased` 标题。
 - 按当前版本号提升一个版本，更新根目录 `VERSION`。
 - 将当前未提交的代码全部提交到 Git。

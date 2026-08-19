@@ -53,14 +53,16 @@ export type StorageConfig = {
 
 const store = localforage.createInstance({ name: "infinite-canvas", storeName: "image_files" });
 const objectUrls = new Map<string, string>();
-const serverUrls = new Map<string, string>();
+const serverUrls = new Map<string, { url: string; expiresAt: number }>();
 export const USER_STORAGE_PROVIDER_KEY = "infinite-canvas:user_storage_provider";
 export const USER_WEBDAV_STORAGE_PROVIDER_KEY = "infinite-canvas:user_webdav_storage_provider";
 let storageConfigPromise: Promise<StorageConfig> | null = null;
 
 export function canUseGlobalStorage(config: StorageConfig) {
     const user = useUserStore.getState().user;
-    return config.mode === "server_sqlite_s3" && Boolean(user && user.role !== "guest" && (user.role === "admin" || config.allowUserGlobalProvider));
+    if (!user || user.role === "guest") return false;
+    if (config.mode === "server_local_disk") return true;
+    return config.mode === "server_sqlite_s3" && (user.role === "admin" || config.allowUserGlobalProvider);
 }
 
 function isLocalNetworkHost(hostname: string) {
@@ -167,7 +169,7 @@ export async function uploadRemoteImageToServer(url: string, filename: string): 
     const payload = (await uploadResponse.json().catch(() => null)) as { code?: number; msg?: string; data?: UploadedImage } | null;
     if (!uploadResponse.ok || payload?.code !== 0 || !payload.data) throw new Error(payload?.msg || "服务端图片上传失败");
     const meta = await readImageMeta(payload.data.url);
-    if (payload.data.storageKey?.startsWith("server:")) serverUrls.set(payload.data.storageKey.slice("server:".length), payload.data.url);
+    if (payload.data.storageKey?.startsWith("server:")) cacheServerURL(payload.data.storageKey.slice("server:".length), payload.data.url);
     return { ...payload.data, width: payload.data.width || meta.width, height: payload.data.height || meta.height, mimeType: payload.data.mimeType || blob.type || "image/png", bytes: payload.data.bytes || blob.size };
 }
 
@@ -175,11 +177,22 @@ export function clearStorageConfigCache() {
     storageConfigPromise = null;
 }
 
+function cacheServerURL(id: string, url: string) {
+    let expiresAt = Number.POSITIVE_INFINITY;
+    try {
+        const value = new URL(url, window.location.origin).searchParams.get("expires");
+        const seconds = value ? Number(value) : 0;
+        if (Number.isFinite(seconds) && seconds > 0) expiresAt = seconds * 1000;
+    } catch {
+        // Keep non-signed provider URLs cached for the session.
+    }
+    serverUrls.set(id, { url, expiresAt });
+}
+
 export async function resolveImageUrl(storageKey?: string, fallback = "") {
     if (!storageKey) return fallback;
     if (storageKey.startsWith("server:")) {
         const id = storageKey.slice("server:".length);
-        if (fallback && !fallback.startsWith("blob:")) return fallback;
         const cached = objectUrls.get(storageKey);
         if (cached) return cached;
         const blob = await store.getItem<Blob>(storageKey).catch(() => null);
@@ -189,11 +202,12 @@ export async function resolveImageUrl(storageKey?: string, fallback = "") {
             return url;
         }
         const cachedUrl = serverUrls.get(id);
-        if (cachedUrl) return cachedUrl;
-        const info = await apiGet<{ publicUrl?: string }>(`/api/files/${encodeURIComponent(id)}`).catch(() => null);
+        if (cachedUrl && cachedUrl.expiresAt > Date.now() + 60_000) return cachedUrl.url;
+        const token = useUserStore.getState().token;
+        const info = await apiGet<{ contentUrl?: string; publicUrl?: string }>(`/api/files/${encodeURIComponent(id)}`, undefined, token).catch(() => null);
         if (!info) return fallback;
-        const url = info?.publicUrl || `/api/files/${encodeURIComponent(id)}/content`;
-        serverUrls.set(id, url);
+        const url = info.contentUrl || info.publicUrl || fallback || `/api/files/${encodeURIComponent(id)}/content`;
+        cacheServerURL(id, url);
         return url;
     }
     const cached = objectUrls.get(storageKey);
@@ -226,7 +240,7 @@ async function maybeUploadImageToServer(blob: Blob): Promise<UploadedImage | nul
         throw new Error(payload?.msg || "服务端图片上传失败");
     }
     const meta = await readImageMeta(payload.data.url);
-    if (payload.data.storageKey?.startsWith("server:")) serverUrls.set(payload.data.storageKey.slice("server:".length), payload.data.url);
+    if (payload.data.storageKey?.startsWith("server:")) cacheServerURL(payload.data.storageKey.slice("server:".length), payload.data.url);
     return { ...payload.data, width: payload.data.width || meta.width, height: payload.data.height || meta.height, mimeType: payload.data.mimeType || blob.type || "image/png", bytes: payload.data.bytes || blob.size };
 }
 

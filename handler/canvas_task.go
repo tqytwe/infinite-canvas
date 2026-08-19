@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -95,6 +96,21 @@ func GetCanvasImageTask(w http.ResponseWriter, r *http.Request, id string) {
 	if !found {
 		Fail(w, "图片任务不存在")
 		return
+	}
+	if service.LocalStorageEnabled() && task.Status == "processing" && task.ImageURL != "" {
+		if persisted, persistErr := persistCanvasImageTask(task, user); persistErr == nil {
+			task = persisted
+			task.Status = "completed"
+			task.Progress = 100
+			task.CompletedAt = taskTime()
+			task.Error = ""
+			task.ErrorDetail = ""
+			_, _ = service.SaveCanvasImageTask(task)
+		} else {
+			task.Progress = 99
+			task.ErrorDetail = "图片已生成，服务端保存重试中: " + persistErr.Error()
+			_, _ = service.SaveCanvasImageTask(task)
+		}
 	}
 	OK(w, service.CanvasImageTaskResponse(task))
 }
@@ -247,6 +263,21 @@ func GetCanvasAudioTask(w http.ResponseWriter, r *http.Request, id string) {
 		Fail(w, "音频任务不存在")
 		return
 	}
+	if service.LocalStorageEnabled() && task.Status == "processing" && task.AudioURL != "" {
+		if persisted, persistErr := persistCanvasAudioTask(task, user); persistErr == nil {
+			task = persisted
+			task.Status = "completed"
+			task.Progress = 100
+			task.CompletedAt = taskTime()
+			task.Error = ""
+			task.ErrorDetail = ""
+			_, _ = service.SaveCanvasAudioTask(task)
+		} else {
+			task.Progress = 99
+			task.ErrorDetail = "音频已生成，服务端保存重试中: " + persistErr.Error()
+			_, _ = service.SaveCanvasAudioTask(task)
+		}
+	}
 	OK(w, service.CanvasAudioTaskResponse(task))
 }
 
@@ -277,17 +308,31 @@ func runCanvasImageTask(task model.CanvasImageTask, user model.AuthUser, body []
 		saveFailedCanvasImageTask(task, err.Error(), string(payload))
 		return
 	}
-	task.Status = "completed"
-	task.Progress = 100
-	task.CompletedAt = taskTime()
+	task.Status = "processing"
+	task.Progress = 99
+	task.CompletedAt = ""
 	task.ResponseBody = string(payload)
 	task.ImageURL = imageURLs[0]
 	if collectAll {
 		task.ImageURLs = imageURLs
 	}
-	task.StorageKey = ""
+	if service.LocalStorageEnabled() {
+		if persisted, persistErr := persistCanvasImageTask(task, user); persistErr != nil {
+			task.Error = ""
+			task.ErrorDetail = "图片已生成，服务端保存重试中: " + persistErr.Error()
+			_, _ = service.SaveCanvasImageTask(task)
+			return
+		} else {
+			task = persisted
+		}
+	}
+	task.Status = "completed"
+	task.Progress = 100
+	task.CompletedAt = taskTime()
 	task.MimeType = mimeType
-	task.Bytes = bytes
+	if task.Bytes == 0 {
+		task.Bytes = bytes
+	}
 	task.Width = 0
 	task.Height = 0
 	task.Error = ""
@@ -327,17 +372,87 @@ func runCanvasAudioTask(task model.CanvasAudioTask, user model.AuthUser, body []
 	if task.ContentType != "" && strings.HasPrefix(task.ContentType, "audio/") {
 		mimeType = task.ContentType
 	}
-	task.Status = "completed"
-	task.Progress = 100
-	task.CompletedAt = taskTime()
+	task.Status = "processing"
+	task.Progress = 99
+	task.CompletedAt = ""
 	task.ResponseBody = "[binary audio]"
 	task.AudioURL = "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(payload)
 	task.StorageKey = ""
 	task.MimeType = mimeType
 	task.Bytes = int64(len(payload))
+	if service.LocalStorageEnabled() {
+		if persisted, persistErr := persistCanvasAudioTask(task, user); persistErr != nil {
+			task.Error = ""
+			task.ErrorDetail = "音频已生成，服务端保存重试中: " + persistErr.Error()
+			_, _ = service.SaveCanvasAudioTask(task)
+			return
+		} else {
+			task = persisted
+		}
+	}
+	task.Status = "completed"
+	task.Progress = 100
+	task.CompletedAt = taskTime()
 	task.Error = ""
 	task.ErrorDetail = ""
 	_, _ = service.SaveCanvasAudioTask(task)
+}
+
+func persistCanvasImageTask(task model.CanvasImageTask, user model.AuthUser) (model.CanvasImageTask, error) {
+	imageURLs := task.ImageURLs
+	if len(imageURLs) == 0 && task.ImageURL != "" {
+		imageURLs = []string{task.ImageURL}
+	}
+	if len(imageURLs) == 0 {
+		return task, errors.New("图片地址为空")
+	}
+	storedURLs := make([]string, 0, len(imageURLs))
+	for index, imageURL := range imageURLs {
+		stored, err := persistCanvasRemoteObject(user, imageURL, "image", fmt.Sprintf("%s:%d", task.ID, index))
+		if err != nil {
+			return task, err
+		}
+		if index == 0 {
+			task.StorageKey = stored.StorageKey
+			task.MimeType = stored.MimeType
+			task.Bytes = stored.Bytes
+		}
+		storedURLs = append(storedURLs, stored.URL)
+	}
+	task.ImageURL = storedURLs[0]
+	if len(imageURLs) > 1 {
+		task.ImageURLs = storedURLs
+	}
+	return task, nil
+}
+
+func persistCanvasAudioTask(task model.CanvasAudioTask, user model.AuthUser) (model.CanvasAudioTask, error) {
+	if strings.TrimSpace(task.AudioURL) == "" {
+		return task, errors.New("音频地址为空")
+	}
+	stored, err := persistCanvasRemoteObject(user, task.AudioURL, "audio", task.ID)
+	if err != nil {
+		return task, err
+	}
+	task.AudioURL = stored.URL
+	task.StorageKey = stored.StorageKey
+	task.MimeType = stored.MimeType
+	task.Bytes = stored.Bytes
+	return task, nil
+}
+
+func persistCanvasRemoteObject(user model.AuthUser, remoteURL string, kind string, taskID string) (service.UploadedStorageObject, error) {
+	ctx := service.WithUser(context.Background(), user)
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		stored, err := service.PersistRemoteStorageObject(ctx, remoteURL, kind, taskID)
+		if err == nil {
+			return stored, nil
+		}
+		lastErr = err
+		time.Sleep(time.Duration(attempt+1) * 500 * time.Millisecond)
+	}
+	return service.UploadedStorageObject{}, lastErr
 }
 
 func executeCanvasAIRequest(user model.AuthUser, endpoint string, body []byte, contentType string, channelID string, userChannelID string) ([]byte, int, string, error) {

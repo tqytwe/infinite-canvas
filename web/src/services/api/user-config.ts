@@ -67,6 +67,17 @@ export async function syncUserAssetData<T>(token: string, data: T) {
     return apiPost<T>("/api/v1/user-data/assets", { data }, token);
 }
 
+export type UserAssetPage<T> = {
+    assets: T[];
+    nextCursor?: string;
+    hasMore: boolean;
+    total: number;
+};
+
+export async function fetchUserAssets<T>(token: string, params: { kind?: string; q?: string; cursor?: string; limit?: number }) {
+    return apiGet<UserAssetPage<T>>("/api/v1/user-assets", params, token);
+}
+
 export type CreativeWorkflowRecord<T = unknown> = {
     id: string;
     ownerUserId?: string;

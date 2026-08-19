@@ -9,6 +9,10 @@ import { useCopyText } from "@/hooks/use-copy-text";
 import { formatBytes } from "@/lib/image-utils";
 import { cn } from "@/lib/utils";
 import { useAssetStore, type Asset, type AssetKind } from "@/stores/use-asset-store";
+import { useUserStore } from "@/stores/use-user-store";
+import { fetchUserAssets } from "@/services/api/user-config";
+import { resolveMediaUrl } from "@/services/file-storage";
+import { resolveImageUrl } from "@/services/image-storage";
 import { exportAssets, readAssetPackage } from "./asset-transfer";
 import { AssetFormModal } from "@/components/assets/asset-form-modal";
 
@@ -25,6 +29,7 @@ export default function AssetsPage() {
     const copyText = useCopyText();
     const assetInputRef = useRef<HTMLInputElement>(null);
     const assets = useAssetStore((state) => state.assets);
+    const token = useUserStore((state) => state.token);
     const addAsset = useAssetStore((state) => state.addAsset);
     const removeAsset = useAssetStore((state) => state.removeAsset);
     const [keyword, setKeyword] = useState("");
@@ -35,9 +40,13 @@ export default function AssetsPage() {
     const [isAssetOpen, setIsAssetOpen] = useState(false);
     const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
     const [deletingAsset, setDeletingAsset] = useState<Asset | null>(null);
+    const [remoteAssets, setRemoteAssets] = useState<Asset[] | null>(null);
+    const [remoteTotal, setRemoteTotal] = useState(0);
+    const pageCursorsRef = useRef<Record<number, string>>({ 1: "" });
     const validAssets = useMemo(() => assets.filter((asset) => asset.kind === "text" || asset.kind === "image" || asset.kind === "video" || asset.kind === "audio"), [assets]);
+    const assetRevision = useMemo(() => assets.map((asset) => `${asset.id}:${asset.updatedAt}`).join("|"), [assets]);
 
-    const filteredAssets = useMemo(() => {
+    const filteredLocalAssets = useMemo(() => {
         const query = keyword.trim().toLowerCase();
         return validAssets.filter((asset) => {
             if (kindFilter !== "all" && asset.kind !== kindFilter) return false;
@@ -46,15 +55,64 @@ export default function AssetsPage() {
         });
     }, [validAssets, keyword, kindFilter]);
 
-    const visibleAssets = useMemo(() => {
+    const visibleLocalAssets = useMemo(() => {
         const start = (page - 1) * pageSize;
-        return filteredAssets.slice(start, start + pageSize);
-    }, [filteredAssets, page, pageSize]);
+        return filteredLocalAssets.slice(start, start + pageSize);
+    }, [filteredLocalAssets, page, pageSize]);
 
     useEffect(() => {
-        const maxPage = Math.max(1, Math.ceil(filteredAssets.length / pageSize));
+        setPage(1);
+        pageCursorsRef.current = { 1: "" };
+    }, [kindFilter, keyword, pageSize, token]);
+
+    useEffect(() => {
+        if (!token) {
+            setRemoteAssets(null);
+            setRemoteTotal(0);
+            return;
+        }
+        let active = true;
+        const load = async () => {
+            try {
+                const request = { kind: kindFilter === "all" ? undefined : kindFilter, q: keyword.trim() || undefined, limit: pageSize };
+                let cursor = page === 1 ? "" : pageCursorsRef.current[page] || "";
+                if (page > 1 && !cursor) {
+                    let probeCursor = "";
+                    for (let probePage = 1; probePage < page; probePage += 1) {
+                        const knownCursor = pageCursorsRef.current[probePage + 1];
+                        if (knownCursor) {
+                            probeCursor = knownCursor;
+                            continue;
+                        }
+                        const intermediate = await fetchUserAssets<Asset>(token, { ...request, cursor: probeCursor });
+                        if (!intermediate.nextCursor) break;
+                        pageCursorsRef.current[probePage + 1] = intermediate.nextCursor;
+                        probeCursor = intermediate.nextCursor;
+                    }
+                    cursor = pageCursorsRef.current[page] || "";
+                }
+                const result = await fetchUserAssets<Asset>(token, { ...request, cursor });
+                if (!active) return;
+                if (result.nextCursor) pageCursorsRef.current[page + 1] = result.nextCursor;
+                setRemoteAssets(result.assets || []);
+                setRemoteTotal(result.total || 0);
+            } catch {
+                if (active) setRemoteAssets(null);
+            }
+        };
+        void load();
+        return () => {
+            active = false;
+        };
+    }, [assetRevision, kindFilter, keyword, page, pageSize, token]);
+
+    useEffect(() => {
+        const total = remoteAssets ? remoteTotal : filteredLocalAssets.length;
+        const maxPage = Math.max(1, Math.ceil(total / pageSize));
         setPage((value) => Math.min(value, maxPage));
-    }, [filteredAssets.length, pageSize]);
+    }, [filteredLocalAssets.length, pageSize, remoteAssets, remoteTotal]);
+
+    const visibleAssets = remoteAssets ?? visibleLocalAssets;
 
     const openCreate = () => {
         setEditingAsset(null);
@@ -199,7 +257,7 @@ export default function AssetsPage() {
                         <Pagination
                             current={page}
                             pageSize={pageSize}
-                            total={filteredAssets.length}
+                            total={remoteAssets ? remoteTotal : filteredLocalAssets.length}
                             showSizeChanger
                             pageSizeOptions={[10, 20, 50, 100]}
                             onChange={(nextPage, nextPageSize) => {
@@ -225,7 +283,8 @@ export default function AssetsPage() {
 }
 
 function AssetCard({ asset, onOpen, onEdit, onCopy, onDownload, onDelete }: { asset: Asset; onOpen: () => void; onEdit: () => void; onCopy: (asset: Asset) => void; onDownload: (asset: Asset) => void; onDelete: () => void }) {
-    const cover = asset.coverUrl || (asset.kind === "image" ? asset.data.dataUrl : "");
+    const resolvedURL = useAssetMediaURL(asset);
+    const cover = resolvedURL || asset.coverUrl || (asset.kind === "image" ? asset.data.dataUrl : "");
     const summary = assetSummary(asset);
     return (
         <Card
@@ -235,9 +294,9 @@ function AssetCard({ asset, onOpen, onEdit, onCopy, onDownload, onDelete }: { as
             cover={
                 <button type="button" className="block w-full text-left" onClick={onOpen}>
                     {cover ? (
-                        <img src={cover} alt={asset.title} className="aspect-[4/3] w-full object-cover" />
+                        <img src={cover} alt={asset.title} loading="lazy" decoding="async" className="aspect-[4/3] w-full object-cover" />
                     ) : asset.kind === "video" ? (
-                        <video src={asset.data.url + "#t=0.1"} muted playsInline preload="metadata" className="aspect-[4/3] w-full object-cover" />
+                        <video src={resolvedURL ? resolvedURL + "#t=0.1" : undefined} muted playsInline preload="none" className="aspect-[4/3] w-full object-cover" />
                     ) : (
                         <div className="flex aspect-[4/3] items-center justify-center bg-stone-100 p-5 text-center text-sm leading-6 text-stone-600 dark:bg-stone-900 dark:text-stone-300">{asset.kind === "text" ? asset.data.content : "暂无封面"}</div>
                     )}
@@ -293,8 +352,32 @@ function AssetCard({ asset, onOpen, onEdit, onCopy, onDownload, onDelete }: { as
     );
 }
 
+function useAssetMediaURL(asset: Asset | null) {
+    const initial = !asset ? "" : asset.kind === "image" ? asset.data.dataUrl : asset.kind === "text" ? "" : asset.data.url;
+    const [url, setURL] = useState(initial);
+    useEffect(() => {
+        let active = true;
+        const storageKey = !asset || asset.kind === "text" ? "" : asset.data.storageKey;
+        if (!storageKey || !storageKey.startsWith("server:")) {
+            setURL(initial);
+            return () => {
+                active = false;
+            };
+        }
+        const resolve = asset?.kind === "image" ? resolveImageUrl(storageKey, initial) : resolveMediaUrl(storageKey, initial);
+        void resolve.then((next) => {
+            if (active && next) setURL(next);
+        });
+        return () => {
+            active = false;
+        };
+    }, [asset, initial]);
+    return url;
+}
+
 function AssetDrawer({ asset, onClose, onCopy, onDownload }: { asset: Asset | null; onClose: () => void; onCopy: (asset: Asset) => void; onDownload: (asset: Asset) => void }) {
-    const cover = asset ? asset.coverUrl || (asset.kind === "image" ? asset.data.dataUrl : "") : "";
+    const resolvedURL = useAssetMediaURL(asset);
+    const cover = asset ? resolvedURL || asset.coverUrl || (asset.kind === "image" ? asset.data.dataUrl : "") : "";
     return (
         <Drawer title="素材详情" open={Boolean(asset)} size="large" onClose={onClose}>
             {asset ? (
@@ -322,9 +405,9 @@ function AssetDrawer({ asset, onClose, onCopy, onDownload }: { asset: Asset | nu
                         {asset.kind === "text" ? (
                             <Typography.Paragraph className="mt-2 whitespace-pre-wrap">{asset.data.content}</Typography.Paragraph>
                         ) : asset.kind === "video" ? (
-                            <video src={asset.data.url} controls className="mt-2 aspect-video w-full rounded-lg bg-black" />
+                            <video src={resolvedURL || asset.data.url} controls className="mt-2 aspect-video w-full rounded-lg bg-black" />
                         ) : asset.kind === "audio" ? (
-                            <audio src={asset.data.url} controls className="mt-2 w-full" />
+                            <audio src={resolvedURL || asset.data.url} controls className="mt-2 w-full" />
                         ) : (
                             <Typography.Text className="mt-2 block">
                                 {asset.data.width}x{asset.data.height} · {formatBytes(asset.data.bytes)} · {asset.data.mimeType}

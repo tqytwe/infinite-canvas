@@ -40,12 +40,14 @@ docker compose -f docker-compose.local.yml up -d --build
 
 ## 数据目录
 
-`docker-compose.yml` 会把本地 `./data` 挂载到容器内 `/app/data`，用于保存 SQLite 数据库、提示词数据和上传素材。
+Zeabur 正式部署使用持久化卷挂载 `/data/infinite-canvas`，SQLite 数据库和生成的图片、视频、音频都保存在该目录。Docker Compose 本地开发仍可把本地目录挂载到容器内 `/app/data`；生产环境不要把本地卷当作多副本共享存储。
 
 Docker 部署时建议把 `.env` 中的 SQLite 路径设置为：
 
 ```text
 DATABASE_DSN=/app/data/infinite-canvas.db
 ```
+
+生产容量策略：默认总卷 30GB，预留 3GB，媒体池约 27GB；达到 24GB 左右时先清理过期临时文件和超过 72 小时且无资产、画布、历史或任务引用的媒体。带引用文件不会自动删除，仍不足时拒绝新写入。管理员可在 `/admin/storage` 查看真实磁盘容量、用户占用、孤儿/隔离文件和引用，并执行受保护的回收或删除。
 
 如果需要让火山方舟拉取本地上传的 Seedance 参考素材，还需要把 `PUBLIC_BASE_URL` 设置为公网可访问的站点地址。

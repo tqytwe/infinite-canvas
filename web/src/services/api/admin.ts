@@ -352,3 +352,98 @@ export type StorageCapacityResult = {
 export async function measureAdminStorageProvider(token: string, payload: { index: number; provider: AdminStorageProvider }) {
     return apiPost<StorageCapacityResult>("/api/admin/storage/measure", payload, token);
 }
+
+export type AdminStorageReference = {
+    type: "user_asset" | "canvas" | "video_history" | "image_history" | "legacy_user_data" | "catalog_asset" | "image_task" | "audio_task" | "video_task";
+    id: string;
+    userId: string;
+};
+
+export type AdminLocalStorageObject = {
+    id: string;
+    backend: string;
+    objectKey: string;
+    mimeType: string;
+    bytes: number;
+    sha256: string;
+    createdBy: string;
+    userDisplayName: string;
+    status: string;
+    kind: string;
+    sourceTaskId: string;
+    createdAt: string;
+    updatedAt: string;
+    deletedAt: string;
+    lastError: string;
+    references: AdminStorageReference[];
+    reclaimable: boolean;
+};
+
+export type AdminLocalStorageObjectPage = {
+    items: AdminLocalStorageObject[];
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+};
+
+export type AdminLocalStorageUserUsage = {
+    userId: string;
+    userDisplayName: string;
+    bytes: number;
+    objectCount: number;
+};
+
+export type AdminLocalStorageStatus = {
+    enabled: boolean;
+    root: string;
+    filesystemTotalBytes: number;
+    filesystemUsedBytes: number;
+    filesystemAvailableBytes: number;
+    dataDirectoryBytes: number;
+    mediaDirectoryBytes: number;
+    temporaryDirectoryBytes: number;
+    quarantineDirectoryBytes: number;
+    indexedBytes: number;
+    indexedObjectCount: number;
+    mediaLimitBytes: number;
+    reserveBytes: number;
+    cleanupThresholdBytes: number;
+    userLimitBytes: number;
+    orphanCount: number;
+    orphanBytes: number;
+    users: AdminLocalStorageUserUsage[];
+    checkedAt: string;
+};
+
+export type AdminLocalStorageReclaimResult = {
+    temporaryBytes: number;
+    objectBytes: number;
+    objectCount: number;
+    orphanBytes: number;
+    message: string;
+};
+
+export async function fetchAdminLocalStorageStatus(token: string) {
+    return apiGet<AdminLocalStorageStatus>("/api/admin/local-storage", undefined, token);
+}
+
+export async function fetchAdminLocalStorageObjects(token: string, query: { userId?: string; status?: string; page?: number; limit?: number } = {}) {
+    return apiGet<AdminLocalStorageObjectPage>("/api/admin/local-storage/objects", compactApiParams(query), token);
+}
+
+export async function reclaimAdminLocalStorage(token: string, allEligible = false) {
+    return apiPost<AdminLocalStorageReclaimResult>("/api/admin/local-storage/reclaim", { allEligible }, token);
+}
+
+export async function reconcileAdminLocalStorage(token: string) {
+    return apiPost<AdminLocalStorageStatus>("/api/admin/local-storage/reconcile", {}, token);
+}
+
+export async function purgeAdminLocalStorageQuarantine(token: string) {
+    return apiPost<{ bytes: number; count: number }>("/api/admin/local-storage/quarantine/purge", {}, token);
+}
+
+export async function deleteAdminLocalStorageObject(token: string, id: string) {
+    return apiDelete<boolean>(`/api/admin/local-storage/objects/${encodeURIComponent(id)}`, token);
+}

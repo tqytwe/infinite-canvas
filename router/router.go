@@ -30,10 +30,13 @@ func New() *gin.Engine {
 	api.HEAD("/media/references/:id", func(c *gin.Context) {
 		handler.ReferenceMedia(c.Writer, c.Request, c.Param("id"))
 	})
-	api.GET("/files/:id", func(c *gin.Context) {
+	api.GET("/files/:id", middleware.OptionalAuth, func(c *gin.Context) {
 		handler.FileInfo(c.Writer, c.Request, c.Param("id"))
 	})
-	api.GET("/files/:id/content", func(c *gin.Context) {
+	api.GET("/files/:id/content", middleware.OptionalAuth, func(c *gin.Context) {
+		handler.FileContent(c.Writer, c.Request, c.Param("id"))
+	})
+	api.HEAD("/files/:id/content", middleware.OptionalAuth, func(c *gin.Context) {
 		handler.FileContent(c.Writer, c.Request, c.Param("id"))
 	})
 	api.POST("/ai/direct-request", gin.WrapF(handler.PrepareDirectAIRequest))
@@ -104,6 +107,7 @@ func New() *gin.Engine {
 	})
 	v1.GET("/user-data/assets", gin.WrapF(handler.UserAssetData))
 	v1.POST("/user-data/assets", gin.WrapF(handler.SaveUserAssetData))
+	v1.GET("/user-assets", gin.WrapF(handler.UserAssets))
 	api.GET("/proxy-image", gin.WrapF(handler.ProxyImage))
 	api.GET("/prompts", middleware.OptionalAuth, gin.WrapF(handler.Prompts))
 	api.GET("/assets", middleware.OptionalAuth, gin.WrapF(handler.Assets))
@@ -130,6 +134,14 @@ func New() *gin.Engine {
 	admin.POST("/settings/channel-models", gin.WrapF(handler.AdminChannelModels))
 	admin.POST("/settings/channel-test", gin.WrapF(handler.AdminTestChannelModel))
 	admin.POST("/storage/measure", gin.WrapF(handler.AdminMeasureStorageProvider))
+	admin.GET("/local-storage", gin.WrapF(handler.AdminLocalStorageStatus))
+	admin.GET("/local-storage/objects", gin.WrapF(handler.AdminLocalStorageObjects))
+	admin.DELETE("/local-storage/objects/:id", func(c *gin.Context) {
+		handler.AdminDeleteLocalStorageObject(c.Writer, c.Request, c.Param("id"))
+	})
+	admin.POST("/local-storage/reclaim", gin.WrapF(handler.AdminReclaimLocalStorage))
+	admin.POST("/local-storage/reconcile", gin.WrapF(handler.AdminReconcileLocalStorage))
+	admin.POST("/local-storage/quarantine/purge", gin.WrapF(handler.AdminPurgeLocalStorageQuarantine))
 	admin.GET("/prompt-categories", gin.WrapF(handler.AdminPromptCategories))
 	admin.POST("/prompt-categories/sync", gin.WrapF(handler.AdminSyncPromptCategories))
 	admin.POST("/prompt-categories/sync-all", gin.WrapF(handler.AdminSyncAllPromptCategories))

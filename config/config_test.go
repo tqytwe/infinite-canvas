@@ -31,3 +31,27 @@ func TestNormalizeDockerSQLiteDSNLeavesLocalPathWithoutMountedDataDir(t *testing
 		t.Fatalf("DatabaseDSN = %q, want relative local path", Cfg.DatabaseDSN)
 	}
 }
+
+func TestApplyLegacyCanvasStorageLimit(t *testing.T) {
+	t.Setenv("CANVAS_STORAGE_LIMIT_BYTES", "")
+	t.Setenv("CANVAS_MAX_STORAGE_BYTES", "32212254720")
+	Cfg.CanvasStorageLimit = 30_000_000_000
+
+	applyLegacyCanvasStorageLimit()
+
+	if Cfg.CanvasStorageLimit != 32_212_254_720 {
+		t.Fatalf("CanvasStorageLimit = %d, want legacy environment value", Cfg.CanvasStorageLimit)
+	}
+}
+
+func TestApplyLegacyCanvasStorageLimitPrefersCurrentName(t *testing.T) {
+	t.Setenv("CANVAS_STORAGE_LIMIT_BYTES", "30000000000")
+	t.Setenv("CANVAS_MAX_STORAGE_BYTES", "32212254720")
+	Cfg.CanvasStorageLimit = 30_000_000_000
+
+	applyLegacyCanvasStorageLimit()
+
+	if Cfg.CanvasStorageLimit != 30_000_000_000 {
+		t.Fatalf("CanvasStorageLimit = %d, want current environment value", Cfg.CanvasStorageLimit)
+	}
+}

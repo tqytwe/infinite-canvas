@@ -11,6 +11,7 @@ export type UploadedFile = { url: string; storageKey: string; bytes: number; mim
 
 const store = localforage.createInstance({ name: "infinite-canvas", storeName: "media_files" });
 const objectUrls = new Map<string, string>();
+const serverUrls = new Map<string, { url: string; expiresAt: number }>();
 let storageConfigPromise: Promise<StorageConfig> | null = null;
 
 export async function uploadMediaFile(input: string | Blob, prefix = "file"): Promise<UploadedFile> {
@@ -68,6 +69,7 @@ async function uploadMediaBlobToServer(blob: Blob, filename: string): Promise<Up
     const payload = (await response.json().catch(() => null)) as { code?: number; msg?: string; data?: UploadedFile } | null;
     if (!response.ok || payload?.code !== 0 || !payload.data) throw new Error(payload?.msg || "媒体同步失败");
     const meta = payload.data.mimeType?.startsWith("video/") ? await readVideoMeta(payload.data.url) : {};
+    if (payload.data.storageKey?.startsWith("server:")) cacheServerURL(payload.data.storageKey.slice("server:".length), payload.data.url);
     return { ...payload.data, bytes: payload.data.bytes || blob.size, mimeType: payload.data.mimeType || blob.type || "application/octet-stream", ...meta };
 }
 
@@ -96,13 +98,28 @@ export async function resolveMediaUrl(storageKey?: string, fallback = "") {
     }
     if (storageKey.startsWith("server:")) {
         const id = storageKey.slice("server:".length);
-        if (fallback && !fallback.startsWith("blob:")) return fallback;
-        const info = await apiGet<{ publicUrl?: string }>(`/api/files/${encodeURIComponent(id)}`).catch(() => null);
+        const cachedURL = serverUrls.get(id);
+        if (cachedURL && cachedURL.expiresAt > Date.now() + 60_000) return cachedURL.url;
+        const token = useUserStore.getState().token;
+        const info = await apiGet<{ contentUrl?: string; publicUrl?: string }>(`/api/files/${encodeURIComponent(id)}`, undefined, token).catch(() => null);
         if (!info) return fallback;
-        const url = info?.publicUrl || `/api/files/${encodeURIComponent(id)}/content`;
+        const url = info.contentUrl || info.publicUrl || fallback || `/api/files/${encodeURIComponent(id)}/content`;
+        cacheServerURL(id, url);
         return url;
     }
     return fallback;
+}
+
+function cacheServerURL(id: string, url: string) {
+    let expiresAt = Number.POSITIVE_INFINITY;
+    try {
+        const value = new URL(url, window.location.origin).searchParams.get("expires");
+        const seconds = value ? Number(value) : 0;
+        if (Number.isFinite(seconds) && seconds > 0) expiresAt = seconds * 1000;
+    } catch {
+        // Keep non-signed provider URLs cached for the session.
+    }
+    serverUrls.set(id, { url, expiresAt });
 }
 
 export async function getMediaBlob(storageKey: string) {
@@ -129,6 +146,7 @@ async function deleteServerMedia(storageKey: string) {
     });
     const payload = (await response.json().catch(() => null)) as { code?: number; msg?: string } | null;
     if (!response.ok || payload?.code !== 0) throw new Error(payload?.msg || "删除服务端视频失败");
+    serverUrls.delete(id);
 }
 
 export async function deleteStoredMedia(keys: Iterable<string>) {

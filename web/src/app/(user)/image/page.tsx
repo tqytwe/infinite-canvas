@@ -2406,7 +2406,7 @@ function isRecoverableImageTask(task: CanvasImageTask) {
 }
 
 function isCompletedImageTask(task: CanvasImageTask) {
-    return Boolean(task.image_url || task.url) || ["completed", "complete", "done", "succeeded", "success"].includes((task.status || "").toLowerCase());
+    return Boolean(task.image_url || task.url) && Boolean(task.storageKey) || ["completed", "complete", "done", "succeeded", "success"].includes((task.status || "").toLowerCase());
 }
 
 function isFailedImageTask(task: CanvasImageTask) {
@@ -2881,7 +2881,6 @@ function buildLog({
 function formatLogTime(value: number) {
     return new Date(value).toLocaleString("zh-CN", { hour12: false });
 }
-
 
 
 

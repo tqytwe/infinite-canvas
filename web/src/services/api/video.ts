@@ -133,7 +133,7 @@ export async function pollCreatedVideoGenerationTask(config: AiConfig, task: Vid
             onPoll?.(video);
             if (isFailedVideoStatus(video.status)) throw new VideoRequestError(video.error?.message || "视频生成失败", video);
             if (typeof video.progress === "number") onProgress?.(video.progress, video);
-            if (isCompletedVideoStatus(video.status) || video.video_url || video.url) {
+            if (isCompletedVideoStatus(video.status) || ((video.video_url || video.url) && "storageKey" in video && video.storageKey)) {
                 completed = video;
                 break;
             }

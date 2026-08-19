@@ -4670,7 +4670,7 @@ function applyCanvasImageTaskUpdate(nodes: CanvasNodeData[], nodeId: string, tas
         if (node.id !== nodeId) return node;
         const progress = typeof task.progress === "number" ? Math.max(0, Math.min(100, task.progress)) : node.metadata?.progress || 0;
         const url = urls[0] || "";
-        const completed = canvasTaskCompleted(task.status) || Boolean(url);
+        const completed = canvasTaskCompleted(task.status) || (Boolean(url) && Boolean(task.storageKey));
         const failed = canvasTaskFailed(task.status) || (completed && !url);
         const taskStartedAt = parseCanvasTaskTime(task.started_at ?? task.startedAt ?? task.created_at ?? task.createdAt) || startedAt;
         const metadata: CanvasNodeMetadata = {
@@ -4761,7 +4761,7 @@ function applyCanvasAudioTaskUpdate(nodes: CanvasNodeData[], nodeId: string, tas
         if (node.id !== nodeId) return node;
         const progress = typeof task.progress === "number" ? Math.max(0, Math.min(100, task.progress)) : node.metadata?.progress || 0;
         const url = task.audio_url || task.url || "";
-        const completed = canvasTaskCompleted(task.status) || Boolean(url);
+        const completed = canvasTaskCompleted(task.status) || (Boolean(url) && Boolean(task.storageKey));
         const failed = canvasTaskFailed(task.status) || (completed && !url);
         const taskStartedAt = parseCanvasTaskTime(task.started_at ?? task.startedAt ?? task.created_at ?? task.createdAt) || startedAt;
         const metadata: CanvasNodeMetadata = {
@@ -4806,7 +4806,7 @@ function canvasVideoTaskId(metadata?: CanvasNodeMetadata) {
 }
 
 function canvasVideoTaskCompleted(task: VideoResponse) {
-    return Boolean(task.video_url || task.url) || ["completed", "complete", "done", "succeeded", "success"].includes((task.status || "").toLowerCase());
+    return Boolean(task.video_url || task.url) && Boolean(task.storageKey) || ["completed", "complete", "done", "succeeded", "success"].includes((task.status || "").toLowerCase());
 }
 
 function canvasVideoTaskFailed(task: VideoResponse) {

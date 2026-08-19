@@ -19,10 +19,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tigerowo/infinite-canvas/model"
-	"github.com/tigerowo/infinite-canvas/repository"
 	"github.com/google/uuid"
 	"github.com/robfig/cron/v3"
+	"github.com/tigerowo/infinite-canvas/model"
+	"github.com/tigerowo/infinite-canvas/repository"
 	"gorm.io/gorm"
 )
 
@@ -74,11 +74,20 @@ func canUseGlobalStorage(ctx context.Context, storage model.PrivateStorageSettin
 	if !ok || user.ID == "" || user.Role == model.UserRoleGuest {
 		return false
 	}
+	if LocalStorageEnabled() {
+		return true
+	}
 	return user.Role == model.UserRoleAdmin || storage.AllowUserGlobalProvider
 }
 
 // HasActiveCloudStorage 判断当前请求是否有可用的云存储。
 func HasActiveCloudStorage(ctx context.Context) (bool, error) {
+	if LocalStorageEnabled() {
+		user, ok := UserFromContext(ctx)
+		if ok && user.ID != "" && user.Role != model.UserRoleGuest {
+			return true, nil
+		}
+	}
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return false, err
@@ -114,7 +123,9 @@ func PublicStorageConfig() (model.PublicStorageSetting, error) {
 	storage := normalizePrivateStorageSetting(settings.Private.Storage)
 
 	mode := "local_indexeddb"
-	if HasAdminStorageProvider(storage) {
+	if LocalStorageEnabled() {
+		mode = "server_local_disk"
+	} else if HasAdminStorageProvider(storage) {
 		mode = "server_sqlite_s3"
 	} else if storage.AllowUserProvider {
 		mode = "hybrid"
@@ -176,6 +187,9 @@ func UploadStorageObject(ctx context.Context, filename string, contentType strin
 
 // UploadStorageObjectWithProvider 上传对象到存储（可选用户自定义 Provider）。
 func UploadStorageObjectWithProvider(ctx context.Context, filename string, contentType string, data []byte, providerInput *StorageObjectProviderInput) (UploadedStorageObject, error) {
+	if providerInput == nil && LocalStorageEnabled() {
+		return UploadLocalObject(ctx, filename, contentType, bytes.NewReader(data), storageKindFromMime(contentType), "")
+	}
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return UploadedStorageObject{}, err
@@ -214,17 +228,29 @@ func UploadStorageObjectWithProvider(ctx context.Context, filename string, conte
 	}
 	publicURL := objectURL(provider, objectKey)
 	object := model.StorageObject{
-		ID: objectID, ProviderID: provider.ID, Bucket: provider.Bucket, ObjectKey: objectKey, PublicURL: publicURL,
-		MimeType: contentType, Bytes: int64(len(data)), SHA256: hex.EncodeToString(sum[:]), CreatedBy: userID, CreatedAt: now(),
+		ID: objectID, Backend: strings.ToLower(provider.Type), ProviderID: provider.ID, Bucket: provider.Bucket, ObjectKey: objectKey, PublicURL: publicURL,
+		MimeType: contentType, Bytes: int64(len(data)), SHA256: hex.EncodeToString(sum[:]), CreatedBy: userID,
+		Status: "ready", Kind: storageKindFromMime(contentType), CreatedAt: now(), UpdatedAt: now(),
 	}
 	if _, err := repository.SaveStorageObject(object); err != nil {
 		return UploadedStorageObject{}, err
 	}
-	url := "/api/files/" + objectID + "/content"
-	if publicURL != "" {
-		url = publicURL
-	}
+	url := SignedStorageURL(objectID, userID)
 	return UploadedStorageObject{ID: objectID, URL: url, StorageKey: "server:" + objectID, Bytes: int64(len(data)), MimeType: contentType}, nil
+}
+
+func storageKindFromMime(mimeType string) string {
+	mimeType = normalizeStoredMimeType(mimeType)
+	switch {
+	case strings.HasPrefix(mimeType, "image/"):
+		return "image"
+	case strings.HasPrefix(mimeType, "video/"):
+		return "video"
+	case strings.HasPrefix(mimeType, "audio/"):
+		return "audio"
+	default:
+		return "file"
+	}
 }
 
 // DeleteStorageObject 删除存储对象。
@@ -238,6 +264,13 @@ func DeleteStorageObject(ctx context.Context, id string, providerInput *StorageO
 	}
 	if user, ok := UserFromContext(ctx); ok && object.CreatedBy != "" && object.CreatedBy != user.ID {
 		return errors.New("无权删除该对象")
+	}
+	if object.Backend == LocalStorageBackend {
+		user, ok := UserFromContext(ctx)
+		if !ok || user.ID == "" || (object.CreatedBy != user.ID && user.Role != model.UserRoleAdmin) {
+			return errors.New("无权删除该对象")
+		}
+		return DeleteLocalStorageObject(object.ID)
 	}
 	settings, err := repository.GetSettings()
 	if err != nil {

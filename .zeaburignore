@@ -1,0 +1,14 @@
+.git/
+.github/
+.agents/
+.idea/
+data/
+docs/
+web/node_modules/
+web/.next/
+web/out/
+web/tsconfig.tsbuildinfo
+*.log
+.env
+.env.*
+!.env.example

@@ -80,7 +80,7 @@ description: 当前后端主要数据表与字段说明
 
 ### storage_objects
 
-S3/R2 与 WebDAV 共用的媒体文件索引表，不保存画布、素材列表或生成记录。
+S3/R2、WebDAV 与本地持久卷共用的媒体文件索引表，不保存画布、素材列表或生成记录。`backend=local_disk` 时 `object_key` 是 `/data/infinite-canvas` 下的服务端相对路径，`status` 记录 `pending`、`ready`、`deleting`、`missing` 等生命周期状态；本地对象按 `created_by` 做用户隔离。
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -96,7 +96,13 @@ S3/R2 与 WebDAV 共用的媒体文件索引表，不保存画布、素材列表
 | `sha256` | string | 文件内容摘要 |
 | `created_by` | string | 创建用户 ID |
 | `created_at` | string | 创建时间 |
-| `deleted_at` | string | 预留字段；当前删除链路直接删除索引记录 |
+| `status` | string | 对象状态：`pending`、`ready`、`deleting`、`missing` |
+| `kind` | string | 对象类型：`image`、`video`、`audio` 或 `file` |
+| `source_task_id` | string | 生成任务 ID，用于幂等恢复 |
+| `ref_count` | number | 兼容字段；删除前以后端全局引用扫描结果为准 |
+| `deleted_at` | string | 软删除时间；本地对象文件删除后保留索引状态 |
+
+本地卷管理规则：总卷上限由 `CANVAS_STORAGE_LIMIT_BYTES` 控制，历史环境变量 `CANVAS_MAX_STORAGE_BYTES` 在未设置新变量时仍兼容；`CANVAS_STORAGE_RESERVE_BYTES` 为数据库、日志和临时空间保留量；接近 `CANVAS_STORAGE_CLEANUP_THRESHOLD_BYTES` 时只清理过期临时文件和超过 `CANVAS_UNREFERENCED_RETENTION_HOURS` 且没有资产、画布、历史或任务引用的对象。带引用对象永不自动删除，空间仍不足时拒绝新写入。管理员 `/admin/storage` 可查看真实文件系统容量、用户占用、孤儿/隔离文件和对象引用，并通过受保护的回收与删除操作管理空间。
 
 ### prompts
 
