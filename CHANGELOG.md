@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v0.6.3 - 2026-08-19
+
++ [修复] 视频状态轮询携带原始模型名，避免统一网关把 Seedance、Veo、MiniMax 等任务错误路由到 Agnes 账号而返回 `task_not_exist`。
+
 ## v0.6.2 - 2026-08-19
 
 + [修复] 标准视频接口优先使用上游 `video_*` 任务 ID 轮询，避免混用内部 `task_*` ID 导致 `task_not_exist`。

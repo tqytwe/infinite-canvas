@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -246,8 +247,11 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 		return service.VideoTaskPollUpdate{}, errors.New("视频任务缺少上游任务 ID")
 	}
 	endpoint := "/videos/" + pollID
-	upstreamPath := resolveAIProxyPath(channel, task.Model, endpoint)
-	request, err := http.NewRequest(http.MethodGet, resolveAIProxyURL(channel, task.Model, upstreamPath), nil)
+	pollURL, err := buildVideoTaskPollURL(channel, task.Model, pollID)
+	if err != nil {
+		return service.VideoTaskPollUpdate{}, err
+	}
+	request, err := http.NewRequest(http.MethodGet, pollURL, nil)
 	if err != nil {
 		return service.VideoTaskPollUpdate{}, err
 	}
@@ -307,6 +311,25 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 		ErrorDetail:  parsed.ErrorDetail,
 		ResponseBody: string(transformed),
 	}, nil
+}
+
+// buildVideoTaskPollURL preserves provider-specific status paths and carries
+// the originating model. Gateways route status requests by that model because
+// asynchronous lookup paths do not include it themselves.
+func buildVideoTaskPollURL(channel model.ModelChannel, modelName string, pollID string) (string, error) {
+	endpoint := "/videos/" + strings.TrimSpace(pollID)
+	upstreamPath := resolveAIProxyPath(channel, modelName, endpoint)
+	targetURL := resolveAIProxyURL(channel, modelName, upstreamPath)
+	parsed, err := url.Parse(targetURL)
+	if err != nil {
+		return "", err
+	}
+	if normalizedModel := strings.TrimSpace(modelName); normalizedModel != "" {
+		query := parsed.Query()
+		query.Set("model", normalizedModel)
+		parsed.RawQuery = query.Encode()
+	}
+	return parsed.String(), nil
 }
 
 func isTransientVideoTaskNotFound(task model.VideoTask, message string) bool {

@@ -5,6 +5,11 @@ description: 当前版本已实现但仍需人工验证的变更项
 
 # 待测试
 
+## 视频状态查询模型路由
+
+- 使用用户自有的极速蹬 `video视频` API Key 创建 `manxue2.5`、`minimax_h3`、`seedance2.5`、`sd2.5`、`veo-3.1`、`veo-3.1-fast` 和 `veo-3.1-i2v` 后，Canvas 的服务端状态轮询必须携带对应模型名。
+- 当网关同一分组包含多个视频上游账号时，状态查询必须继续命中创建该模型的账号；不得因查询请求缺少模型而默认路由到 `agnes-video-v2.0` 账号并返回 `task_not_exist`。
+
 ## Seedance 与 Veo 文档协议
 
 - 标准 Seedance、Veo 和 Sora-2 渠道应使用 `POST /v1/videos` 的 JSON 请求；Seedance 使用 `seconds`/`resolution`，Veo 使用整数 `duration`，参考图分别按文档字段传递。

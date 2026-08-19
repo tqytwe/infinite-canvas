@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"net/url"
 	"testing"
 	"time"
 
@@ -32,6 +33,44 @@ func TestVideoPayloadUsesVideoIDForDocumentedPolling(t *testing.T) {
 	parsed := parseVideoTaskPayload([]byte(`{"id":"video_abc","task_id":"task_xyz","status":"queued"}`), "seedance2.5")
 	if parsed.UpstreamTaskID != "video_abc" {
 		t.Fatalf("poll id = %q, want video_abc", parsed.UpstreamTaskID)
+	}
+}
+
+func TestVideoTaskPollURLCarriesOriginatingModel(t *testing.T) {
+	target, err := buildVideoTaskPollURL(model.ModelChannel{BaseURL: "https://api.example.com/v1"}, "seedance2.5", "task_123")
+	if err != nil {
+		t.Fatalf("build poll URL: %v", err)
+	}
+	parsed, err := url.Parse(target)
+	if err != nil {
+		t.Fatalf("parse poll URL: %v", err)
+	}
+	if parsed.Path != "/v1/videos/task_123" {
+		t.Fatalf("poll path = %q, want /v1/videos/task_123", parsed.Path)
+	}
+	if got := parsed.Query().Get("model"); got != "seedance2.5" {
+		t.Fatalf("poll model = %q, want seedance2.5", got)
+	}
+}
+
+func TestVideoTaskPollURLPreservesKIEStatusRoute(t *testing.T) {
+	channel := model.ModelChannel{BaseURL: "https://api.kie.ai", Name: "KIE 视频"}
+	target, err := buildVideoTaskPollURL(channel, "veo-3.1", "task_123")
+	if err != nil {
+		t.Fatalf("build KIE poll URL: %v", err)
+	}
+	parsed, err := url.Parse(target)
+	if err != nil {
+		t.Fatalf("parse KIE poll URL: %v", err)
+	}
+	if parsed.Path != "/v1/jobs/recordInfo" {
+		t.Fatalf("KIE poll path = %q, want /v1/jobs/recordInfo", parsed.Path)
+	}
+	if got := parsed.Query().Get("taskId"); got != "task_123" {
+		t.Fatalf("KIE task id = %q, want task_123", got)
+	}
+	if got := parsed.Query().Get("model"); got != "veo-3.1" {
+		t.Fatalf("KIE poll model = %q, want veo-3.1", got)
 	}
 }
 
