@@ -53,10 +53,7 @@ export default function AdminStoragePage() {
         if (!token) return;
         setLoading(true);
         try {
-            const [nextStatus, nextObjects] = await Promise.all([
-                fetchAdminLocalStorageStatus(token),
-                fetchAdminLocalStorageObjects(token, { page: 1, limit: 50 }),
-            ]);
+            const [nextStatus, nextObjects] = await Promise.all([fetchAdminLocalStorageStatus(token), fetchAdminLocalStorageObjects(token, { page: 1, limit: 50 })]);
             setStatus(nextStatus);
             setObjects(nextObjects.items);
             setTotal(nextObjects.total);
@@ -114,20 +111,24 @@ export default function AdminStoragePage() {
             }
         });
 
-    const deleteObject = (item: AdminLocalStorageObject) =>
-        confirmAction("删除这个媒体对象？", "只有没有资产、画布和历史引用的对象允许删除。删除后不会影响其他用户。", async () => {
-            try {
-                await deleteAdminLocalStorageObject(token, item.id);
-                message.success("媒体对象已删除");
-                await load();
-            } catch (error) {
-                message.error(error instanceof Error ? error.message : "媒体删除失败");
-            }
-        });
+    const deleteObject = (item: AdminLocalStorageObject, force = false) =>
+        confirmAction(
+            force ? "强制删除这个媒体对象？" : "删除这个媒体对象？",
+            force ? `该对象仍有 ${item.references.length} 处引用。强制删除会使这些资产、画布或历史记录中的媒体失效，确认继续吗？` : "只有没有资产、画布和历史引用的对象允许删除。删除后不会影响其他用户。",
+            async () => {
+                try {
+                    await deleteAdminLocalStorageObject(token, item.id, force);
+                    message.success("媒体对象已删除");
+                    await load();
+                } catch (error) {
+                    message.error(error instanceof Error ? error.message : "媒体删除失败");
+                }
+            },
+        );
 
     const objectColumns = useMemo<ColumnsType<AdminLocalStorageObject>>(
         () => [
-            { title: "用户", dataIndex: "userDisplayName", width: 150, render: (value: string, item) => value || item.createdBy },
+            { title: "用户", dataIndex: "userEmail", width: 210, render: (value: string, item) => value || item.userDisplayName || item.createdBy },
             { title: "类型", dataIndex: "kind", width: 90, render: (value: string) => <Tag>{value || "file"}</Tag> },
             { title: "大小", dataIndex: "bytes", width: 110, render: (value: number) => formatBytes(value) },
             { title: "创建时间", dataIndex: "createdAt", width: 180, render: (value: string) => new Date(value).toLocaleString() },
@@ -137,28 +138,45 @@ export default function AdminStoragePage() {
                 render: (references: AdminLocalStorageObject["references"]) =>
                     references.length ? (
                         <Space size={[4, 4]} wrap>
-                            {references.map((reference) => <Tag key={`${reference.type}-${reference.id}`}>{referenceLabels[reference.type] || reference.type}</Tag>)}
+                            {references.map((reference) => (
+                                <Tag key={`${reference.type}-${reference.id}`}>{referenceLabels[reference.type] || reference.type}</Tag>
+                            ))}
                         </Space>
-                    ) : <Typography.Text type="secondary">无引用</Typography.Text>,
+                    ) : (
+                        <Typography.Text type="secondary">无引用</Typography.Text>
+                    ),
             },
             {
                 title: "状态",
                 dataIndex: "reclaimable",
                 width: 130,
-                render: (reclaimable: boolean, item) => reclaimable ? <Tag color="green">可安全删除</Tag> : <Tooltip title={item.references.length ? "存在受保护引用" : "当前不可删除"}><Tag color="orange">受保护</Tag></Tooltip>,
+                render: (reclaimable: boolean, item) =>
+                    reclaimable ? (
+                        <Tag color="green">可安全删除</Tag>
+                    ) : (
+                        <Tooltip title={item.references.length ? "存在受保护引用" : "当前不可删除"}>
+                            <Tag color="orange">受保护</Tag>
+                        </Tooltip>
+                    ),
             },
             {
                 title: "操作",
                 key: "actions",
                 width: 80,
-                render: (_, item) => <Button danger type="text" icon={<DeleteOutlined />} disabled={!item.reclaimable} onClick={() => deleteObject(item)} />,
+                render: (_, item) => (
+                    <Space size={0}>
+                        <Tooltip title={item.reclaimable ? "删除" : "存在引用，强制删除后引用会失效"}>
+                            <Button danger type="text" icon={<DeleteOutlined />} onClick={() => deleteObject(item, !item.reclaimable)} />
+                        </Tooltip>
+                    </Space>
+                ),
             },
         ],
         [],
     );
 
     const usageColumns = [
-        { title: "用户", dataIndex: "userDisplayName", render: (value: string, item: AdminLocalStorageStatus["users"][number]) => value || item.userId },
+        { title: "用户", dataIndex: "userEmail", render: (value: string, item: AdminLocalStorageStatus["users"][number]) => value || item.userDisplayName || item.userId },
         { title: "占用", dataIndex: "bytes", render: (value: number) => formatBytes(value) },
         { title: "对象数", dataIndex: "objectCount" },
         { title: "占媒体池", dataIndex: "bytes", render: (value: number) => `${percent(value, status?.mediaLimitBytes || 0)}%` },
@@ -167,18 +185,52 @@ export default function AdminStoragePage() {
     return (
         <main style={{ padding: 24 }}>
             <Flex vertical gap={16}>
-                <Card title="本地媒体空间" extra={<Space><Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>刷新</Button><Button icon={<ScanOutlined />} onClick={runReconcile}>扫描孤儿</Button><Button icon={<ThunderboltOutlined />} onClick={runReclaim}>按策略回收</Button><Button danger onClick={purgeQuarantine}>清理隔离区</Button></Space>}>
-                    <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>已引用的资产、画布和历史媒体不会自动删除。接近容量阈值时，系统只回收超过保留期且确认无引用的媒体；仍不足时拒绝新任务。</Typography.Paragraph>
+                <Card
+                    title="本地媒体空间"
+                    extra={
+                        <Space>
+                            <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void load()}>
+                                刷新
+                            </Button>
+                            <Button icon={<ScanOutlined />} onClick={runReconcile}>
+                                扫描孤儿
+                            </Button>
+                            <Button icon={<ThunderboltOutlined />} onClick={runReclaim}>
+                                按策略回收
+                            </Button>
+                            <Button danger onClick={purgeQuarantine}>
+                                清理隔离区
+                            </Button>
+                        </Space>
+                    }
+                >
+                    <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
+                        已引用的资产、画布和历史媒体不会自动删除。接近容量阈值时，系统只回收超过保留期且确认无引用的媒体；仍不足时拒绝新任务。
+                    </Typography.Paragraph>
                     <Row gutter={[16, 16]}>
-                        <Col xs={12} md={6}><Statistic title="文件系统已用" value={formatBytes(status?.filesystemUsedBytes || 0)} suffix={status ? `${percent(status.filesystemUsedBytes, status.filesystemTotalBytes)}%` : ""} /></Col>
-                        <Col xs={12} md={6}><Statistic title="文件系统可用" value={formatBytes(status?.filesystemAvailableBytes || 0)} /></Col>
-                        <Col xs={12} md={6}><Statistic title="媒体池登记" value={formatBytes(status?.indexedBytes || 0)} suffix={`/ ${formatBytes(status?.mediaLimitBytes || 0)}`} /></Col>
-                        <Col xs={12} md={6}><Statistic title="隔离区" value={formatBytes(status?.quarantineDirectoryBytes || 0)} suffix={`${status?.orphanCount || 0} 个待处理`} /></Col>
+                        <Col xs={12} md={6}>
+                            <Statistic title="文件系统已用" value={formatBytes(status?.filesystemUsedBytes || 0)} suffix={status ? `${percent(status.filesystemUsedBytes, status.filesystemTotalBytes)}%` : ""} />
+                        </Col>
+                        <Col xs={12} md={6}>
+                            <Statistic title="文件系统可用" value={formatBytes(status?.filesystemAvailableBytes || 0)} />
+                        </Col>
+                        <Col xs={12} md={6}>
+                            <Statistic title="媒体池登记" value={formatBytes(status?.indexedBytes || 0)} suffix={`/ ${formatBytes(status?.mediaLimitBytes || 0)}`} />
+                        </Col>
+                        <Col xs={12} md={6}>
+                            <Statistic title="隔离区" value={formatBytes(status?.quarantineDirectoryBytes || 0)} suffix={`${status?.orphanCount || 0} 个待处理`} />
+                        </Col>
                     </Row>
-                    <Typography.Text type="secondary">卷路径：{status?.root || "-"}　检查时间：{status?.checkedAt ? new Date(status.checkedAt).toLocaleString() : "-"}</Typography.Text>
+                    <Typography.Text type="secondary">
+                        卷路径：{status?.root || "-"}　检查时间：{status?.checkedAt ? new Date(status.checkedAt).toLocaleString() : "-"}
+                    </Typography.Text>
                 </Card>
-                <Card title="用户占用排行"><Table rowKey="userId" size="small" pagination={false} loading={loading} dataSource={status?.users || []} columns={usageColumns} /></Card>
-                <Card title={`媒体对象（${total}）`}><Table rowKey="id" size="small" loading={loading} dataSource={objects} columns={objectColumns} pagination={false} scroll={{ x: 900 }} /></Card>
+                <Card title="用户占用排行">
+                    <Table rowKey="userId" size="small" pagination={false} loading={loading} dataSource={status?.users || []} columns={usageColumns} />
+                </Card>
+                <Card title={`媒体对象（${total}）`}>
+                    <Table rowKey="id" size="small" loading={loading} dataSource={objects} columns={objectColumns} pagination={false} scroll={{ x: 900 }} />
+                </Card>
             </Flex>
         </main>
     );

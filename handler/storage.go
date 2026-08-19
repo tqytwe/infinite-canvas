@@ -206,7 +206,11 @@ func AdminLocalStorageObjects(w http.ResponseWriter, r *http.Request) {
 }
 
 func AdminDeleteLocalStorageObject(w http.ResponseWriter, r *http.Request, id string) {
-	if err := service.DeleteLocalStorageObject(id); err != nil {
+	delete := service.DeleteLocalStorageObject
+	if strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("force")), "true") {
+		delete = service.ForceDeleteLocalStorageObject
+	}
+	if err := delete(id); err != nil {
 		FailError(w, err)
 		return
 	}

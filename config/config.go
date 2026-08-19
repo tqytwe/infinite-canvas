@@ -22,10 +22,10 @@ type Config struct {
 	StorageDriver                    string `env:"STORAGE_DRIVER" envDefault:"sqlite"`
 	DatabaseDSN                      string `env:"DATABASE_DSN" envDefault:"data/infinite-canvas.db"`
 	CanvasDataDir                    string `env:"CANVAS_DATA_DIR" envDefault:"/data/infinite-canvas"`
-	CanvasStorageLimit               int64  `env:"CANVAS_STORAGE_LIMIT_BYTES" envDefault:"30000000000"`
-	CanvasStorageReserve             int64  `env:"CANVAS_STORAGE_RESERVE_BYTES" envDefault:"3000000000"`
-	CanvasCleanupThreshold           int64  `env:"CANVAS_STORAGE_CLEANUP_THRESHOLD_BYTES" envDefault:"24000000000"`
-	CanvasUserStorageLimit           int64  `env:"CANVAS_USER_STORAGE_LIMIT_BYTES" envDefault:"5000000000"`
+	CanvasStorageLimit               int64  `env:"CANVAS_STORAGE_LIMIT_BYTES" envDefault:"10000000000"`
+	CanvasStorageReserve             int64  `env:"CANVAS_STORAGE_RESERVE_BYTES" envDefault:"1000000000"`
+	CanvasCleanupThreshold           int64  `env:"CANVAS_STORAGE_CLEANUP_THRESHOLD_BYTES" envDefault:"8000000000"`
+	CanvasUserStorageLimit           int64  `env:"CANVAS_USER_STORAGE_LIMIT_BYTES" envDefault:"2000000000"`
 	CanvasMaxObjectBytes             int64  `env:"CANVAS_MAX_OBJECT_BYTES" envDefault:"2147483648"`
 	CanvasUnreferencedRetentionHours int    `env:"CANVAS_UNREFERENCED_RETENTION_HOURS" envDefault:"72"`
 	PublicBaseURL                    string `env:"PUBLIC_BASE_URL"`
@@ -52,7 +52,7 @@ func Load() error {
 		Cfg.CanvasDataDir = "/data/infinite-canvas"
 	}
 	if Cfg.CanvasStorageLimit <= 0 {
-		Cfg.CanvasStorageLimit = 30_000_000_000
+		Cfg.CanvasStorageLimit = 10_000_000_000
 	}
 	if Cfg.CanvasStorageReserve < 0 || Cfg.CanvasStorageReserve >= Cfg.CanvasStorageLimit {
 		Cfg.CanvasStorageReserve = Cfg.CanvasStorageLimit / 10
@@ -61,7 +61,7 @@ func Load() error {
 		Cfg.CanvasCleanupThreshold = (Cfg.CanvasStorageLimit - Cfg.CanvasStorageReserve) * 8 / 9
 	}
 	if Cfg.CanvasUserStorageLimit <= 0 || Cfg.CanvasUserStorageLimit > Cfg.CanvasStorageLimit-Cfg.CanvasStorageReserve {
-		Cfg.CanvasUserStorageLimit = 5_000_000_000
+		Cfg.CanvasUserStorageLimit = 2_000_000_000
 	}
 	if Cfg.CanvasMaxObjectBytes <= 0 || Cfg.CanvasMaxObjectBytes > Cfg.CanvasStorageLimit-Cfg.CanvasStorageReserve {
 		Cfg.CanvasMaxObjectBytes = 2 * 1024 * 1024 * 1024

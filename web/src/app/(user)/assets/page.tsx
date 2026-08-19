@@ -232,11 +232,7 @@ export default function AssetsPage() {
                                 >
                                     导入素材
                                 </button>
-                                <button
-                                    type="button"
-                                    className="cursor-pointer text-sm font-medium text-stone-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:underline dark:text-stone-300"
-                                    onClick={openCreate}
-                                >
+                                <button type="button" className="cursor-pointer text-sm font-medium text-stone-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:underline dark:text-stone-300" onClick={openCreate}>
                                     新增素材
                                 </button>
                             </div>
@@ -284,7 +280,7 @@ export default function AssetsPage() {
 
 function AssetCard({ asset, onOpen, onEdit, onCopy, onDownload, onDelete }: { asset: Asset; onOpen: () => void; onEdit: () => void; onCopy: (asset: Asset) => void; onDownload: (asset: Asset) => void; onDelete: () => void }) {
     const resolvedURL = useAssetMediaURL(asset);
-    const cover = resolvedURL || asset.coverUrl || (asset.kind === "image" ? asset.data.dataUrl : "");
+    const cover = asset.kind === "video" ? asset.coverUrl : resolvedURL || asset.coverUrl || (asset.kind === "image" ? asset.data.dataUrl : "");
     const summary = assetSummary(asset);
     return (
         <Card
@@ -293,10 +289,10 @@ function AssetCard({ asset, onOpen, onEdit, onCopy, onDownload, onDelete }: { as
             styles={{ body: { padding: 0 } }}
             cover={
                 <button type="button" className="block w-full text-left" onClick={onOpen}>
-                    {cover ? (
+                    {asset.kind === "video" ? (
+                        <video src={resolvedURL || asset.data.url} poster={cover || undefined} muted playsInline preload="metadata" className="aspect-[4/3] w-full bg-black object-cover" />
+                    ) : cover ? (
                         <img src={cover} alt={asset.title} loading="lazy" decoding="async" className="aspect-[4/3] w-full object-cover" />
-                    ) : asset.kind === "video" ? (
-                        <video src={resolvedURL ? resolvedURL + "#t=0.1" : undefined} muted playsInline preload="none" className="aspect-[4/3] w-full object-cover" />
                     ) : (
                         <div className="flex aspect-[4/3] items-center justify-center bg-stone-100 p-5 text-center text-sm leading-6 text-stone-600 dark:bg-stone-900 dark:text-stone-300">{asset.kind === "text" ? asset.data.content : "暂无封面"}</div>
                     )}
@@ -377,12 +373,14 @@ function useAssetMediaURL(asset: Asset | null) {
 
 function AssetDrawer({ asset, onClose, onCopy, onDownload }: { asset: Asset | null; onClose: () => void; onCopy: (asset: Asset) => void; onDownload: (asset: Asset) => void }) {
     const resolvedURL = useAssetMediaURL(asset);
-    const cover = asset ? resolvedURL || asset.coverUrl || (asset.kind === "image" ? asset.data.dataUrl : "") : "";
+    const cover = asset ? (asset.kind === "video" ? asset.coverUrl : resolvedURL || asset.coverUrl || (asset.kind === "image" ? asset.data.dataUrl : "")) : "";
     return (
         <Drawer title="素材详情" open={Boolean(asset)} size="large" onClose={onClose}>
             {asset ? (
                 <div className="space-y-5">
-                    {cover ? (
+                    {asset.kind === "video" ? (
+                        <video src={resolvedURL || asset.data.url} poster={cover || undefined} controls playsInline className="aspect-video w-full rounded-lg bg-black object-contain" />
+                    ) : cover ? (
                         <Image src={cover} alt={asset.title} className="rounded-lg" />
                     ) : (
                         <div className="rounded-lg border border-stone-200 bg-stone-50 p-5 text-sm leading-6 text-stone-600 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300">{asset.kind === "text" ? asset.data.content : "暂无封面"}</div>

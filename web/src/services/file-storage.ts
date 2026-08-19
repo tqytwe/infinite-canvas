@@ -24,6 +24,49 @@ export async function uploadMediaFile(input: string | Blob, prefix = "file"): Pr
     return { url, storageKey, bytes: blob.size, mimeType: blob.type || "application/octet-stream", ...meta };
 }
 
+/** Extract a small, durable poster from a video URL for asset cards. */
+export async function createVideoPosterDataUrl(url: string, maxWidth = 640): Promise<string> {
+    if (!url) throw new Error("视频地址为空");
+    const source = getProxyUrl(url);
+    const response = await fetch(source);
+    if (!response.ok) throw new Error(`视频封面读取失败：${response.status}`);
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const video = document.createElement("video");
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = "auto";
+    video.src = objectUrl;
+    try {
+        await new Promise<void>((resolve, reject) => {
+            video.onloadedmetadata = () => resolve();
+            video.onerror = () => reject(new Error("视频封面读取失败"));
+        });
+        const duration = Number.isFinite(video.duration) ? video.duration : 0;
+        const target = Math.min(0.1, Math.max(0, duration > 0 ? duration - 0.05 : 0));
+        if (target > 0) {
+            await new Promise<void>((resolve) => {
+                video.onseeked = () => resolve();
+                video.currentTime = target;
+            });
+        }
+        const width = video.videoWidth || 1280;
+        const height = video.videoHeight || 720;
+        const scale = Math.min(1, maxWidth / width);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(width * scale));
+        canvas.height = Math.max(1, Math.round(height * scale));
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("视频封面生成失败");
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL("image/jpeg", 0.78);
+    } finally {
+        video.removeAttribute("src");
+        video.load();
+        URL.revokeObjectURL(objectUrl);
+    }
+}
+
 export async function uploadAssetMediaFile(file: File, prefix = "asset-media"): Promise<UploadedFile> {
     try {
         return await uploadMediaBlobToServer(file, file.name || `${prefix}-${nanoid()}`);
@@ -152,9 +195,10 @@ async function deleteServerMedia(storageKey: string) {
 export async function deleteStoredMedia(keys: Iterable<string>) {
     const { useAssetStore } = await import("@/stores/use-asset-store");
     const assetKeys = new Set(
-        useAssetStore.getState().assets
-            .map((a) => (a.kind === "video" || a.kind === "audio" ? a.data.storageKey : null))
-            .filter((k): k is string => Boolean(k))
+        useAssetStore
+            .getState()
+            .assets.map((a) => (a.kind === "video" || a.kind === "audio" ? a.data.storageKey : null))
+            .filter((k): k is string => Boolean(k)),
     );
     await Promise.all(
         Array.from(new Set(keys)).map(async (key) => {

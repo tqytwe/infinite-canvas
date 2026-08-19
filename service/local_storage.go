@@ -37,6 +37,7 @@ var ErrStorageObjectNotFound = errors.New("存储对象不存在")
 
 type LocalStorageUserUsage struct {
 	UserID          string `json:"userId"`
+	UserEmail       string `json:"userEmail"`
 	UserDisplayName string `json:"userDisplayName"`
 	Bytes           int64  `json:"bytes"`
 	ObjectCount     int64  `json:"objectCount"`
@@ -73,6 +74,7 @@ type LocalStorageStatus struct {
 
 type LocalStorageObjectDetails struct {
 	model.StorageObject
+	UserEmail       string                         `json:"userEmail"`
 	UserDisplayName string                         `json:"userDisplayName"`
 	References      []model.StorageObjectReference `json:"references"`
 	Reclaimable     bool                           `json:"reclaimable"`
@@ -393,7 +395,7 @@ func localStorageObjectDetails(object repository.LocalStorageObjectRow) (LocalSt
 		return LocalStorageObjectDetails{}, err
 	}
 	return LocalStorageObjectDetails{
-		StorageObject: object.StorageObject, UserDisplayName: object.UserDisplayName,
+		StorageObject: object.StorageObject, UserEmail: object.UserEmail, UserDisplayName: object.UserDisplayName,
 		References:  references,
 		Reclaimable: object.Status == "ready" && object.DeletedAt == "" && len(protectedStorageReferences(references)) == 0,
 	}, nil
@@ -463,6 +465,19 @@ func DeleteLocalStorageObject(id string) error {
 	}
 	if protected := protectedStorageReferences(references); len(protected) > 0 {
 		return fmt.Errorf("媒体仍被 %d 处资产、画布或历史引用，不能删除", len(protected))
+	}
+	return deleteLocalStorageObjectLocked(object)
+}
+
+// ForceDeleteLocalStorageObject is an explicit administrator escape hatch for a full disk.
+// It intentionally does not rewrite user assets or canvas history; callers must warn that
+// references to the removed media will become unavailable.
+func ForceDeleteLocalStorageObject(id string) error {
+	localStorageReferenceMu.Lock()
+	defer localStorageReferenceMu.Unlock()
+	object, err := repository.GetStorageObject(strings.TrimSpace(id))
+	if err != nil {
+		return err
 	}
 	return deleteLocalStorageObjectLocked(object)
 }
