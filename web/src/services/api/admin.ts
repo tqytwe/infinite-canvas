@@ -367,6 +367,7 @@ export type AdminLocalStorageObject = {
     bytes: number;
     sha256: string;
     createdBy: string;
+    userEmail: string;
     userDisplayName: string;
     status: string;
     kind: string;
@@ -389,6 +390,7 @@ export type AdminLocalStorageObjectPage = {
 
 export type AdminLocalStorageUserUsage = {
     userId: string;
+    userEmail: string;
     userDisplayName: string;
     bytes: number;
     objectCount: number;
@@ -444,6 +446,6 @@ export async function purgeAdminLocalStorageQuarantine(token: string) {
     return apiPost<{ bytes: number; count: number }>("/api/admin/local-storage/quarantine/purge", {}, token);
 }
 
-export async function deleteAdminLocalStorageObject(token: string, id: string) {
-    return apiDelete<boolean>(`/api/admin/local-storage/objects/${encodeURIComponent(id)}`, token);
+export async function deleteAdminLocalStorageObject(token: string, id: string, force = false) {
+    return apiDelete<boolean>(`/api/admin/local-storage/objects/${encodeURIComponent(id)}${force ? "?force=true" : ""}`, token);
 }

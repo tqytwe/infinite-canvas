@@ -134,7 +134,11 @@ var platformAuthHTTPClient = &http.Client{Timeout: 15 * time.Second}
 type platformIdentityExchangeResponse struct {
 	Code int `json:"code"`
 	Data struct {
-		UserID int64 `json:"user_id"`
+		UserID      int64  `json:"user_id"`
+		Email       string `json:"email"`
+		DisplayName string `json:"display_name"`
+		Name        string `json:"name"`
+		AvatarURL   string `json:"avatar_url"`
 	} `json:"data"`
 }
 
@@ -236,8 +240,20 @@ func LoginWithPlatformLaunchToken(ctx context.Context, launchToken string) (mode
 			Status:         model.UserStatusActive,
 			CreatedAt:      now(),
 		}
+		user.Email = strings.TrimSpace(payload.Data.Email)
+		user.DisplayName = firstNonEmpty(payload.Data.DisplayName, payload.Data.Name, user.DisplayName)
+		user.AvatarURL = strings.TrimSpace(payload.Data.AvatarURL)
 	} else if user.Status == model.UserStatusBan {
 		return model.AuthSession{}, safeMessageError{message: "Canvas 账号已被禁用"}
+	}
+	if strings.TrimSpace(user.Email) == "" {
+		user.Email = strings.TrimSpace(payload.Data.Email)
+	}
+	if strings.TrimSpace(user.DisplayName) == "" || user.DisplayName == "极速蹬用户" {
+		user.DisplayName = firstNonEmpty(payload.Data.DisplayName, payload.Data.Name, user.DisplayName)
+	}
+	if strings.TrimSpace(user.AvatarURL) == "" {
+		user.AvatarURL = strings.TrimSpace(payload.Data.AvatarURL)
 	}
 	normalizeUserDefaults(&user)
 	user.LastLoginAt = now()

@@ -57,10 +57,10 @@ export default function AdminUsersPage() {
                     <Avatar src={item.avatarUrl || undefined}>{(item.displayName || item.username || "U").slice(0, 1).toUpperCase()}</Avatar>
                     <Flex vertical style={{ minWidth: 0 }}>
                         <Typography.Text strong ellipsis>
-                            {item.displayName || item.username}
+                            {item.email || item.displayName || item.username}
                         </Typography.Text>
                         <Typography.Text type="secondary" ellipsis>
-                            {item.username}
+                            {item.email ? `${item.displayName || "极速蹬用户"} · ${item.username}` : item.username}
                         </Typography.Text>
                     </Flex>
                 </Flex>

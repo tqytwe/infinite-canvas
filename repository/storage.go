@@ -17,6 +17,7 @@ type LocalStorageObjectQuery struct {
 
 type LocalStorageObjectRow struct {
 	model.StorageObject
+	UserEmail       string `json:"userEmail" gorm:"column:user_email"`
 	UserDisplayName string `json:"userDisplayName" gorm:"column:user_display_name"`
 }
 
@@ -141,7 +142,7 @@ func ListLocalStorageObjects(query LocalStorageObjectQuery) ([]LocalStorageObjec
 		return nil, 0, err
 	}
 	var rows []LocalStorageObjectRow
-	err = base.Select("storage_objects.*, COALESCE(users.display_name, users.username, '') AS user_display_name").
+	err = base.Select("storage_objects.*, COALESCE(NULLIF(users.email, ''), '') AS user_email, COALESCE(NULLIF(users.display_name, ''), NULLIF(users.username, ''), '') AS user_display_name").
 		Joins("LEFT JOIN users ON users.id = storage_objects.created_by").
 		Order("storage_objects.updated_at DESC").
 		Offset((query.Page - 1) * query.Limit).
@@ -184,10 +185,10 @@ func ListLocalStorageUserUsage(limit int) ([]model.StorageUserUsage, error) {
 	}
 	var result []model.StorageUserUsage
 	err = db.Model(&model.StorageObject{}).
-		Select("storage_objects.created_by AS user_id, COALESCE(users.display_name, users.username, '') AS user_display_name, COALESCE(SUM(storage_objects.bytes), 0) AS bytes, COUNT(storage_objects.id) AS object_count").
+		Select("storage_objects.created_by AS user_id, COALESCE(NULLIF(users.email, ''), '') AS user_email, COALESCE(NULLIF(users.display_name, ''), NULLIF(users.username, ''), '') AS user_display_name, COALESCE(SUM(storage_objects.bytes), 0) AS bytes, COUNT(storage_objects.id) AS object_count").
 		Joins("LEFT JOIN users ON users.id = storage_objects.created_by").
 		Where("storage_objects.backend = ? AND storage_objects.status IN ? AND storage_objects.deleted_at = ?", "local_disk", []string{"pending", "ready"}, "").
-		Group("storage_objects.created_by, users.display_name, users.username").
+		Group("storage_objects.created_by, users.email, users.display_name, users.username").
 		Order("bytes DESC").Limit(limit).Find(&result).Error
 	return result, err
 }

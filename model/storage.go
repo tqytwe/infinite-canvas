@@ -34,6 +34,7 @@ type StorageObjectReference struct {
 // StorageUserUsage is the aggregated local-media usage for an account.
 type StorageUserUsage struct {
 	UserID          string `json:"userId"`
+	UserEmail       string `json:"userEmail"`
 	UserDisplayName string `json:"userDisplayName"`
 	Bytes           int64  `json:"bytes"`
 	ObjectCount     int64  `json:"objectCount"`
