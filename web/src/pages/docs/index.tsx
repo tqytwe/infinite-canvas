@@ -37,7 +37,7 @@ const userSections: readonly DisplayDocSection[] = [
         icon: HardDrive,
         body: [
             "30GB 是当前 AI创作空间全站共享容量，不是单个用户独享。所有已登录用户上传、生成、保存到空间内的素材都会计入同一个容量池。",
-            "空间没有固定过期时间。全站容量不足时，系统会优先清理最久未访问、且没有被当前画布/素材/生成历史引用保护的媒体文件。完成创作后请及时导出或保存自己的成果。",
+            "空间没有固定过期时间。接近上限时，系统先清理过期临时文件，再清理超过保留期且没有被画布、素材或生成历史引用的媒体。被引用的文件不会自动删除；仍不足时会拒绝新写入。",
         ],
     },
     {
@@ -55,7 +55,7 @@ const userSections: readonly DisplayDocSection[] = [
         icon: Cloud,
         body: [
             "上传的图片、视频、音频和画布状态会计入全站共享空间。导出画布或素材时会从已保存数据中打包，不改变线上空间占用。",
-            "如果某个历史结果已经被滚动清理，界面仍会尽量保留画布结构和文本信息；建议把长期需要复用的关键成果加入我的资产或导出备份。",
+            "被画布、资产或工作台历史引用的结果不会自动清理。长期需要复用的关键成果仍建议加入我的资产或导出备份。",
         ],
     },
 ] as const;
@@ -170,6 +170,11 @@ export default function DocsPage({ mode = "user" }: { mode?: DocMode }) {
                         <div className="text-sm font-medium text-stone-500 dark:text-stone-400">Jisudeng AI创作空间</div>
                         <h1 className="mt-3 text-4xl font-semibold tracking-normal sm:text-5xl">{title}</h1>
                         <p className="mt-4 max-w-3xl text-base leading-7 text-stone-500 dark:text-stone-400">{subtitle}</p>
+                        {isAdminRoute && adminStatus === "ready" ? (
+                            <Link to="/admin/storage" className="mt-5 inline-flex h-9 items-center rounded-md bg-stone-950 px-3 text-sm font-medium text-white hover:bg-stone-800 dark:bg-stone-100 dark:text-stone-950">
+                                打开存储管理
+                            </Link>
+                        ) : null}
                     </header>
 
                     {!isAdminRoute || adminStatus === "ready" ? (

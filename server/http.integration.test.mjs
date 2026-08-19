@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, readdir, rm, mkdir, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, mkdir, writeFile, utimes } from "node:fs/promises";
 import { createServer } from "node:http";
 import { join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -219,6 +219,26 @@ test("HTTP global storage keeps pinned objects during shared LRU cleanup", async
     assert.equal("image:pinned" in pinnedMetadata.objects, true);
     assert.equal("image:evictable" in pinnedMetadata.objects, false);
     assert.equal("image:replacement" in pinnedMetadata.objects, true);
+});
+
+test("HTTP storage only reclaims aged unreferenced media", async (t) => {
+    const dataDir = await mkdtemp(join(tmpdir(), "infinite-canvas-http-retention-"));
+    const port = await freePort(); const baseUrl = `http://127.0.0.1:${port}`;
+    const child = spawn(process.execPath, ["index.mjs"], { cwd: SERVER_DIR, env: { ...process.env, NODE_ENV: "test", PORT: String(port), STATIC_DIR, CANVAS_DATA_DIR: dataDir, CANVAS_MAX_STORAGE_BYTES: "10b", CANVAS_STORAGE_RESERVE_BYTES: "0b", CANVAS_UNREFERENCED_RETENTION_HOURS: "24", CANVAS_MAX_UPLOAD_BYTES: "8b", CANVAS_MIN_FREE_BYTES: "1b", CANVAS_PLATFORM_API_BASE_URL: "", CANVAS_EXCHANGE_SECRET: "" }, stdio: ["ignore", "pipe", "pipe"] });
+    t.after(async () => { child.kill("SIGTERM"); await new Promise((resolvePromise) => child.once("exit", resolvePromise)); await rm(dataDir, { recursive: true, force: true }); });
+    await waitForHealth(baseUrl);
+    const token = await createSession(dataDir, 109, "retention");
+    assert.equal((await putObject(baseUrl, token, "image:recent", "11111")).status, 200);
+    assert.equal((await putObject(baseUrl, token, "image:filled", "2222")).status, 200);
+    assert.equal((await putObject(baseUrl, token, "image:blocked", "333")).status, 413);
+    const metadataPath = join(dataDir, "users", "109", "metadata.json");
+    const metadata = JSON.parse(await readFile(metadataPath, "utf8"));
+    metadata.objects["image:recent"].lastAccessedAt = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    await writeFile(metadataPath, JSON.stringify(metadata));
+    assert.equal((await putObject(baseUrl, token, "image:accepted", "444")).status, 200);
+    const after = JSON.parse(await readFile(metadataPath, "utf8"));
+    assert.equal("image:recent" in after.objects, false);
+    assert.equal("image:filled" in after.objects, true);
 });
 
 test("HTTP storage preserves state-referenced objects during LRU cleanup", async (t) => {
@@ -733,4 +753,29 @@ test("HTTP admin documentation requires an authenticated administrator", async (
     assert.equal(payload.metrics[0].value, "全站共 30GB");
     assert.equal(payload.sections.some((section) => section.title === "部署配置"), true);
     assert.equal(JSON.stringify(payload).includes("CANVAS_DATA_DIR"), true);
+});
+
+test("HTTP admin storage protects references and quarantines aged orphans", async (t) => {
+    const dataDir = await mkdtemp(join(tmpdir(), "infinite-canvas-http-admin-storage-"));
+    const port = await freePort(); const baseUrl = `http://127.0.0.1:${port}`;
+    const child = spawn(process.execPath, ["index.mjs"], { cwd: SERVER_DIR, env: { ...process.env, NODE_ENV: "test", PORT: String(port), STATIC_DIR, CANVAS_DATA_DIR: dataDir, CANVAS_MAX_STORAGE_BYTES: "100b", CANVAS_MAX_UPLOAD_BYTES: "32b", CANVAS_MIN_FREE_BYTES: "1b", CANVAS_PLATFORM_API_BASE_URL: "", CANVAS_EXCHANGE_SECRET: "" }, stdio: ["ignore", "pipe", "pipe"] });
+    t.after(async () => { child.kill("SIGTERM"); await new Promise((resolvePromise) => child.once("exit", resolvePromise)); await rm(dataDir, { recursive: true, force: true }); });
+    await waitForHealth(baseUrl);
+    assert.equal((await fetch(`${baseUrl}/api/admin/storage`)).status, 401);
+    const userToken = await createSession(dataDir, 201, "regular");
+    assert.equal((await fetch(`${baseUrl}/api/admin/storage`, { headers: { cookie: cookie(userToken) } })).status, 403);
+    const adminToken = await createSession(dataDir, 202, "admin", { isAdmin: true });
+    assert.equal((await putObject(baseUrl, adminToken, "image:referenced", "12345")).status, 200);
+    assert.equal((await putObject(baseUrl, adminToken, "image:free", "67890")).status, 200);
+    assert.equal((await fetch(`${baseUrl}/api/storage/state/canvas`, { method: "PUT", headers: { cookie: cookie(adminToken), "content-type": "application/json" }, body: JSON.stringify({ nodes: [{ storageKey: "image:referenced" }] }) })).status, 200);
+    const objects = await responseJson(await fetch(`${baseUrl}/api/admin/storage/objects`, { headers: { cookie: cookie(adminToken) } }));
+    assert.equal(objects.items.find((item) => item.storage_key === "image:referenced").references.length > 0, true);
+    assert.equal((await fetch(`${baseUrl}/api/admin/storage/objects/${encodeURIComponent("image:referenced")}?user_id=202`, { method: "DELETE", headers: { cookie: cookie(adminToken) } })).status, 409);
+    assert.equal((await fetch(`${baseUrl}/api/admin/storage/objects/${encodeURIComponent("image:free")}?user_id=202`, { method: "DELETE", headers: { cookie: cookie(adminToken) } })).status, 200);
+    const orphan = join(dataDir, "users", "202", "orphan.bin");
+    await writeFile(orphan, "orphan");
+    const old = new Date(Date.now() - 2 * 60 * 60 * 1000); await utimes(orphan, old, old);
+    const reconciled = await responseJson(await fetch(`${baseUrl}/api/admin/storage/reconcile`, { method: "POST", headers: { cookie: cookie(adminToken), "content-type": "application/json" }, body: "{}" }));
+    assert.equal(reconciled.orphan_count, 1);
+    assert.equal((await fetch(`${baseUrl}/api/admin/storage/quarantine/purge`, { method: "POST", headers: { cookie: cookie(adminToken), "content-type": "application/json" }, body: JSON.stringify({ confirm: true }) })).status, 200);
 });

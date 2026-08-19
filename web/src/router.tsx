@@ -14,6 +14,7 @@ const ImagePage = lazy(() => import("@/pages/image"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 const PromptsPage = lazy(() => import("@/pages/prompts"));
 const VideoPage = lazy(() => import("@/pages/video"));
+const AdminStoragePage = lazy(() => import("@/pages/admin/storage"));
 
 function PageLoading() {
     return <div className="flex h-full items-center justify-center bg-background text-sm text-stone-500 dark:text-stone-400">正在加载页面...</div>;
@@ -43,6 +44,7 @@ export const router = createBrowserRouter([
             { path: "/docs", element: <LazyPage><DocsPage /></LazyPage> },
             { path: "/docs/user", element: <LazyPage><DocsPage mode="user" /></LazyPage> },
             { path: "/docs/admin", element: <LazyPage><DocsPage mode="admin" /></LazyPage> },
+            { path: "/admin/storage", element: <LazyPage><AdminStoragePage /></LazyPage> },
         ],
     },
     { path: "*", element: <LazyPage><NotFound /></LazyPage> },

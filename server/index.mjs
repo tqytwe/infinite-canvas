@@ -20,11 +20,26 @@ const USERS_DIR = join(DATA_DIR, "users");
 const SESSIONS_DIR = join(DATA_DIR, "sessions");
 const PORT = Number.parseInt(process.env.PORT || "8080", 10);
 const MAX_STORAGE_BYTES = parseBytes(process.env.CANVAS_MAX_STORAGE_BYTES, 30 * 1024 * 1024 * 1024);
+const DEFAULT_STORAGE_RESERVE_BYTES = (process.env.NODE_ENV === "production" || process.env.ZEABUR)
+    ? Math.min(3 * 1024 * 1024 * 1024, Math.floor(MAX_STORAGE_BYTES * 0.1))
+    : 0;
+const STORAGE_RESERVE_BYTES = parseNonNegativeBytes(
+    process.env.CANVAS_STORAGE_RESERVE_BYTES,
+    DEFAULT_STORAGE_RESERVE_BYTES,
+);
+const STORAGE_CLEANUP_THRESHOLD_BYTES = parseNonNegativeBytes(
+    process.env.CANVAS_STORAGE_CLEANUP_THRESHOLD_BYTES,
+    Math.max(0, MAX_STORAGE_BYTES - STORAGE_RESERVE_BYTES),
+);
+const DEFAULT_UNREFERENCED_RETENTION_HOURS = (process.env.NODE_ENV === "production" || process.env.ZEABUR) ? 72 : 0;
+const UNREFERENCED_RETENTION_MS = Math.max(0, Number.parseInt(process.env.CANVAS_UNREFERENCED_RETENTION_HOURS || String(DEFAULT_UNREFERENCED_RETENTION_HOURS), 10)) * 60 * 60 * 1000;
+const TEMPORARY_FILE_RETENTION_MS = Math.max(1, Number.parseInt(process.env.CANVAS_TEMPORARY_RETENTION_HOURS || "1", 10)) * 60 * 60 * 1000;
 const MAX_UPLOAD_BYTES = parseBytes(process.env.CANVAS_MAX_UPLOAD_BYTES, 1024 * 1024 * 1024);
 const MAX_STATE_BYTES = parseBytes(process.env.CANVAS_MAX_STATE_BYTES, 256 * 1024 * 1024);
 const MIN_FREE_BYTES = parseBytes(process.env.CANVAS_MIN_FREE_BYTES, 512 * 1024 * 1024);
 const ASSET_PROXY_TTL_SECONDS = Number.parseInt(process.env.CANVAS_ASSET_PROXY_TTL_SECONDS || "86400", 10);
 const ASSET_CACHE_DIR = join(DATA_DIR, "asset-cache");
+const QUARANTINE_DIR = join(DATA_DIR, "quarantine");
 const ASSET_CACHE_MAX_BYTES = parseBytes(process.env.CANVAS_ASSET_CACHE_MAX_BYTES, 512 * 1024 * 1024);
 const SESSION_TTL_SECONDS = Number.parseInt(process.env.CANVAS_SESSION_TTL_SECONDS || "604800", 10);
 const PLATFORM_API_BASE_URL = normalizeOrigin(process.env.CANVAS_PLATFORM_API_BASE_URL || process.env.PLATFORM_API_BASE_URL || "https://api.jisudeng.com");
@@ -49,6 +64,7 @@ let storageLock = Promise.resolve();
 await mkdir(USERS_DIR, { recursive: true, mode: 0o700 });
 await mkdir(SESSIONS_DIR, { recursive: true, mode: 0o700 });
 await mkdir(ASSET_CACHE_DIR, { recursive: true, mode: 0o700 });
+await mkdir(QUARANTINE_DIR, { recursive: true, mode: 0o700 });
 
 const server = createServer(async (req, res) => {
     try {
@@ -142,6 +158,31 @@ async function handleApi(req, res, url, method) {
     }
     if (url.pathname === "/api/admin/docs" && method === "GET") {
         await handleAdminDocs(req, res);
+        return;
+    }
+    if (url.pathname === "/api/admin/storage" && method === "GET") {
+        await handleAdminStorage(req, res);
+        return;
+    }
+    if (url.pathname === "/api/admin/storage/objects" && method === "GET") {
+        await handleAdminStorageObjects(req, res, url);
+        return;
+    }
+    if (url.pathname === "/api/admin/storage/reconcile" && method === "POST") {
+        await handleAdminStorageAction(req, res, "reconcile");
+        return;
+    }
+    if (url.pathname === "/api/admin/storage/reclaim" && method === "POST") {
+        await handleAdminStorageAction(req, res, "reclaim");
+        return;
+    }
+    if (url.pathname === "/api/admin/storage/quarantine/purge" && method === "POST") {
+        await handleAdminStorageAction(req, res, "purge");
+        return;
+    }
+    const adminObjectMatch = url.pathname.match(/^\/api\/admin\/storage\/objects\/([^/]+)$/);
+    if (adminObjectMatch && method === "DELETE") {
+        await handleAdminStorageObjectDelete(req, res, decodeURIComponent(adminObjectMatch[1]), url);
         return;
     }
 
@@ -549,6 +590,164 @@ async function handleAdminDocs(req, res) {
     sendJson(res, 200, { ok: true, ...adminDocsPayload() });
 }
 
+async function requireAdminSession(req, res) {
+    const session = await readSessionFromRequest(req);
+    if (!session) {
+        sendJson(res, 401, { ok: false, error: "AUTH_REQUIRED", login_url: buildAuthUrl(PLATFORM_LOGIN_PATH) });
+        return null;
+    }
+    if (session.isAdmin || ADMIN_USER_IDS.has(Number(session.userId))) return session;
+    const bootstrap = await fetchPlatformBootstrap(session);
+    if (!isAdminPayload(bootstrap?.user)) {
+        sendJson(res, 403, { ok: false, error: "ADMIN_REQUIRED" });
+        return null;
+    }
+    return session;
+}
+
+async function scanStorageInventory(users) {
+    let temporaryBytes = 0;
+    let temporaryFiles = 0;
+    let orphanBytes = 0;
+    let orphanFiles = 0;
+    for (const user of users) {
+        const registered = new Set(Object.values(user.metadata.objects).map((item) => item.path));
+        await walkFiles(userDir(user.userId), async (absolute, relativePath) => {
+            try {
+                const info = await stat(absolute);
+                if (/^\.(?:upload|ingest)-/.test(relativePath)) {
+                    temporaryBytes += info.size;
+                    temporaryFiles += 1;
+                } else if (relativePath !== "metadata.json" && !registered.has(relativePath) && !relativePath.startsWith("state/")) {
+                    orphanBytes += info.size;
+                    orphanFiles += 1;
+                }
+            } catch {}
+        });
+    }
+    return { temporaryBytes, temporaryFiles, orphanBytes, orphanFiles };
+}
+
+async function getAdminStorageSnapshot() {
+    const users = await readAllUserMetadata();
+    const inventory = await scanStorageInventory(users);
+    const quarantine = await getQuarantineStats();
+    let filesystem = { totalBytes: null, freeBytes: null, usedBytes: null };
+    try {
+        const fs = await statfs(DATA_DIR);
+        filesystem = {
+            totalBytes: Number(fs.blocks) * Number(fs.bsize),
+            freeBytes: Number(fs.bavail) * Number(fs.bsize),
+            usedBytes: (Number(fs.blocks) - Number(fs.bavail)) * Number(fs.bsize),
+        };
+    } catch {}
+    const indexedBytes = totalBytes(users);
+    const usersByUsage = users.map((user) => ({
+        user_id: Number(user.userId),
+        bytes: Object.values(user.metadata.objects).reduce((sum, item) => sum + Number(item.bytes || 0), 0),
+        object_count: Object.values(user.metadata.objects).filter((item) => item.kind === "file").length,
+        state_count: Object.values(user.metadata.objects).filter((item) => item.kind === "state").length,
+    })).sort((a, b) => b.bytes - a.bytes);
+    return {
+        ok: true,
+        filesystem: { total_bytes: filesystem.totalBytes, used_bytes: filesystem.usedBytes, free_bytes: filesystem.freeBytes },
+        media_pool: {
+            indexed_bytes: indexedBytes,
+            max_bytes: MAX_STORAGE_BYTES,
+            cleanup_threshold_bytes: STORAGE_CLEANUP_THRESHOLD_BYTES,
+            reserve_bytes: STORAGE_RESERVE_BYTES,
+            available_bytes: Math.max(0, MAX_STORAGE_BYTES - indexedBytes),
+            object_count: users.reduce((sum, user) => sum + Object.values(user.metadata.objects).filter((item) => item.kind === "file").length, 0),
+        },
+        temporary: { files: inventory.temporaryFiles, bytes: inventory.temporaryBytes },
+        orphan: { files: inventory.orphanFiles, bytes: inventory.orphanBytes },
+        quarantine: { files: quarantine.files, bytes: quarantine.bytes },
+        users: usersByUsage,
+        policy: {
+            unreferenced_retention_hours: Math.round(UNREFERENCED_RETENTION_MS / 3600000),
+            temporary_retention_hours: Math.round(TEMPORARY_FILE_RETENTION_MS / 3600000),
+            referenced_files_auto_delete: false,
+        },
+    };
+}
+
+async function handleAdminStorage(req, res) {
+    if (!(await requireAdminSession(req, res))) return;
+    await withStorageLock(async () => sendJson(res, 200, await getAdminStorageSnapshot()));
+}
+
+async function handleAdminStorageObjects(req, res, url) {
+    if (!(await requireAdminSession(req, res))) return;
+    const page = Math.max(1, Number.parseInt(url.searchParams.get("page") || "1", 10));
+    const pageSize = Math.min(200, Math.max(1, Number.parseInt(url.searchParams.get("page_size") || "50", 10)));
+    const filterUserId = url.searchParams.get("user_id") || "";
+    const filter = url.searchParams.get("reclaimable") || "";
+    await withStorageLock(async () => {
+        const users = await readAllUserMetadata();
+        const all = [];
+        const cutoff = Date.now() - UNREFERENCED_RETENTION_MS;
+        for (const user of users) {
+            if (filterUserId && user.userId !== filterUserId) continue;
+            const references = await collectStorageReferences(user.userId, user.metadata);
+            for (const item of Object.values(user.metadata.objects)) {
+                if (item.kind !== "file") continue;
+                const itemReferences = references.filter((reference) => reference.storage_key === item.storageKey);
+                const timestamp = Date.parse(item.lastAccessedAt || item.createdAt || "");
+                const reclaimable = !item.pinned && itemReferences.length === 0 && Number.isFinite(timestamp) && timestamp <= cutoff;
+                if (filter === "true" && !reclaimable) continue;
+                all.push({ storage_key: item.storageKey, user_id: Number(user.userId), bytes: Number(item.bytes || 0), mime_type: item.mimeType || "application/octet-stream", created_at: item.createdAt || null, last_accessed_at: item.lastAccessedAt || null, pinned: item.pinned === true, references: itemReferences, reclaimable });
+            }
+        }
+        all.sort((a, b) => Number(b.bytes) - Number(a.bytes));
+        const start = (page - 1) * pageSize;
+        sendJson(res, 200, { ok: true, items: all.slice(start, start + pageSize), total: all.length, page, page_size: pageSize });
+    });
+}
+
+async function handleAdminStorageAction(req, res, action) {
+    if (!(await requireAdminSession(req, res))) return;
+    await withStorageLock(async () => {
+        if (action === "purge") {
+            const body = await readJson(req, 32 * 1024);
+            if (body?.confirm !== true) { sendJson(res, 400, { ok: false, error: "CONFIRMATION_REQUIRED" }); return; }
+        }
+        if (action === "reconcile") {
+            sendJson(res, 200, { ok: true, ...(await reconcileStorage()), snapshot: await getAdminStorageSnapshot() });
+            return;
+        }
+        if (action === "reclaim") {
+            const body = await readJson(req, 32 * 1024);
+            const targetBytes = Math.max(0, Number(body?.target_bytes || 0));
+            const result = await reclaimEligibleStorage(targetBytes);
+            sendJson(res, 200, { ok: true, reclaimed_bytes: result.reclaimedBytes, reclaimed_files: result.reclaimedFiles, snapshot: await getAdminStorageSnapshot() });
+            return;
+        }
+        const removed = [];
+        await walkFiles(QUARANTINE_DIR, async (absolute, relativePath) => {
+            try { const info = await stat(absolute); await rm(absolute, { force: true }); removed.push({ path: relativePath, bytes: info.size }); } catch {}
+        });
+        sendJson(res, 200, { ok: true, deleted_files: removed.length, deleted_bytes: removed.reduce((sum, item) => sum + item.bytes, 0), snapshot: await getAdminStorageSnapshot() });
+    });
+}
+
+async function handleAdminStorageObjectDelete(req, res, storageKey, url) {
+    if (!(await requireAdminSession(req, res))) return;
+    validateStorageKey(storageKey);
+    const userId = url.searchParams.get("user_id") || "";
+    if (!/^\d+$/.test(userId)) { sendJson(res, 400, { ok: false, error: "USER_ID_REQUIRED" }); return; }
+    await withStorageLock(async () => {
+        const metadata = await readMetadata(userId);
+        const item = metadata.objects[storageKey];
+        if (!item || item.kind !== "file") { sendJson(res, 404, { ok: false, error: "OBJECT_NOT_FOUND" }); return; }
+        const references = await collectStorageReferences(userId, metadata, storageKey);
+        if (references.length) { sendJson(res, 409, { ok: false, error: "STORAGE_OBJECT_REFERENCED", storage_key: storageKey, user_id: Number(userId), references }); return; }
+        await rm(join(userDir(userId), item.path), { force: true });
+        delete metadata.objects[storageKey];
+        await writeMetadata(userId, metadata);
+        sendJson(res, 200, { ok: true, storage_key: storageKey, user_id: Number(userId), deleted_bytes: Number(item.bytes || 0) });
+    });
+}
+
 function adminDocsPayload() {
     return {
         title: "管理员与部署文档",
@@ -564,8 +763,8 @@ function adminDocsPayload() {
                 title: "管理边界",
                 icon: "userRoundCog",
                 body: [
-                    "当前 AI创作空间本身没有独立管理员后台，也没有内置用户管理、套餐管理、封禁、充值、模型授权等管理页面。",
-                    "管理员登录、用户管理、模型权限、消费统计和账号治理都由极速蹬主平台负责。Canvas 只消费平台会话、模型权限和网关能力，并保存当前用户的创作文件。",
+                    "AI创作空间不负责用户、套餐、充值或模型权限治理，这些仍由极速蹬主平台统一管理；本页提供本地媒体卷的容量巡检和引用安全清理。",
+                    "管理员存储页只允许查看真实磁盘、用户占用、临时区和隔离区，并在引用检查通过后清理无引用文件。画布、资产和生成历史引用的文件不会被删除。",
                 ],
             },
             {
@@ -575,7 +774,7 @@ function adminDocsPayload() {
                 body: [
                     "Zeabur 必须在 infinite-canvas 服务的「硬盘」页挂载持久卷；硬盘 ID 建议使用 data，挂载目录必须设置为 /data/infinite-canvas。不要只依赖容器临时层，否则每次重建都会丢失画布、素材和工作台历史。",
                     "容器环境变量保持 CANVAS_DATA_DIR=/data/infinite-canvas。用户文件按 users/<userId> 分目录存放，生成结果保存后会写入该目录下的 objects，不以主平台旧图像工作室对象存储作为最终记录。",
-                    "CANVAS_MAX_STORAGE_BYTES=30GB 表示全站共享空间上限；健康检查中的 storage.scope=global、storage.max_bytes 表示当前全站容量池。PORT 使用 8080，对外域名为当前 Canvas 域名。",
+                    "CANVAS_MAX_STORAGE_BYTES=30GB 表示全站共享媒体池上限；接近清理阈值时先清理临时文件，再清理超过保留期且无引用的媒体。引用中的对象永不自动删除，空间仍不足时拒绝新写入。管理员可在 /admin/storage 查看真实磁盘、用户排行、孤儿和隔离区。PORT 使用 8080，对外域名为当前 Canvas 域名。",
                 ],
             },
             {
@@ -707,6 +906,11 @@ async function handleObject(req, res, storageKey, method, session) {
         await withStorageLock(async () => {
             const metadata = await readMetadata(userId);
             const item = metadata.objects[storageKey];
+            if (item?.kind === "file") {
+                const references = await collectStorageReferences(userId, metadata, storageKey);
+                if (references.length) { sendJson(res, 409, { ok: false, error: "STORAGE_OBJECT_REFERENCED", storage_key: storageKey, references }); return; }
+                if (item.pinned) { sendJson(res, 409, { ok: false, error: "STORAGE_OBJECT_PINNED", storage_key: storageKey }); return; }
+            }
             if (item?.kind === "file") {
                 await rm(join(userDir(userId), item.path), { force: true });
                 delete metadata.objects[storageKey];
@@ -870,52 +1074,58 @@ async function serveObject(req, res, storageKey, userId, method) {
 }
 
 async function ensureCapacity(userId, metadata, delta, incomingKey, protectedKeys = new Set()) {
-    if (delta <= 0) return;
-    const users = await readAllUserMetadata(userId, metadata);
-    const used = totalBytes(users);
-    const availableAfterExisting = MAX_STORAGE_BYTES - used;
-    if (delta <= availableAfterExisting) {
+    if (delta <= 0) {
         await ensureFreeDisk();
         return;
     }
+    await cleanupTemporaryFiles();
+    const users = await readAllUserMetadata(userId, metadata);
+    let used = totalBytes(users);
+    const capacityLimit = Math.min(MAX_STORAGE_BYTES, Math.max(0, STORAGE_CLEANUP_THRESHOLD_BYTES || MAX_STORAGE_BYTES));
+    const prospective = used + delta;
+    if (prospective > capacityLimit) {
+        await reclaimEligibleStorage(prospective - capacityLimit, { users, userId, metadata, incomingKey, protectedKeys });
+        used = totalBytes(users);
+    }
+    if (used + delta > capacityLimit) {
+        const error = new Error("STORAGE_QUOTA_EXCEEDED");
+        error.statusCode = 413;
+        throw error;
+    }
+    await ensureFreeDisk();
+}
 
-    let need = delta - availableAfterExisting;
-    const currentUserId = String(userId);
+async function reclaimEligibleStorage(targetBytes = 0, options = {}) {
+    const users = options.users || (await readAllUserMetadata(options.userId, options.metadata));
+    const currentUserId = String(options.userId || "");
+    const incomingKey = options.incomingKey || "";
+    const protectedKeys = options.protectedKeys || new Set();
     const protectedByUser = new Map();
     for (const user of users) {
         const keys = await collectProtectedStorageKeys(user.userId, user.metadata);
         if (user.userId === currentUserId) for (const key of protectedKeys) keys.add(key);
         protectedByUser.set(user.userId, keys);
     }
-    const candidates = users
-        .flatMap((user) =>
-            Object.values(user.metadata.objects)
-                .filter((item) => item.kind === "file" && !(user.userId === currentUserId && item.storageKey === incomingKey) && !item.pinned && !protectedByUser.get(user.userId)?.has(item.storageKey))
-                .map((item) => ({ user, item })),
-        )
-        .sort((a, b) => Date.parse(a.item.lastAccessedAt || a.item.createdAt || "") - Date.parse(b.item.lastAccessedAt || b.item.createdAt || ""));
-
-    const removable = [];
-    for (const candidate of candidates) {
-        if (need <= 0) break;
-        removable.push(candidate);
-        need -= Number(candidate.item.bytes || 0);
-    }
-    if (need > 0) {
-        const error = new Error("STORAGE_QUOTA_EXCEEDED");
-        error.statusCode = 413;
-        throw error;
-    }
+    const cutoff = Date.now() - UNREFERENCED_RETENTION_MS;
+    const candidates = users.flatMap((user) => Object.values(user.metadata.objects).filter((item) => {
+        const timestamp = Date.parse(item.lastAccessedAt || item.createdAt || "");
+        return item.kind === "file" && !(user.userId === currentUserId && item.storageKey === incomingKey) && !item.pinned && !protectedByUser.get(user.userId)?.has(item.storageKey) && Number.isFinite(timestamp) && timestamp <= cutoff;
+    }).map((item) => ({ user, item, timestamp: Date.parse(item.lastAccessedAt || item.createdAt || "") }))).sort((a, b) => a.timestamp - b.timestamp);
+    let reclaimedBytes = 0;
+    let reclaimedFiles = 0;
     const changedUserIds = new Set();
-    for (const { user, item } of removable) {
+    for (const { user, item } of candidates) {
+        if (targetBytes > 0 && reclaimedBytes >= targetBytes) break;
         await rm(join(userDir(user.userId), item.path), { force: true });
+        reclaimedBytes += Number(item.bytes || 0);
+        reclaimedFiles += 1;
         delete user.metadata.objects[item.storageKey];
         changedUserIds.add(user.userId);
     }
     for (const changedUserId of changedUserIds) {
-        if (changedUserId !== currentUserId) await writeMetadata(changedUserId, users.find((user) => user.userId === changedUserId).metadata);
+        await writeMetadata(changedUserId, users.find((user) => user.userId === changedUserId).metadata);
     }
-    await ensureFreeDisk();
+    return { reclaimedBytes, reclaimedFiles, users };
 }
 
 async function ensureFreeDisk() {
@@ -1054,17 +1264,86 @@ function totalBytes(users) {
 }
 
 async function collectProtectedStorageKeys(userId, metadata) {
-    const keys = new Set();
+    return new Set((await collectStorageReferences(userId, metadata)).map((reference) => reference.storage_key));
+}
+
+async function collectStorageReferences(userId, metadata, targetKey = "") {
+    const references = [];
     const stateItems = Object.values(metadata.objects).filter((item) => item.kind === "state");
-    await Promise.all(
-        stateItems.map(async (item) => {
+    await Promise.all(stateItems.map(async (item) => {
+        try {
+            const raw = await readFile(join(userDir(userId), item.path), "utf8");
+            collectStorageReferencesFromJson(JSON.parse(raw), references, String(userId), item.storageKey.replace(/^state:/, ""), "$");
+        } catch {}
+    }));
+    return targetKey ? references.filter((reference) => reference.storage_key === targetKey) : references;
+}
+
+function collectStorageReferencesFromJson(value, references, userId, domain, path) {
+    if (!value || typeof value !== "object") return;
+    const storageKey = typeof value.storageKey === "string" ? value.storageKey : typeof value.storage_key === "string" ? value.storage_key : "";
+    if (storageKey) references.push({ user_id: userId, domain, path, storage_key: storageKey });
+    for (const [key, child] of Object.entries(value)) {
+        if (child && typeof child === "object") collectStorageReferencesFromJson(child, references, userId, domain, `${path}.${key}`);
+    }
+}
+
+async function walkFiles(root, visitor, relativeRoot = root) {
+    let entries;
+    try { entries = await readdir(root, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+        const absolute = join(root, entry.name);
+        const relativePath = relative(relativeRoot, absolute);
+        if (entry.isDirectory()) await walkFiles(absolute, visitor, relativeRoot);
+        else if (entry.isFile()) await visitor(absolute, relativePath, entry);
+    }
+}
+
+async function cleanupTemporaryFiles(now = Date.now()) {
+    const removed = [];
+    const cutoff = now - TEMPORARY_FILE_RETENTION_MS;
+    let bytes = 0;
+    for (const user of await readAllUserMetadata()) {
+        await walkFiles(userDir(user.userId), async (absolute, relativePath) => {
+            if (!/^\.(?:upload|ingest)-/.test(relativePath)) return;
             try {
-                const raw = await readFile(join(userDir(userId), item.path), "utf8");
-                collectStorageKeysFromJson(JSON.parse(raw), keys);
+                const info = await stat(absolute);
+                if (info.mtimeMs > cutoff) return;
+                await rm(absolute, { force: true });
+                bytes += info.size;
+                removed.push({ user_id: user.userId, path: relativePath, bytes: info.size });
             } catch {}
-        }),
-    );
-    return keys;
+        });
+    }
+    return { files: removed, file_count: removed.length, bytes };
+}
+
+async function reconcileStorage() {
+    const temporary = await cleanupTemporaryFiles();
+    const quarantined = [];
+    const cutoff = Date.now() - TEMPORARY_FILE_RETENTION_MS;
+    for (const user of await readAllUserMetadata()) {
+        const registered = new Set(Object.values(user.metadata.objects).map((item) => item.path));
+        await walkFiles(userDir(user.userId), async (absolute, relativePath) => {
+            if (relativePath === "metadata.json" || registered.has(relativePath) || relativePath.startsWith("state/") || relativePath.startsWith(".")) return;
+            try {
+                const info = await stat(absolute);
+                if (info.mtimeMs > cutoff) return;
+                const safeName = relativePath.replace(/[^A-Za-z0-9._-]+/g, "_");
+                const destination = join(QUARANTINE_DIR, `${Date.now()}-${user.userId}-${safeName}`);
+                await rename(absolute, destination);
+                quarantined.push({ user_id: user.userId, path: relativePath, quarantine_path: relative(destination, QUARANTINE_DIR), bytes: info.size });
+            } catch {}
+        });
+    }
+    return { temporary, quarantined, orphan_count: quarantined.length, orphan_bytes: quarantined.reduce((sum, item) => sum + item.bytes, 0) };
+}
+
+async function getQuarantineStats() {
+    let bytes = 0;
+    let files = 0;
+    await walkFiles(QUARANTINE_DIR, async (absolute) => { try { const info = await stat(absolute); bytes += info.size; files += 1; } catch {} });
+    return { bytes, files };
 }
 
 function collectStorageKeysFromJson(value, keys) {
@@ -1547,6 +1826,14 @@ function parseBytes(value, fallback) {
     if (!match) return fallback;
     const units = { b: 1, kb: 1024, mb: 1024 ** 2, gb: 1024 ** 3, tb: 1024 ** 4 };
     return Math.max(1, Math.floor(Number(match[1]) * (units[match[2]?.toLowerCase()] || 1)));
+}
+
+function parseNonNegativeBytes(value, fallback) {
+    if (value === undefined || value === null || value === "") return fallback;
+    const match = /^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb|tb)?$/i.exec(String(value).trim());
+    if (!match) return fallback;
+    const units = { b: 1, kb: 1024, mb: 1024 ** 2, gb: 1024 ** 3, tb: 1024 ** 4 };
+    return Math.max(0, Math.floor(Number(match[1]) * (units[match[2]?.toLowerCase()] || 1)));
 }
 
 function formatBytes(value) {
