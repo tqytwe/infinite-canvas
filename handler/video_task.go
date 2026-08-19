@@ -271,7 +271,7 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 	if status >= http.StatusBadRequest {
 		message := readUpstreamAIErrorMessage(payload, status)
 		saveAIProxyLog(logContext, status, string(payload), strings.TrimSpace(string(payload)))
-		if status == http.StatusTooManyRequests {
+		if isRetryableVideoPollError(status, message) {
 			return service.VideoTaskPollUpdate{Status: task.Status, ErrorDetail: message, ResponseBody: string(payload)}, nil
 		}
 		if isTransientVideoTaskNotFound(task, message) {
@@ -321,6 +321,14 @@ func isTransientVideoTaskNotFound(task model.VideoTask, message string) bool {
 	}
 	created, err := time.Parse(time.RFC3339Nano, task.CreatedAt)
 	return err == nil && time.Since(created) < taskVisibilityRetryWindow
+}
+
+func isRetryableVideoPollError(status int, message string) bool {
+	if status != http.StatusTooManyRequests {
+		return false
+	}
+	normalized := strings.ToLower(strings.TrimSpace(message))
+	return strings.Contains(normalized, "rate limit") || strings.Contains(normalized, "too many requests") || strings.Contains(normalized, "throttle") || strings.Contains(normalized, "temporarily unavailable")
 }
 
 func normalizeVideoCreateBody(body []byte, contentType string, modelName string, channel model.ModelChannel, upstreamPath string) ([]byte, string, error) {

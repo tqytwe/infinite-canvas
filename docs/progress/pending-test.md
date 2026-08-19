@@ -10,6 +10,7 @@ description: 当前版本已实现但仍需人工验证的变更项
 - 标准 Seedance、Veo 和 Sora-2 渠道应使用 `POST /v1/videos` 的 JSON 请求；Seedance 使用 `seconds`/`resolution`，Veo 使用整数 `duration`，参考图分别按文档字段传递。
 - 普通 Seedance 渠道不应再被改写到 Ark Plan 的 `/contents/generations/tasks`；Ark Plan 渠道仍应保留原路径。
 - Veo 4/6/8 秒选择应分别发送对应时长，任务应按 5 秒间隔轮询，超过 10 分钟应明确提示超时；创建后上游暂时返回 `task_not_exist` 时应在 20 分钟内继续重试。
+- 上游返回 `insufficient credits`、`video generation timed out` 等明确失败信息时，Canvas 必须立即同步为失败并停止轮询；只有明确限流信息才允许重试。
 - 生产环境需使用真实测试账号分别验证 Seedance 2.5、Veo 3.1、Veo 3.1 Fast、Veo 3.1 I2V 以及 Sora-2 的文生视频、参考图和失败状态。
 
 ## 图片生成结果持久化

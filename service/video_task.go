@@ -14,6 +14,7 @@ import (
 
 const videoTaskPollInterval = 5 * time.Second
 const videoTaskInitialPollDelay = 5 * time.Second
+const videoTaskMaxPollingDuration = 20 * time.Minute
 const videoTaskFinishedRetention = 10 * time.Minute
 const videoTaskCleanupInterval = 10 * time.Minute
 
@@ -301,6 +302,11 @@ func waitForNextVideoTaskPoll() {
 
 func UpdateVideoTaskFromPoll(task model.VideoTask, update VideoTaskPollUpdate) error {
 	current := now()
+	if shouldExpireVideoTask(task, update) {
+		update.Status = "failed"
+		update.Error = "视频任务查询超时，未收到上游完成结果"
+		update.ErrorDetail = firstVideoTaskValue(update.ErrorDetail, "Canvas 已持续查询 20 分钟，任务未完成")
+	}
 	task.Status = NormalizeVideoTaskStatus(firstVideoTaskValue(update.Status, task.Status))
 	if task.Status == "" {
 		task.Status = "processing"
@@ -363,6 +369,14 @@ func UpdateVideoTaskFromPoll(task model.VideoTask, update VideoTaskPollUpdate) e
 	}
 	_, err := repository.SaveVideoTask(task)
 	return err
+}
+
+func shouldExpireVideoTask(task model.VideoTask, update VideoTaskPollUpdate) bool {
+	if strings.TrimSpace(update.VideoURL) != "" || IsCompletedVideoTaskStatus(update.Status) || IsFailedVideoTaskStatus(update.Status) {
+		return false
+	}
+	created, err := time.Parse(time.RFC3339Nano, task.CreatedAt)
+	return err == nil && time.Since(created) >= videoTaskMaxPollingDuration
 }
 
 func NormalizeVideoTaskStatus(status string) string {

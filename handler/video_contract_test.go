@@ -48,3 +48,15 @@ func TestTransientDocumentedVideoTaskNotFound(t *testing.T) {
 		t.Fatal("stale task_not_exist should fail")
 	}
 }
+
+func TestRetryableVideoPollErrorOnlyRetriesActualRateLimits(t *testing.T) {
+	if !isRetryableVideoPollError(429, "rate limit exceeded") {
+		t.Fatal("rate limit should retry")
+	}
+	if isRetryableVideoPollError(429, "insufficient credits (status=429)") {
+		t.Fatal("insufficient credits must fail")
+	}
+	if isRetryableVideoPollError(429, "video generation timed out") {
+		t.Fatal("upstream timeout must fail")
+	}
+}
