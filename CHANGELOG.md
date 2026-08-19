@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## v0.5.8 - 2026-08-19
+
++ [修复] 避免 Seedance/Veo 创建后短暂任务同步延迟被 `task_not_exist` 误判为失败，增加首次查询延迟和有限时间重试。
+
 ## v0.5.7 - 2026-08-19
 
 + [修复] 视频创建响应同时返回 `id` 与 `task_id` 时，标准 `/v1/videos` 轮询改用文档规定的 `id`，避免 Seedance/Veo 返回 `task_not_exist`。

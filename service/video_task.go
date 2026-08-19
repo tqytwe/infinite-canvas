@@ -13,6 +13,7 @@ import (
 )
 
 const videoTaskPollInterval = 5 * time.Second
+const videoTaskInitialPollDelay = 5 * time.Second
 const videoTaskFinishedRetention = 10 * time.Minute
 const videoTaskCleanupInterval = 10 * time.Minute
 
@@ -243,6 +244,21 @@ func runVideoTaskPoller() {
 				videoTaskRunningMu.Unlock()
 				break
 			}
+			// Some async video gateways expose the task a few seconds after POST returns.
+			// Do not turn that short consistency window into a permanent task failure.
+			readyTasks := make([]model.VideoTask, 0, len(tasks))
+			for _, task := range tasks {
+				created, parseErr := time.Parse(time.RFC3339Nano, task.CreatedAt)
+				if parseErr == nil && current.Sub(created) < videoTaskInitialPollDelay {
+					continue
+				}
+				readyTasks = append(readyTasks, task)
+			}
+			if len(readyTasks) == 0 {
+				waitForNextVideoTaskPoll()
+				continue
+			}
+			tasks = readyTasks
 			if lastCleanupAt.IsZero() || current.Sub(lastCleanupAt) >= videoTaskCleanupInterval {
 				if err := repository.DeleteFinishedVideoTasksBefore(videoTaskTime(current.Add(-videoTaskFinishedRetention))); err != nil {
 					log.Printf("cleanup finished video tasks failed err=%v", err)

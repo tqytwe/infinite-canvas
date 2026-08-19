@@ -2,6 +2,7 @@ package handler
 
 import (
 	"testing"
+	"time"
 
 	"github.com/tigerowo/infinite-canvas/model"
 )
@@ -33,5 +34,17 @@ func TestVideoPayloadUsesVideoIDForDocumentedPolling(t *testing.T) {
 	}
 	if parsed.UpstreamTaskID != "task_xyz" {
 		t.Fatalf("task id = %q, want task_xyz", parsed.UpstreamTaskID)
+	}
+}
+
+func TestTransientDocumentedVideoTaskNotFound(t *testing.T) {
+	task := model.VideoTask{Model: "seedance2.5", CreatedAt: time.Now().UTC().Format(time.RFC3339Nano)}
+	if !isTransientVideoTaskNotFound(task, "task_not_exist") {
+		t.Fatal("fresh task_not_exist should be retried")
+	}
+	old := time.Now().Add(-3 * time.Minute).UTC().Format(time.RFC3339Nano)
+	task.CreatedAt = old
+	if isTransientVideoTaskNotFound(task, "task_not_exist") {
+		t.Fatal("stale task_not_exist should fail")
 	}
 }

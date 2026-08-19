@@ -274,6 +274,9 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 		if status == http.StatusTooManyRequests {
 			return service.VideoTaskPollUpdate{Status: task.Status, ErrorDetail: message, ResponseBody: string(payload)}, nil
 		}
+		if isTransientVideoTaskNotFound(task, message) {
+			return service.VideoTaskPollUpdate{Status: task.Status, Progress: task.Progress, Seconds: task.Seconds, Size: task.Size, ErrorDetail: message, ResponseBody: string(payload)}, nil
+		}
 		return service.VideoTaskPollUpdate{Status: "failed", Error: message, ErrorDetail: message, ResponseBody: string(payload)}, nil
 	}
 	transformed := transformVideoStatusPayload(payload, request, channel, task.Model)
@@ -282,6 +285,9 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 		parsed.Error = firstNonEmpty(parsed.ErrorDetail, "视频任务生成失败")
 	}
 	if errMessage := readVideoStatusErrorMessage(payload, transformed, channel, task.Model); errMessage != "" {
+		if isTransientVideoTaskNotFound(task, errMessage) {
+			return service.VideoTaskPollUpdate{Status: task.Status, Progress: task.Progress, Seconds: parsed.Seconds, Size: parsed.Size, ErrorDetail: errMessage, ResponseBody: string(transformed)}, nil
+		}
 		if parsed.Error == "" {
 			parsed.Error = errMessage
 		}
@@ -301,6 +307,19 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 		ErrorDetail:  parsed.ErrorDetail,
 		ResponseBody: string(transformed),
 	}, nil
+}
+
+func isTransientVideoTaskNotFound(task model.VideoTask, message string) bool {
+	modelName := strings.ToLower(strings.TrimSpace(task.Model))
+	if !strings.Contains(modelName, "seedance") && !strings.Contains(modelName, "veo") && !strings.HasPrefix(modelName, "sora-2") {
+		return false
+	}
+	normalized := strings.ToLower(strings.TrimSpace(message))
+	if normalized != "task_not_exist" && normalized != "task_not_found" && normalized != "task does not exist" {
+		return false
+	}
+	created, err := time.Parse(time.RFC3339Nano, task.CreatedAt)
+	return err == nil && time.Since(created) < 2*time.Minute
 }
 
 func normalizeVideoCreateBody(body []byte, contentType string, modelName string, channel model.ModelChannel, upstreamPath string) ([]byte, string, error) {
