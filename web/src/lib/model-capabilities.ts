@@ -14,6 +14,18 @@ export type ModelCapabilitySource = {
     declaredModelIds?: string[];
 };
 
+export type ModelDiscoveryState = ModelDiscoveryMode | "error";
+
+export type ModelDiscoveryChannel = {
+    models: string[];
+    modelCapabilities?: ModelCapabilities;
+    declaredModelIds?: string[];
+    modelDiscovery?: {
+        state: ModelDiscoveryState;
+        message?: string;
+    };
+};
+
 const exactLegacyCapabilities: Record<string, ModelCapability[]> = {
     "sensenova-u1.5-lite": ["image"],
     "sensenova-u1-fast": ["image"],
@@ -42,31 +54,33 @@ const capabilityAliases: Record<string, ModelCapability> = {
 
 export function parseModelDiscovery(payload: unknown): ModelDiscoveryResult {
     const data = isRecord(payload) && Array.isArray(payload.data) ? payload.data : [];
+    const discovered = new Map<string, { present: boolean; capabilities: ModelCapability[] }>();
+    for (const item of data) {
+        if (!isRecord(item)) continue;
+        const id = stringValue(item.id);
+        if (!id) continue;
+        const declared = readDeclaredCapabilities(item);
+        const previous = discovered.get(id);
+        discovered.set(id, {
+            present: previous?.present === true || declared.present,
+            capabilities: declared.present ? uniqueCapabilities([...(previous?.capabilities || []), ...declared.capabilities]) : previous?.capabilities || [],
+        });
+    }
+
     const modelCapabilities: ModelCapabilities = {};
-    const declaredModelIds: string[] = [];
-    const models = Array.from(
-        new Set(
-            data.flatMap((item) => {
-                if (!isRecord(item)) return [];
-                const id = stringValue(item.id);
-                if (!id) return [];
-                const declared = readDeclaredCapabilities(item);
-                if (declared.present) {
-                    modelCapabilities[id] = declared.capabilities;
-                    declaredModelIds.push(id);
-                } else {
-                    modelCapabilities[id] = legacyModelCapabilities(id);
-                }
-                return [id];
-            }),
-        ),
-    ).sort((a, b) => a.localeCompare(b));
+    const models = Array.from(discovered.keys()).sort((a, b) => a.localeCompare(b));
+    const declaredModelIds = models.filter((id) => discovered.get(id)?.present);
+    const hasDeclarations = declaredModelIds.length > 0;
+    for (const id of models) {
+        const declared = discovered.get(id);
+        modelCapabilities[id] = hasDeclarations ? (declared?.present ? declared.capabilities : []) : legacyModelCapabilities(id);
+    }
 
     return {
         models,
         modelCapabilities,
-        declaredModelIds: Array.from(new Set(declaredModelIds)),
-        mode: declaredModelIds.length ? "declared" : "legacy",
+        declaredModelIds,
+        mode: hasDeclarations ? "declared" : "legacy",
     };
 }
 
@@ -85,7 +99,7 @@ export function modelMatchesCapability(model: string, capability?: ModelCapabili
     const modelId = model.trim();
     const declaredModelIds = source?.declaredModelIds || [];
     const capabilities = source?.modelCapabilities;
-    if (declaredModelIds.includes(modelId)) return capabilities?.[modelId]?.includes(capability) === true;
+    if (declaredModelIds.length) return capabilities?.[modelId]?.includes(capability) === true;
     if (capabilities && Object.prototype.hasOwnProperty.call(capabilities, modelId)) return capabilities[modelId].includes(capability);
     return legacyModelCapabilities(modelId).includes(capability);
 }
@@ -102,6 +116,30 @@ export function legacyModelCapabilities(model: string): ModelCapability[] {
     if (isImageModelName(value)) return ["image"];
     if (isAudioModelName(value)) return ["audio"];
     return ["text"];
+}
+
+export function modelDiscoveryFailure<T extends ModelDiscoveryChannel>(channel: T, message: string) {
+    return {
+        channel: {
+            ...channel,
+            modelDiscovery: { state: "error", message },
+        } as T,
+        error: true,
+    };
+}
+
+export function applyModelDiscovery<T extends ModelDiscoveryChannel>(channel: T, discovery: ModelDiscoveryResult) {
+    if (!discovery.models.length) return modelDiscoveryFailure(channel, "接口没有返回可用模型，已保留原模型");
+    return {
+        channel: {
+            ...channel,
+            models: discovery.models,
+            modelCapabilities: discovery.modelCapabilities,
+            declaredModelIds: discovery.declaredModelIds,
+            modelDiscovery: { state: discovery.mode },
+        } as T,
+        error: false,
+    };
 }
 
 function readDeclaredCapabilities(model: Record<string, unknown>) {
@@ -132,6 +170,10 @@ function readDeclaredCapabilities(model: Record<string, unknown>) {
     }
 
     return { present, capabilities };
+}
+
+function uniqueCapabilities(capabilities: ModelCapability[]) {
+    return capabilities.filter((capability, index) => capabilities.indexOf(capability) === index);
 }
 
 function readCapabilityValues(value: unknown): ModelCapability[] {

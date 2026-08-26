@@ -408,17 +408,24 @@ function normalizeVersionedBaseUrl(baseUrl: string) {
 
 export function normalizeLocalChannels(config: Partial<AiConfig>): LocalModelChannel[] {
     const channels = Array.isArray(config.localChannels) ? config.localChannels : [];
-    const normalized: LocalModelChannel[] = channels.map((channel, index) => ({
-        id: channel.id || `local-${index + 1}`,
-        protocol: channel.protocol === "kie" || channel.protocol === "mimo" ? channel.protocol : "openai",
-        name: typeof channel.name === "string" ? channel.name : `本地渠道 ${index + 1}`,
-        baseUrl: channel.baseUrl || "",
-        apiKey: channel.apiKey || "",
-        models: Array.isArray(channel.models) ? channel.models.filter(Boolean) : [],
-        modelCapabilities: channel.modelCapabilities,
-        declaredModelIds: Array.isArray(channel.declaredModelIds) ? channel.declaredModelIds.filter((model): model is string => typeof model === "string" && Boolean(model.trim())) : [],
-        modelDiscovery: channel.modelDiscovery,
-    }));
+    const normalized: LocalModelChannel[] = channels.map((channel, index) => {
+        const models = Array.isArray(channel.models) ? channel.models.filter(Boolean) : [];
+        const declaredModelIds = Array.isArray(channel.declaredModelIds) ? channel.declaredModelIds.filter((model): model is string => typeof model === "string" && Boolean(model.trim())) : [];
+        const modelCapabilities = declaredModelIds.length
+            ? Object.fromEntries(models.map((model) => [model, declaredModelIds.includes(model) ? channel.modelCapabilities?.[model] || [] : []]))
+            : channel.modelCapabilities;
+        return {
+            id: channel.id || `local-${index + 1}`,
+            protocol: channel.protocol === "kie" || channel.protocol === "mimo" ? channel.protocol : "openai",
+            name: typeof channel.name === "string" ? channel.name : `本地渠道 ${index + 1}`,
+            baseUrl: channel.baseUrl || "",
+            apiKey: channel.apiKey || "",
+            models,
+            modelCapabilities,
+            declaredModelIds,
+            modelDiscovery: channel.modelDiscovery,
+        };
+    });
     if (!normalized.length) {
         normalized.push({ id: "local-default", protocol: "openai", name: "本地直连", baseUrl: config.baseUrl || defaultConfig.baseUrl, apiKey: config.apiKey || "", models: Array.isArray(config.models) ? config.models.filter(Boolean) : [] });
     }

@@ -59,7 +59,7 @@ func TestModelCapabilitiesRecognizeSenseNovaOnlyByExactID(t *testing.T) {
 	}
 }
 
-func TestPublicChannelInfosPublishDeclaredAndLegacyModelCapabilities(t *testing.T) {
+func TestPublicChannelInfosFailClosedWhenAChannelDeclaresCapabilities(t *testing.T) {
 	channels := []model.ModelChannel{
 		{
 			ID:      "declared-image",
@@ -80,8 +80,88 @@ func TestPublicChannelInfosPublishDeclaredAndLegacyModelCapabilities(t *testing.
 	if got := infos[0].ModelCapabilities["future-image"]; !reflect.DeepEqual(got, []model.ModelCapability{model.ModelCapabilityImage}) {
 		t.Fatalf("declared capabilities = %#v, want image", got)
 	}
-	if got := infos[0].ModelCapabilities["sensenova-u1-fast"]; !reflect.DeepEqual(got, []model.ModelCapability{model.ModelCapabilityImage}) {
-		t.Fatalf("legacy SenseNova capabilities = %#v, want image", got)
+	if got, exists := infos[0].ModelCapabilities["sensenova-u1-fast"]; !exists || len(got) != 0 {
+		t.Fatalf("undeclared model capabilities = %#v, want an explicit empty declaration", got)
+	}
+	public := publicModelCapabilities(nil, channels, []string{"future-image", "sensenova-u1-fast"})
+	if got, exists := public["sensenova-u1-fast"]; !exists || len(got) != 0 {
+		t.Fatalf("public undeclared model capabilities = %#v, want an explicit empty declaration", got)
+	}
+}
+
+func TestModelCapabilitiesForModelsUsesLegacyOnlyWithoutDeclarations(t *testing.T) {
+	declared := model.ModelCapabilities{
+		"declared-text": {model.ModelCapabilityText},
+	}
+	models := []string{"declared-text", "sensenova-u1-fast", "legacy-image"}
+
+	got := modelCapabilitiesForModels(declared, models)
+	if want := []model.ModelCapability{model.ModelCapabilityText}; !reflect.DeepEqual(got["declared-text"], want) {
+		t.Fatalf("declared capabilities = %#v, want %#v", got["declared-text"], want)
+	}
+	for _, name := range []string{"sensenova-u1-fast", "legacy-image"} {
+		if capabilities, exists := got[name]; !exists || len(capabilities) != 0 {
+			t.Fatalf("%q capabilities = %#v, want explicit empty declaration", name, capabilities)
+		}
+	}
+
+	legacy := modelCapabilitiesForModels(nil, []string{"sensenova-u1-fast", "legacy-image"})
+	if got := legacy["sensenova-u1-fast"]; !reflect.DeepEqual(got, []model.ModelCapability{model.ModelCapabilityImage}) {
+		t.Fatalf("legacy exact SenseNova capabilities = %#v, want image", got)
+	}
+	if got := legacy["legacy-image"]; !reflect.DeepEqual(got, []model.ModelCapability{model.ModelCapabilityImage}) {
+		t.Fatalf("legacy image capabilities = %#v, want image", got)
+	}
+}
+
+func TestPublicModelCapabilitiesKeepsLegacyClassificationScopedToLegacyChannels(t *testing.T) {
+	channels := []model.ModelChannel{
+		{
+			ID:      "declared-channel",
+			BaseURL: "https://declared.example.test",
+			Enabled: true,
+			Models:  []string{"declared-image", "sensenova-u1-fast"},
+			ModelCapabilities: model.ModelCapabilities{
+				"declared-image": {model.ModelCapabilityImage},
+			},
+		},
+		{
+			ID:      "legacy-channel",
+			BaseURL: "https://legacy.example.test",
+			Enabled: true,
+			Models:  []string{"legacy-video"},
+		},
+	}
+
+	got := publicModelCapabilities(nil, channels, []string{"declared-image", "sensenova-u1-fast", "legacy-video"})
+	if capabilities := got["sensenova-u1-fast"]; len(capabilities) != 0 {
+		t.Fatalf("undeclared model capabilities = %#v, want explicit empty declaration", capabilities)
+	}
+	if want := []model.ModelCapability{model.ModelCapabilityVideo}; !reflect.DeepEqual(got["legacy-video"], want) {
+		t.Fatalf("legacy channel capabilities = %#v, want %#v", got["legacy-video"], want)
+	}
+}
+
+func TestNormalizePublicSettingsUsesPublishedCapabilitiesForDefaults(t *testing.T) {
+	channels := []model.ModelChannel{{
+		ID:      "declared-channel",
+		BaseURL: "https://example.test",
+		Enabled: true,
+		Models:  []string{"image-named-text", "opaque-image"},
+		ModelCapabilities: model.ModelCapabilities{
+			"image-named-text": {model.ModelCapabilityText},
+			"opaque-image":     {model.ModelCapabilityImage},
+		},
+	}}
+
+	setting := normalizePublicSettingWithChannels(model.PublicSetting{
+		ModelChannel: model.PublicModelChannelSetting{AvailableModels: []string{"image-named-text", "opaque-image"}},
+	}, channels)
+	if got := setting.ModelChannel.DefaultImageModel; got != "opaque-image" {
+		t.Fatalf("default image model = %q, want opaque-image", got)
+	}
+	if got := setting.ModelChannel.DefaultTextModel; got != "image-named-text" {
+		t.Fatalf("default text model = %q, want image-named-text", got)
 	}
 }
 

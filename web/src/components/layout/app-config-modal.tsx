@@ -4,6 +4,7 @@ import { App, Button, Form, Input, Modal, Segmented, Select, Switch } from "antd
 import { useEffect, useState } from "react";
 
 import { ModelPicker } from "@/components/model-picker";
+import { applyModelDiscovery, modelDiscoveryFailure } from "@/lib/model-capabilities";
 import { fetchImageModels } from "@/services/api/image";
 import { fetchUserConfig, measureUserStorageProvider, syncUserModelConfig, syncUserStorageProvider } from "@/services/api/user-config";
 import { clearStorageConfigCache as clearFileStorageCache } from "@/services/file-storage";
@@ -522,40 +523,13 @@ function configForLocalChannel(config: AiConfig, channel: LocalModelChannel): Ai
 
 async function refreshChannelModels(config: AiConfig, channel: LocalModelChannel): Promise<{ channel: LocalModelChannel; error: boolean }> {
     if (!channel.baseUrl.trim() || !channel.apiKey.trim()) {
-        return {
-            channel: { ...channel, modelDiscovery: { state: "error" as const, message: "请先填写该渠道的 Base URL 和 API Key" } },
-            error: true,
-        };
+        return modelDiscoveryFailure(channel, "请先填写该渠道的 Base URL 和 API Key");
     }
     try {
         const discovery = await fetchImageModels(configForLocalChannel(config, channel));
-        if (!discovery.models.length) {
-            return {
-                channel: { ...channel, modelDiscovery: { state: "error" as const, message: "接口没有返回可用模型，已保留原模型" } },
-                error: true,
-            };
-        }
-        return {
-            channel: {
-                ...channel,
-                models: discovery.models,
-                modelCapabilities: discovery.modelCapabilities,
-                declaredModelIds: discovery.declaredModelIds,
-                modelDiscovery: { state: discovery.mode },
-            },
-            error: false,
-        };
+        return applyModelDiscovery(channel, discovery);
     } catch (error) {
-        return {
-            channel: {
-                ...channel,
-                modelDiscovery: {
-                    state: "error" as const,
-                    message: error instanceof Error ? error.message : "读取模型失败，已保留原模型",
-                },
-            },
-            error: true,
-        };
+        return modelDiscoveryFailure(channel, error instanceof Error ? error.message : "读取模型失败，已保留原模型");
     }
 }
 

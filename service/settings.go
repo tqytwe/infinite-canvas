@@ -210,10 +210,18 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 	}
 	setting.ModelChannel.AvailableModels = filterEnabledModels(setting.ModelChannel.AvailableModels, enabledChannelModels(channels))
 	setting.ModelChannel.ModelCapabilities = publicModelCapabilities(setting.ModelChannel.ModelCapabilities, channels, setting.ModelChannel.AvailableModels)
-	setting.ModelChannel.DefaultTextModel = repairDefaultModel(setting.ModelChannel.DefaultTextModel, setting.ModelChannel.AvailableModels, isTextModelName)
-	setting.ModelChannel.DefaultImageModel = repairDefaultModel(setting.ModelChannel.DefaultImageModel, setting.ModelChannel.AvailableModels, isImageModelName)
-	setting.ModelChannel.DefaultVideoModel = repairDefaultModel(setting.ModelChannel.DefaultVideoModel, setting.ModelChannel.AvailableModels, isVideoModelName)
-	setting.ModelChannel.DefaultModel = repairDefaultModel(setting.ModelChannel.DefaultModel, setting.ModelChannel.AvailableModels, isTextModelName)
+	setting.ModelChannel.DefaultTextModel = repairDefaultModel(setting.ModelChannel.DefaultTextModel, setting.ModelChannel.AvailableModels, func(modelName string) bool {
+		return hasModelCapability(setting.ModelChannel.ModelCapabilities, modelName, model.ModelCapabilityText)
+	})
+	setting.ModelChannel.DefaultImageModel = repairDefaultModel(setting.ModelChannel.DefaultImageModel, setting.ModelChannel.AvailableModels, func(modelName string) bool {
+		return hasModelCapability(setting.ModelChannel.ModelCapabilities, modelName, model.ModelCapabilityImage)
+	})
+	setting.ModelChannel.DefaultVideoModel = repairDefaultModel(setting.ModelChannel.DefaultVideoModel, setting.ModelChannel.AvailableModels, func(modelName string) bool {
+		return hasModelCapability(setting.ModelChannel.ModelCapabilities, modelName, model.ModelCapabilityVideo)
+	})
+	setting.ModelChannel.DefaultModel = repairDefaultModel(setting.ModelChannel.DefaultModel, setting.ModelChannel.AvailableModels, func(modelName string) bool {
+		return hasModelCapability(setting.ModelChannel.ModelCapabilities, modelName, model.ModelCapabilityText)
+	})
 	return setting
 }
 
@@ -459,20 +467,34 @@ func normalizeModelCapabilitiesList(items []model.ModelCapability) []model.Model
 func modelCapabilitiesForModels(declared model.ModelCapabilities, models []string) model.ModelCapabilities {
 	declared = normalizeModelCapabilities(declared, models)
 	result := model.ModelCapabilities{}
+	if len(declared) > 0 {
+		for _, modelName := range uniqueModelNames(models) {
+			if capabilities, ok := declared[modelName]; ok {
+				result[modelName] = capabilities
+			} else {
+				result[modelName] = []model.ModelCapability{}
+			}
+		}
+		return result
+	}
 	for _, modelName := range uniqueModelNames(models) {
-		if capabilities, ok := declared[modelName]; ok {
-			result[modelName] = capabilities
-			continue
-		}
-		if capabilities := legacyModelCapabilities(modelName); len(capabilities) > 0 {
-			result[modelName] = capabilities
-		}
+		result[modelName] = legacyModelCapabilities(modelName)
 	}
 	return result
 }
 
 func publicModelCapabilities(declared model.ModelCapabilities, channels []model.ModelChannel, models []string) model.ModelCapabilities {
-	result := modelCapabilitiesForModels(declared, models)
+	declared = normalizeModelCapabilities(declared, models)
+	result := model.ModelCapabilities{}
+	if len(declared) > 0 {
+		for _, modelName := range uniqueModelNames(models) {
+			if capabilities, ok := declared[modelName]; ok {
+				result[modelName] = capabilities
+			} else {
+				result[modelName] = []model.ModelCapability{}
+			}
+		}
+	}
 	allowed := map[string]bool{}
 	for _, modelName := range uniqueModelNames(models) {
 		allowed[modelName] = true
@@ -481,14 +503,29 @@ func publicModelCapabilities(declared model.ModelCapabilities, channels []model.
 		if !channel.Enabled {
 			continue
 		}
-		for modelName, capabilities := range modelCapabilitiesForModels(channel.ModelCapabilities, channel.Models) {
+		channelDeclared := normalizeModelCapabilities(channel.ModelCapabilities, channel.Models)
+		for modelName, capabilities := range modelCapabilitiesForModels(channelDeclared, channel.Models) {
 			if !allowed[modelName] {
 				continue
 			}
 			result[modelName] = mergeModelCapabilities(result[modelName], capabilities)
 		}
 	}
+	for _, modelName := range uniqueModelNames(models) {
+		if _, ok := result[modelName]; !ok {
+			result[modelName] = legacyModelCapabilities(modelName)
+		}
+	}
 	return result
+}
+
+func hasModelCapability(capabilities model.ModelCapabilities, modelName string, capability model.ModelCapability) bool {
+	for _, item := range capabilities[modelName] {
+		if item == capability {
+			return true
+		}
+	}
+	return false
 }
 
 func mergeModelCapabilities(current, next []model.ModelCapability) []model.ModelCapability {
