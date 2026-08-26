@@ -5,6 +5,12 @@ description: 当前版本已实现但仍需人工验证的变更项
 
 # 待测试
 
+## 创作空间统一登录终态
+
+- 从极速蹬 `/ai-creation-space` 进入 Canvas 后，成功兑换只写入 Canvas 本地会话并清理地址栏中的 `launch_token`。
+- 重复兑换、过期令牌、错误密钥、缺少统一登录配置和平台暂时不可用时，Canvas 显示对应终态错误；刷新或重复点击不会在 Canvas 与控制台之间循环。
+- 直接访问 Canvas 未登录时跳主站登录，登录成功后只通过 `/ai-creation-space` 返回一次 Canvas；生产环境需核对平台 URL、managed mode 和交换密钥一致性。
+
 ## 视频状态查询模型路由
 
 - 使用用户自有的极速蹬 `video视频` API Key 创建 `manxue2.5`、`minimax_h3`、`seedance2.5`、`sd2.5`、`veo-3.1`、`veo-3.1-fast` 和 `veo-3.1-i2v` 后，Canvas 的服务端状态轮询必须携带对应模型名。

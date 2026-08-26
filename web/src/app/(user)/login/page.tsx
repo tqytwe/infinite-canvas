@@ -47,8 +47,15 @@ function LoginContent() {
     const [mode, setMode] = useState<"login" | "register">("login");
     const redirect = safeRedirect(searchParams.get("redirect"));
     const launchToken = searchParams.get("launch_token")?.trim() || "";
+    const launchError = searchParams.get("launch_error")?.trim() || "";
     const isAdminRedirect = redirect === "/admin" || redirect.startsWith("/admin/");
-    const [platformExchangeFailed, setPlatformExchangeFailed] = useState(false);
+    const [platformExchangeFailed, setPlatformExchangeFailed] = useState(launchError !== "");
+
+    const launchErrorDescription = launchError === "launch_config_missing"
+        ? "创作空间统一登录尚未配置，请联系管理员。"
+        : launchError === "launch_platform_unavailable"
+            ? "统一登录服务暂时不可用，请稍后重试。"
+            : "登录链接无效、已过期或已使用，请从极速蹬重新进入 AI 创作空间。";
 
     useEffect(() => {
         if (!launchToken) return;
@@ -58,7 +65,13 @@ function LoginContent() {
                 router.replace(redirect);
                 router.refresh();
             })
-            .catch(() => setPlatformExchangeFailed(true));
+            .catch(() => {
+                setPlatformExchangeFailed(true);
+                const url = new URL(window.location.href);
+                url.searchParams.delete("launch_token");
+                url.searchParams.set("launch_error", "launch_token_invalid");
+                window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}`);
+            });
     }, [launchToken, redirect, router, setSession]);
 
     useEffect(() => {
@@ -109,8 +122,8 @@ function LoginContent() {
             <main className="flex h-full min-h-0 items-center justify-center bg-background px-6 py-10">
                 <section className="w-full max-w-[420px] text-center">
                     <h1 className="text-2xl font-semibold text-stone-950 dark:text-stone-100">{platformExchangeFailed ? "极速蹬登录未完成" : "正在跳转极速蹬登录"}</h1>
-                    <p className="mt-3 text-stone-500 dark:text-stone-400">{platformExchangeFailed ? "登录链接已失效，请返回极速蹬重新进入 AI 创作空间。" : "Canvas 使用极速蹬账号登录，不需要单独注册。"}</p>
-                    {platformAuth.loginUrl ? <Button className="mt-6" type="primary" href={platformAuth.loginUrl}>返回极速蹬登录</Button> : null}
+                    <p className="mt-3 text-stone-500 dark:text-stone-400">{platformExchangeFailed ? launchErrorDescription : "Canvas 使用极速蹬账号登录，不需要单独注册。"}</p>
+                    {platformAuth.entryUrl || platformAuth.loginUrl ? <Button className="mt-6" type="primary" href={platformAuth.entryUrl || platformAuth.loginUrl}>重新进入 AI 创作空间</Button> : null}
                 </section>
             </main>
         );

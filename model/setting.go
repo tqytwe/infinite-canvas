@@ -92,6 +92,7 @@ type PublicLinuxDoAuthSetting struct {
 type PublicPlatformAuthSetting struct {
 	Enabled  bool   `json:"enabled"`
 	LoginURL string `json:"loginUrl"`
+	EntryURL string `json:"entryUrl"`
 }
 
 // PrivateSetting 私有配置。
