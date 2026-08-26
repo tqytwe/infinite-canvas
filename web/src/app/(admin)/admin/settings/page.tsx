@@ -1208,6 +1208,7 @@ function normalizeChannel(item: Partial<AdminModelChannel> = {}): AdminModelChan
         baseUrl: item.baseUrl || "",
         apiKey: item.apiKey || "",
         models: item.models || [],
+        modelCapabilities: item.modelCapabilities || {},
         weight: Math.max(1, Number(item.weight) || 1),
         timeout: Math.max(1, Number(item.timeout) || 600),
         enabled: item.enabled !== false,

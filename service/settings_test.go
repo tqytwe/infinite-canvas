@@ -37,6 +37,54 @@ func TestVideoModelNameRecognizesConfiguredAliasesWithoutClassifyingMinimaxText(
 	}
 }
 
+func TestModelCapabilitiesRecognizeSenseNovaOnlyByExactID(t *testing.T) {
+	for _, name := range []string{"sensenova-u1.5-lite", "sensenova-u1-fast"} {
+		capabilities := modelCapabilitiesForModels(nil, []string{name})
+		if got := capabilities[name]; !reflect.DeepEqual(got, []model.ModelCapability{model.ModelCapabilityImage}) {
+			t.Fatalf("%q capabilities = %#v, want image only", name, got)
+		}
+		if !isImageModelName(name) {
+			t.Fatalf("%q should be classified as an image model", name)
+		}
+	}
+
+	for _, name := range []string{"sensenova-u1.5-lite-preview", "custom-sensenova-u1-fast", "sensenova-u1"} {
+		capabilities := modelCapabilitiesForModels(nil, []string{name})
+		if got := capabilities[name]; len(got) != 0 && got[0] == model.ModelCapabilityImage {
+			t.Fatalf("%q must not inherit an image capability from a partial model ID: %#v", name, got)
+		}
+		if isImageModelName(name) {
+			t.Fatalf("%q must not be classified as an image model by a partial SenseNova ID", name)
+		}
+	}
+}
+
+func TestPublicChannelInfosPublishDeclaredAndLegacyModelCapabilities(t *testing.T) {
+	channels := []model.ModelChannel{
+		{
+			ID:      "declared-image",
+			Name:    "Declared image channel",
+			BaseURL: "https://example.test",
+			Enabled: true,
+			Models:  []string{"future-image", "sensenova-u1-fast"},
+			ModelCapabilities: model.ModelCapabilities{
+				"future-image": {model.ModelCapabilityImage},
+			},
+		},
+	}
+
+	infos := publicChannelInfos(channels)
+	if len(infos) != 1 {
+		t.Fatalf("publicChannelInfos() length = %d, want 1", len(infos))
+	}
+	if got := infos[0].ModelCapabilities["future-image"]; !reflect.DeepEqual(got, []model.ModelCapability{model.ModelCapabilityImage}) {
+		t.Fatalf("declared capabilities = %#v, want image", got)
+	}
+	if got := infos[0].ModelCapabilities["sensenova-u1-fast"]; !reflect.DeepEqual(got, []model.ModelCapability{model.ModelCapabilityImage}) {
+		t.Fatalf("legacy SenseNova capabilities = %#v, want image", got)
+	}
+}
+
 func TestFetchAdminChannelModelsParsesOpenAIModels(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/models" {

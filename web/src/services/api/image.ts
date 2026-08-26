@@ -2,6 +2,7 @@ import axios from "axios";
 
 import { dataUrlToFile } from "@/lib/image-utils";
 import { isKIESeedreamLayerDecompositionModel } from "@/lib/kie-models";
+import { legacyModelDiscovery, parseModelDiscovery, type ModelDiscoveryResult } from "@/lib/model-capabilities";
 import { isMimoChannel, mimoModels } from "@/lib/mimo-tts";
 import { imageToDataUrl, resolveImageUrl } from "@/services/image-storage";
 import { buildApiUrl, channelIdForActiveModel, directAIProviderForConfig, localChannelForActiveModel, type AiConfig } from "@/stores/use-config-store";
@@ -1139,21 +1140,18 @@ export async function requestImageQuestion(config: AiConfig, messages: ChatCompl
     return answer || "没有返回内容";
 }
 
-export async function fetchImageModels(config: AiConfig) {
-    if (config.channelMode === "remote") return config.models;
+export async function fetchImageModels(config: AiConfig): Promise<ModelDiscoveryResult> {
+    if (config.channelMode === "remote") return legacyModelDiscovery(config.models);
     const channel = localChannelForActiveModel(config);
-    if (isMimoChannel(channel || { baseUrl: config.baseUrl })) return [...mimoModels];
+    if (isMimoChannel(channel || { baseUrl: config.baseUrl })) return legacyModelDiscovery([...mimoModels]);
     try {
-        const response = await axios.get<{ data?: Array<{ id?: string }>; error?: { message?: string } }>(buildApiUrl(config.baseUrl, "/models"), {
+        const response = await axios.get<unknown>(buildApiUrl(config.baseUrl, "/models"), {
             headers: {
                 Authorization: `Bearer ${config.apiKey}`,
             },
             timeout: IMAGE_REQUEST_TIMEOUT_SECONDS * 1000,
         });
-        return (response.data.data || [])
-            .map((model) => model.id)
-            .filter((id): id is string => Boolean(id))
-            .sort((a, b) => a.localeCompare(b));
+        return parseModelDiscovery(response.data);
     } catch (error) {
         throw new Error(readAxiosError(error, "读取模型失败"));
     }

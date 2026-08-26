@@ -25,6 +25,7 @@ func PublicSettings() (model.PublicSetting, error) {
 	settings = normalizeSettings(settings)
 	if PlatformAuthEnabled() {
 		settings.Public.ModelChannel.AvailableModels = []string{}
+		settings.Public.ModelChannel.ModelCapabilities = model.ModelCapabilities{}
 		settings.Public.ModelChannel.ModelCosts = []model.ModelCost{}
 		settings.Public.ModelChannel.Channels = []model.PublicModelChannelInfo{}
 		settings.Public.ModelChannel.DefaultModel = ""
@@ -37,6 +38,7 @@ func PublicSettings() (model.PublicSetting, error) {
 	if len(settings.Public.ModelChannel.AvailableModels) == 0 {
 		settings.Public.ModelChannel.AvailableModels = enabledChannelModels(settings.Private.Channels)
 	}
+	settings.Public.ModelChannel.ModelCapabilities = publicModelCapabilities(settings.Public.ModelChannel.ModelCapabilities, settings.Private.Channels, settings.Public.ModelChannel.AvailableModels)
 	return settings.Public, err
 }
 
@@ -207,6 +209,7 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 		setting.Auth.AllowRegister = &disabled
 	}
 	setting.ModelChannel.AvailableModels = filterEnabledModels(setting.ModelChannel.AvailableModels, enabledChannelModels(channels))
+	setting.ModelChannel.ModelCapabilities = publicModelCapabilities(setting.ModelChannel.ModelCapabilities, channels, setting.ModelChannel.AvailableModels)
 	setting.ModelChannel.DefaultTextModel = repairDefaultModel(setting.ModelChannel.DefaultTextModel, setting.ModelChannel.AvailableModels, isTextModelName)
 	setting.ModelChannel.DefaultImageModel = repairDefaultModel(setting.ModelChannel.DefaultImageModel, setting.ModelChannel.AvailableModels, isImageModelName)
 	setting.ModelChannel.DefaultVideoModel = repairDefaultModel(setting.ModelChannel.DefaultVideoModel, setting.ModelChannel.AvailableModels, isVideoModelName)
@@ -245,6 +248,8 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 		if setting.Channels[i].Models == nil {
 			setting.Channels[i].Models = []string{}
 		}
+		setting.Channels[i].Models = uniqueModelNames(setting.Channels[i].Models)
+		setting.Channels[i].ModelCapabilities = normalizeModelCapabilities(setting.Channels[i].ModelCapabilities, setting.Channels[i].Models)
 		if setting.Channels[i].Weight <= 0 {
 			setting.Channels[i].Weight = 1
 		}
@@ -419,6 +424,90 @@ func uniqueModelNames(models []string) []string {
 	return result
 }
 
+func normalizeModelCapabilities(capabilities model.ModelCapabilities, models []string) model.ModelCapabilities {
+	allowed := map[string]bool{}
+	for _, item := range uniqueModelNames(models) {
+		allowed[item] = true
+	}
+	result := model.ModelCapabilities{}
+	for modelName, items := range capabilities {
+		modelName = strings.TrimSpace(modelName)
+		if modelName == "" || !allowed[modelName] {
+			continue
+		}
+		result[modelName] = normalizeModelCapabilitiesList(items)
+	}
+	return result
+}
+
+func normalizeModelCapabilitiesList(items []model.ModelCapability) []model.ModelCapability {
+	seen := map[model.ModelCapability]bool{}
+	result := []model.ModelCapability{}
+	for _, item := range items {
+		value := model.ModelCapability(strings.ToLower(strings.TrimSpace(string(item))))
+		switch value {
+		case model.ModelCapabilityImage, model.ModelCapabilityVideo, model.ModelCapabilityText, model.ModelCapabilityAudio:
+			if !seen[value] {
+				seen[value] = true
+				result = append(result, value)
+			}
+		}
+	}
+	return result
+}
+
+func modelCapabilitiesForModels(declared model.ModelCapabilities, models []string) model.ModelCapabilities {
+	declared = normalizeModelCapabilities(declared, models)
+	result := model.ModelCapabilities{}
+	for _, modelName := range uniqueModelNames(models) {
+		if capabilities, ok := declared[modelName]; ok {
+			result[modelName] = capabilities
+			continue
+		}
+		if capabilities := legacyModelCapabilities(modelName); len(capabilities) > 0 {
+			result[modelName] = capabilities
+		}
+	}
+	return result
+}
+
+func publicModelCapabilities(declared model.ModelCapabilities, channels []model.ModelChannel, models []string) model.ModelCapabilities {
+	result := modelCapabilitiesForModels(declared, models)
+	allowed := map[string]bool{}
+	for _, modelName := range uniqueModelNames(models) {
+		allowed[modelName] = true
+	}
+	for _, channel := range channels {
+		if !channel.Enabled {
+			continue
+		}
+		for modelName, capabilities := range modelCapabilitiesForModels(channel.ModelCapabilities, channel.Models) {
+			if !allowed[modelName] {
+				continue
+			}
+			result[modelName] = mergeModelCapabilities(result[modelName], capabilities)
+		}
+	}
+	return result
+}
+
+func mergeModelCapabilities(current, next []model.ModelCapability) []model.ModelCapability {
+	return normalizeModelCapabilitiesList(append(append([]model.ModelCapability{}, current...), next...))
+}
+
+func legacyModelCapabilities(modelName string) []model.ModelCapability {
+	if isVideoModelName(modelName) {
+		return []model.ModelCapability{model.ModelCapabilityVideo}
+	}
+	if isImageModelName(modelName) {
+		return []model.ModelCapability{model.ModelCapabilityImage}
+	}
+	if isAudioModelName(modelName) {
+		return []model.ModelCapability{model.ModelCapabilityAudio}
+	}
+	return []model.ModelCapability{model.ModelCapabilityText}
+}
+
 func repairDefaultModel(current string, models []string, preferred func(string) bool) string {
 	current = strings.TrimSpace(current)
 	for _, item := range models {
@@ -447,11 +536,19 @@ func isVideoModelName(modelName string) bool {
 
 func isImageModelName(modelName string) bool {
 	name := strings.ToLower(strings.TrimSpace(modelName))
+	if name == "sensenova-u1.5-lite" || name == "sensenova-u1-fast" {
+		return true
+	}
 	return strings.Contains(name, "seedream") || strings.Contains(name, "gpt-image") || strings.Contains(name, "image")
 }
 
+func isAudioModelName(modelName string) bool {
+	name := strings.ToLower(strings.TrimSpace(modelName))
+	return strings.Contains(name, "audio") || strings.Contains(name, "tts") || strings.Contains(name, "speech") || strings.Contains(name, "voice") || strings.Contains(name, "music") || strings.Contains(name, "sound") || strings.Contains(name, "elevenlabs") || strings.Contains(name, "suno")
+}
+
 func isTextModelName(modelName string) bool {
-	return !isImageModelName(modelName) && !isVideoModelName(modelName)
+	return !isImageModelName(modelName) && !isVideoModelName(modelName) && !isAudioModelName(modelName)
 }
 
 func normalizeModelChannel(channel model.ModelChannel) model.ModelChannel {
@@ -464,6 +561,8 @@ func normalizeModelChannel(channel model.ModelChannel) model.ModelChannel {
 	if channel.Models == nil {
 		channel.Models = []string{}
 	}
+	channel.Models = uniqueModelNames(channel.Models)
+	channel.ModelCapabilities = normalizeModelCapabilities(channel.ModelCapabilities, channel.Models)
 	if channel.Weight <= 0 {
 		channel.Weight = 1
 	}
@@ -1000,14 +1099,15 @@ func publicChannelInfos(channels []model.ModelChannel) []model.PublicModelChanne
 			continue
 		}
 		result = append(result, model.PublicModelChannelInfo{
-			ID:      channel.ID,
-			Name:    channel.Name,
-			BaseURL: channel.BaseURL,
-			Models:  append([]string{}, channel.Models...),
-			Weight:  channel.Weight,
-			Timeout: channel.Timeout,
-			Enabled: channel.Enabled,
-			Remark:  channel.Remark,
+			ID:                channel.ID,
+			Name:              channel.Name,
+			BaseURL:           channel.BaseURL,
+			Models:            append([]string{}, channel.Models...),
+			ModelCapabilities: modelCapabilitiesForModels(channel.ModelCapabilities, channel.Models),
+			Weight:            channel.Weight,
+			Timeout:           channel.Timeout,
+			Enabled:           channel.Enabled,
+			Remark:            channel.Remark,
 		})
 	}
 	return result

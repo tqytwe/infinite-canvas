@@ -10,7 +10,7 @@ import { clearStorageConfigCache as clearFileStorageCache } from "@/services/fil
 import { clearStorageConfigCache as clearImageStorageCache, defaultUserStorageProvider, defaultUserWebDAVStorageProvider, loadStorageConfig, loadUserS3StorageProvider, loadUserWebDAVStorageProvider, saveUserStorageProvider, saveUserWebDAVStorageProvider, type UserStorageProvider } from "@/services/image-storage";
 import { audioFormatOptions, audioVoiceOptions, glmTtsFormatOptions, glmTtsVoiceOptions, isGlmTtsModel, normalizeAudioSpeedValue, normalizeGlmTtsFormat, normalizeGlmTtsSpeed, normalizeGlmTtsVoice } from "@/lib/audio-generation";
 import { isMimoPresetTtsModel, isMimoTtsModel, isMimoVoiceCloneModel, isMimoVoiceDesignModel, mimoTtsFormatOptions, mimoTtsVoiceOptions } from "@/lib/mimo-tts";
-import { filterModelsByCapability, normalizeLocalChannels, useConfigStore, useEffectiveConfig, type AiConfig, type LocalModelChannel, type ModelCapability } from "@/stores/use-config-store";
+import { localModelsByCapability, modelMatchesCapability, normalizeLocalChannels, useConfigStore, useEffectiveConfig, type AiConfig, type LocalModelChannel, type ModelCapability } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
 type ModelGroup = {
@@ -158,17 +158,14 @@ export function AppConfigModal() {
     const refreshModels = async () => {
         if (effectiveMode === "remote") return;
         const channels = normalizeLocalChannels(config);
-        if (channels.some((channel) => !channel.baseUrl.trim() || !channel.apiKey.trim())) {
-            message.error("请先填写所有本地渠道的 Base URL 和 API Key");
-            return;
-        }
         setLoadingModels(true);
         try {
-            const nextChannels = await Promise.all(channels.map(async (channel) => ({ ...channel, models: await fetchImageModels(configForLocalChannel(config, channel)) })));
+            const refreshed = await Promise.all(channels.map((channel) => refreshChannelModels(config, channel)));
+            const nextChannels = refreshed.map((item) => item.channel);
             updateLocalChannels(nextChannels);
-            message.success("模型列表已更新");
-        } catch (error) {
-            message.error(error instanceof Error ? error.message : "读取模型失败");
+            const failures = refreshed.filter((item) => item.error);
+            if (failures.length) message.warning(`已更新 ${channels.length - failures.length} 个渠道；${failures.length} 个渠道保留原模型，请重试或检查接口权限。`);
+            else message.success("模型列表已更新");
         } finally {
             setLoadingModels(false);
         }
@@ -177,10 +174,10 @@ export function AppConfigModal() {
     const updateLocalChannels = (channels: LocalModelChannel[]) => {
         const normalized = channels.length ? channels : normalizeLocalChannels({ baseUrl: config.baseUrl, apiKey: config.apiKey, models: config.models });
         const models = uniqueModels(normalized.flatMap((channel) => channel.models));
-        const nextImageModels = filterModelsByCapability(models, "image");
-        const nextVideoModels = filterModelsByCapability(models, "video");
-        const nextTextModels = filterModelsByCapability(models, "text");
-        const nextAudioModels = filterModelsByCapability(models, "audio");
+        const nextImageModels = localModelsByCapability(normalized, "image");
+        const nextVideoModels = localModelsByCapability(normalized, "video");
+        const nextTextModels = localModelsByCapability(normalized, "text");
+        const nextAudioModels = localModelsByCapability(normalized, "audio");
         const imageModel = nextImageModels.includes(config.imageModel) ? config.imageModel : nextImageModels[0] || "";
         const videoModel = nextVideoModels.includes(config.videoModel) ? config.videoModel : nextVideoModels[0] || "";
         const textModel = nextTextModels.includes(config.textModel) ? config.textModel : nextTextModels[0] || "";
@@ -195,10 +192,10 @@ export function AppConfigModal() {
         updateConfig("videoModel", videoModel);
         updateConfig("textModel", textModel);
         updateConfig("audioModel", audioModel);
-        updateConfig("imageChannelId", channelIdForLocalModel(normalized, imageModel, config.imageChannelId));
-        updateConfig("videoChannelId", channelIdForLocalModel(normalized, videoModel, config.videoChannelId));
-        updateConfig("textChannelId", channelIdForLocalModel(normalized, textModel, config.textChannelId));
-        updateConfig("audioChannelId", channelIdForLocalModel(normalized, audioModel, config.audioChannelId));
+        updateConfig("imageChannelId", channelIdForLocalModel(normalized, imageModel, config.imageChannelId, "image"));
+        updateConfig("videoChannelId", channelIdForLocalModel(normalized, videoModel, config.videoChannelId, "video"));
+        updateConfig("textChannelId", channelIdForLocalModel(normalized, textModel, config.textChannelId, "text"));
+        updateConfig("audioChannelId", channelIdForLocalModel(normalized, audioModel, config.audioChannelId, "audio"));
         updateConfig("baseUrl", normalized[0]?.baseUrl || config.baseUrl);
         updateConfig("apiKey", normalized[0]?.apiKey || config.apiKey);
     };
@@ -216,21 +213,16 @@ export function AppConfigModal() {
     };
 
     const refreshLocalChannelModels = async (channel: LocalModelChannel) => {
-        if (!channel.baseUrl.trim() || !channel.apiKey.trim()) {
-            message.error("请先填写该渠道的 Base URL 和 API Key");
-            return;
-        }
         setLoadingModels(true);
         try {
-            patchLocalChannel(channel.id, { models: await fetchImageModels(configForLocalChannel(config, channel)) });
-            message.success("模型列表已更新");
-        } catch (error) {
-            message.error(error instanceof Error ? error.message : "读取模型失败");
+            const refreshed = await refreshChannelModels(config, channel);
+            patchLocalChannel(channel.id, refreshed.channel);
+            if (refreshed.error) message.warning("未覆盖已保存的模型，请检查状态后重试。");
+            else message.success("模型列表已更新");
         } finally {
             setLoadingModels(false);
         }
     };
-
 
     const measureStorage = async (provider: UserStorageProvider) => {
         if (!token) {
@@ -335,7 +327,19 @@ export function AppConfigModal() {
                                                 </Button>
                                             </div>
                                         </div>
-                                        <div className="text-xs text-stone-500">已保存 {channel.models.length} 个模型</div>
+                                        <div className="flex flex-wrap items-center gap-x-2 text-xs text-stone-500">
+                                            <span>已保存 {channel.models.length} 个模型</span>
+                                            {channel.modelDiscovery?.state === "declared" ? <span>已按接口声明识别图片、视频等能力</span> : null}
+                                            {channel.modelDiscovery?.state === "legacy" ? <span>接口未声明模型能力，正在使用兼容识别</span> : null}
+                                            {channel.modelDiscovery?.state === "error" ? (
+                                                <>
+                                                    <span className="text-red-600 dark:text-red-400">读取失败：{channel.modelDiscovery.message || "请检查接口、分组和图片权限"}</span>
+                                                    <Button type="link" size="small" className="h-auto p-0" onClick={() => void refreshLocalChannelModels(channel)}>
+                                                        重试
+                                                    </Button>
+                                                </>
+                                            ) : null}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -516,16 +520,54 @@ function configForLocalChannel(config: AiConfig, channel: LocalModelChannel): Ai
     };
 }
 
-function channelIdForLocalModel(channels: LocalModelChannel[], model: string, currentId: string) {
+async function refreshChannelModels(config: AiConfig, channel: LocalModelChannel): Promise<{ channel: LocalModelChannel; error: boolean }> {
+    if (!channel.baseUrl.trim() || !channel.apiKey.trim()) {
+        return {
+            channel: { ...channel, modelDiscovery: { state: "error" as const, message: "请先填写该渠道的 Base URL 和 API Key" } },
+            error: true,
+        };
+    }
+    try {
+        const discovery = await fetchImageModels(configForLocalChannel(config, channel));
+        if (!discovery.models.length) {
+            return {
+                channel: { ...channel, modelDiscovery: { state: "error" as const, message: "接口没有返回可用模型，已保留原模型" } },
+                error: true,
+            };
+        }
+        return {
+            channel: {
+                ...channel,
+                models: discovery.models,
+                modelCapabilities: discovery.modelCapabilities,
+                declaredModelIds: discovery.declaredModelIds,
+                modelDiscovery: { state: discovery.mode },
+            },
+            error: false,
+        };
+    } catch (error) {
+        return {
+            channel: {
+                ...channel,
+                modelDiscovery: {
+                    state: "error" as const,
+                    message: error instanceof Error ? error.message : "读取模型失败，已保留原模型",
+                },
+            },
+            error: true,
+        };
+    }
+}
+
+function channelIdForLocalModel(channels: LocalModelChannel[], model: string, currentId: string, capability: ModelCapability) {
     if (!channels.length) return "";
-    if (channels.some((channel) => channel.id === currentId && (!model || channel.models.includes(model)))) return currentId;
-    return channels.find((channel) => model && channel.models.includes(model))?.id || channels[0].id;
+    if (channels.some((channel) => channel.id === currentId && (!model || channel.models.includes(model)) && (!model || modelMatchesCapability(model, capability, channel)))) return currentId;
+    return channels.find((channel) => model && channel.models.includes(model) && modelMatchesCapability(model, capability, channel))?.id || channels[0].id;
 }
 
 function normalizeImageCount(value: string) {
     return String(Math.max(1, Math.min(15, Math.floor(Math.abs(Number(value)) || 3))));
 }
-
 
 function uniqueModels(models: string[]) {
     return Array.from(new Set(models.map((model) => model.trim()).filter(Boolean)));

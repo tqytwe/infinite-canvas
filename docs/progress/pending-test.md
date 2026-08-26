@@ -5,6 +5,13 @@ description: 当前版本已实现但仍需人工验证的变更项
 
 # 待测试
 
+## 模型能力发现与 SenseNova 图片模型
+
+- Canvas 拉取每个本地渠道的 `/v1/models` 时，应优先使用单个模型返回的 `modalities`、`image_capabilities`、`video_capabilities` 或嵌套 `capabilities`；只有旧响应没有任何能力字段时才使用兼容名称识别。
+- `sensenova-u1.5-lite` 和 `sensenova-u1-fast` 必须仅凭精确 ID 出现在图片模型选择器中；同名前缀或后缀的未声明模型不得被误判为图片模型。
+- 图片、视频、文本和音频选择器必须按渠道各自的能力表过滤，不能将一个渠道的模型能力带到另一个渠道；`video视频` 与 `Grok Heavy` 的已保存视频模型应仍可独立选择。
+- 接口失败或返回空模型列表时，Canvas 必须保留已保存模型，显示渠道级错误和重试入口；恢复后重新拉取应更新能力状态。生产验收时，若两个 SenseNova 模型仍不在原始 66 个已保存模型中，再核对该 API Key 的分组、`model_mapping` 和图片权限。
+
 ## 创作空间统一登录终态
 
 - 从极速蹬 `/ai-creation-space` 进入 Canvas 后，成功兑换只写入 Canvas 本地会话并清理地址栏中的 `launch_token`。

@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { filterModelsByCapability as filterDiscoveredModelsByCapability, modelMatchesCapability as discoveredModelMatchesCapability, type ModelCapabilities, type ModelCapability } from "@/lib/model-capabilities";
 import { apiGet } from "@/services/api/request";
 import type { AdminPublicSettings } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
@@ -15,6 +16,24 @@ export type LocalModelChannel = {
     baseUrl: string;
     apiKey: string;
     models: string[];
+    modelCapabilities?: ModelCapabilities;
+    declaredModelIds?: string[];
+    modelDiscovery?: {
+        state: "declared" | "legacy" | "error";
+        message?: string;
+    };
+};
+
+export type PublicModelChannel = {
+    id?: string;
+    name?: string;
+    baseUrl?: string;
+    models?: string[];
+    modelCapabilities?: ModelCapabilities;
+    weight?: number;
+    timeout?: number;
+    enabled?: boolean;
+    remark?: string;
 };
 
 export type VideoMultiPromptItem = { prompt: string; duration: string };
@@ -76,7 +95,7 @@ export type AiConfig = {
         workflowAgent: string;
     };
     localChannels: LocalModelChannel[];
-    publicChannels: Array<{ id?: string; name?: string; baseUrl?: string; models?: string[]; weight?: number; timeout?: number; enabled?: boolean; remark?: string }>;
+    publicChannels: PublicModelChannel[];
     syncStorageConfig: boolean;
     syncWebDAVStorageConfig: boolean;
     activeChannelId: string;
@@ -87,7 +106,7 @@ export type AiConfig = {
 };
 
 export const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
-export type ModelCapability = "image" | "video" | "text" | "audio";
+export type { ModelCapability, ModelCapabilities } from "@/lib/model-capabilities";
 
 export const defaultConfig: AiConfig = {
     channelMode: "local",
@@ -172,19 +191,25 @@ function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSetti
     const channelMode = canUseRemoteChannel ? (modelChannel?.allowCustomChannel ? config.channelMode : "remote") : "local";
     if (channelMode === "local" || !modelChannel) {
         const localChannels = normalizeLocalChannels(config);
+        const models = normalizeModelList(localChannels.flatMap((channel) => channel.models));
         return {
             ...config,
             channelMode,
             localChannels,
-            models: normalizeModelList(localChannels.flatMap((channel) => channel.models)),
+            models,
+            imageModels: localModelsByCapability(localChannels, "image"),
+            videoModels: localModelsByCapability(localChannels, "video"),
+            textModels: localModelsByCapability(localChannels, "text"),
+            audioModels: localModelsByCapability(localChannels, "audio"),
             publicChannels: modelChannel?.channels || [],
         };
     }
     const models = modelChannel.availableModels;
-    const textModels = filterModelsByCapability(models, "text");
-    const imageModels = filterModelsByCapability(models, "image");
-    const videoModels = filterModelsByCapability(models, "video");
-    const audioModels = filterModelsByCapability(models, "audio");
+    const capabilitySource = { modelCapabilities: modelChannel.modelCapabilities };
+    const textModels = filterModelsByCapability(models, "text", capabilitySource);
+    const imageModels = filterModelsByCapability(models, "image", capabilitySource);
+    const videoModels = filterModelsByCapability(models, "video", capabilitySource);
+    const audioModels = filterModelsByCapability(models, "audio", capabilitySource);
     const fallbackTextModel = validDefault(modelChannel.defaultTextModel, textModels) || preferredModel(textModels, isTextModelName);
     const fallbackModel = validDefault(modelChannel.defaultModel, textModels) || fallbackTextModel;
     const fallbackImageModel = validDefault(modelChannel.defaultImageModel, imageModels) || preferredModel(imageModels, isImageModelName);
@@ -216,110 +241,28 @@ function preferredModel(models: string[], predicate: (model: string) => boolean)
     return models.find(predicate) || "";
 }
 
-function isVideoModelName(model: string) {
-    const value = model.toLowerCase().trim();
-    const normalized = value.replace(/[._/]+/g, "-");
-    return (
-        value.includes("video") ||
-        value.includes("seedance") ||
-        normalized === "sd2-5" ||
-        normalized === "sd-2-5" ||
-        value.includes("sora") ||
-        value.includes("veo") ||
-        value.includes("kling") ||
-        value.includes("hailuo") ||
-        normalized === "minimax-h3" ||
-        (value.includes("minimax") && (value.includes("video") || value.includes("text-to-video") || value.includes("image-to-video"))) ||
-        normalized === "manxue2-5" ||
-        normalized === "manxue-2-5" ||
-        value.includes("skyreels") ||
-        value.includes("happyhorse") ||
-        value.includes("runway") ||
-        value.includes("aleph") ||
-        value.includes("vidu") ||
-        value.includes("pixverse") ||
-        value.includes("omni-flash") ||
-        value.includes("gemini-omni-video") ||
-        value.includes("veo3.1") ||
-        value.includes("veo-3.1") ||
-        value.includes("infinitalk") ||
-        value.includes("wan2-5") ||
-        value.includes("wan2.5") ||
-        value.includes("wan2-6") ||
-        value.includes("wan2.6") ||
-        value.includes("wan2-7") ||
-        value.includes("wan2.7") ||
-        value.includes("wan2-7-r2v") ||
-        value.includes("wan2.7-r2v") ||
-        value.includes("wan2-7-videoedit") ||
-        value.includes("wan2.7-videoedit") ||
-        value.includes("wan/2-5") ||
-        value.includes("wan/2-6") ||
-        value.includes("wan/2-7-text-to-video") ||
-        value.includes("wan/2-7-image-to-video") ||
-        value.includes("wan/2-7-videoedit") ||
-        value.includes("wan/2-7-r2v") ||
-        (value.includes("grok-imagine") && (value.includes("/upscale") || value.includes("/extend")))
-    );
+function isImageModelName(model: string) {
+    return discoveredModelMatchesCapability(model, "image");
 }
 
-function isImageModelName(model: string) {
-    const value = model.toLowerCase();
-    return !isVideoModelName(model) && !isAudioModelName(model) && (
-        value.includes("image") ||
-        value.includes("nano-banana") ||
-        value.includes("seedream") ||
-        value.includes("gpt-image") ||
-        value.includes("cogview") ||
-        value.includes("dall-e") ||
-        value.includes("dalle") ||
-        value.includes("imagen") ||
-        value.includes("gemini-2.5-flash") ||
-        value.includes("gemini-3-pro") ||
-        value.includes("gemini-3.1-flash") ||
-        value.includes("flux") ||
-        value.includes("kontext") ||
-        value.includes("4o-image") ||
-        value.includes("4o image") ||
-        value.includes("gpt-4o-image") ||
-        value.includes("z-image") ||
-        value.includes("qwen/image") ||
-        value.includes("qwen2/image") ||
-        value.includes("qwen/text-to-image") ||
-        value.includes("qwen2/text-to-image") ||
-        value.includes("ideogram") ||
-        value.includes("recraft") ||
-        value.includes("sdxl") ||
-        value.includes("stable-diffusion") ||
-        value.includes("midjourney") ||
-        value.includes("wan2-7-image") ||
-        value.includes("wan2.7-image") ||
-        value.includes("wan/2-7-image") ||
-        value.includes("topaz/image") ||
-        value.includes("gemini-omni-character") ||
-        (value.includes("grok-imagine") && !value.includes("video"))
-    );
+function isVideoModelName(model: string) {
+    return discoveredModelMatchesCapability(model, "video");
 }
 
 function isAudioModelName(model: string) {
-    const value = model.toLowerCase();
-    return value.includes("audio") || value.includes("tts") || value.includes("speech") || value.includes("voice") || value.includes("music") || value.includes("sound") || value.includes("elevenlabs") || value.includes("suno") || value.includes("lyrics") || value.includes("vocal") || value.includes("midi") || value.includes("wav");
+    return discoveredModelMatchesCapability(model, "audio");
 }
 
 function isTextModelName(model: string) {
-    return !isImageModelName(model) && !isVideoModelName(model) && !isAudioModelName(model);
+    return discoveredModelMatchesCapability(model, "text");
 }
 
-export function modelMatchesCapability(model: string, capability?: ModelCapability) {
-    if (!capability) return true;
-    if (capability === "image") return isImageModelName(model);
-    if (capability === "video") return isVideoModelName(model);
-    if (capability === "audio") return isAudioModelName(model);
-    return isTextModelName(model);
+export function modelMatchesCapability(model: string, capability?: ModelCapability, source?: { modelCapabilities?: ModelCapabilities; declaredModelIds?: string[] }) {
+    return discoveredModelMatchesCapability(model, capability, source);
 }
 
-export function filterModelsByCapability(models: string[], capability?: ModelCapability) {
-    return capability ? models.filter((model) => modelMatchesCapability(model, capability)) : models;
+export function filterModelsByCapability(models: string[], capability?: ModelCapability, source?: { modelCapabilities?: ModelCapabilities; declaredModelIds?: string[] }) {
+    return filterDiscoveredModelsByCapability(models, capability, source);
 }
 
 export function selectableModelsByCapability(config: AiConfig, capability?: ModelCapability) {
@@ -409,10 +352,10 @@ export const useConfigStore = create<ConfigStore>()(
                         videoWatermark: config.videoWatermark || "false",
                         videoCharacterOrientation: config.videoCharacterOrientation === "image" ? "image" : "video",
                         canvasImageCount: config.canvasImageCount || "1",
-                        imageModels: filterModelsByCapability(localModels, "image"),
-                        videoModels: filterModelsByCapability(localModels, "video"),
-                        textModels: filterModelsByCapability(localModels, "text"),
-                        audioModels: filterModelsByCapability(localModels, "audio"),
+                        imageModels: localModelsByCapability(localChannels, "image"),
+                        videoModels: localModelsByCapability(localChannels, "video"),
+                        textModels: localModelsByCapability(localChannels, "text"),
+                        audioModels: localModelsByCapability(localChannels, "audio"),
                     },
                 };
             },
@@ -472,6 +415,9 @@ export function normalizeLocalChannels(config: Partial<AiConfig>): LocalModelCha
         baseUrl: channel.baseUrl || "",
         apiKey: channel.apiKey || "",
         models: Array.isArray(channel.models) ? channel.models.filter(Boolean) : [],
+        modelCapabilities: channel.modelCapabilities,
+        declaredModelIds: Array.isArray(channel.declaredModelIds) ? channel.declaredModelIds.filter((model): model is string => typeof model === "string" && Boolean(model.trim())) : [],
+        modelDiscovery: channel.modelDiscovery,
     }));
     if (!normalized.length) {
         normalized.push({ id: "local-default", protocol: "openai", name: "本地直连", baseUrl: config.baseUrl || defaultConfig.baseUrl, apiKey: config.apiKey || "", models: Array.isArray(config.models) ? config.models.filter(Boolean) : [] });
@@ -479,11 +425,30 @@ export function normalizeLocalChannels(config: Partial<AiConfig>): LocalModelCha
     return normalized;
 }
 
+export function localModelsByCapability(channels: LocalModelChannel[], capability?: ModelCapability) {
+    return normalizeModelList(channels.flatMap((channel) => filterModelsByCapability(channel.models, capability, channel)));
+}
+
 export function channelIdForActiveModel(config: AiConfig) {
-    if (modelMatchesCapability(config.model, "image") && config.imageChannelId) return config.imageChannelId;
-    if (modelMatchesCapability(config.model, "video") && config.videoChannelId) return config.videoChannelId;
-    if (modelMatchesCapability(config.model, "audio") && config.audioChannelId) return config.audioChannelId;
-    if (modelMatchesCapability(config.model, "text") && config.textChannelId) return config.textChannelId;
+    const channels =
+        config.channelMode === "remote"
+            ? config.publicChannels.map((channel) => ({
+                  id: channel.id || "",
+                  models: channel.models || [],
+                  modelCapabilities: channel.modelCapabilities,
+              }))
+            : normalizeLocalChannels(config);
+    for (const [capability, preferredChannelID] of [
+        ["image", config.imageChannelId],
+        ["video", config.videoChannelId],
+        ["audio", config.audioChannelId],
+        ["text", config.textChannelId],
+    ] as const) {
+        const preferred = channels.find((channel) => channel.id === preferredChannelID && channel.models.includes(config.model) && modelMatchesCapability(config.model, capability, channel));
+        if (preferred?.id) return preferred.id;
+        const matching = channels.find((channel) => channel.models.includes(config.model) && modelMatchesCapability(config.model, capability, channel));
+        if (matching?.id) return matching.id;
+    }
     if (config.activeChannelId) return config.activeChannelId;
     if (config.model === config.videoModel) return config.videoChannelId;
     if (config.model === config.textModel) return config.textChannelId;
