@@ -31,6 +31,13 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
     const adminRemoteTokenRef = useRef("");
     const platformLaunchHandledRef = useRef(false);
 
+    const launchErrorCode = (error: unknown): string => {
+        const message = error instanceof Error ? error.message : "";
+        if (message.includes("未配置") || message.includes("配置")) return "launch_config_missing";
+        if (message.includes("暂时不可用") || message.includes("服务") || message.includes("连接失败")) return "launch_platform_unavailable";
+        return "launch_token_invalid";
+    };
+
     useEffect(() => {
         void loadPublicSettings();
     }, [loadPublicSettings]);
@@ -46,13 +53,19 @@ export function ClientRootInit({ children }: { children: ReactNode }) {
                     url.searchParams.delete("launch_token");
                     window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
                 })
-                .catch(() => {
-                    window.location.replace("/login");
+                .catch((error) => {
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete("launch_token");
+                    url.searchParams.delete("launch_error");
+                    url.searchParams.set("launch_error", launchErrorCode(error));
+                    url.pathname = "/login";
+                    url.searchParams.set("redirect", pathname || "/");
+                    window.location.replace(`${url.pathname}?${url.searchParams.toString()}`);
                 });
             return;
         }
         if (!isLoginPage && !launchToken) void hydrateUser();
-    }, [hydrateUser, isLoginPage, setSession]);
+    }, [hydrateUser, isLoginPage, pathname, setSession]);
 
     useEffect(() => {
         if (!platformAuthEnabled || !isReady || user || isLoginPage || isAdminPath) return;

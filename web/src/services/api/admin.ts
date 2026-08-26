@@ -220,6 +220,8 @@ export type AdminPublicSettings = {
         platform: {
             enabled: boolean;
             loginUrl: string;
+            entryUrl: string;
+            entryUrl: string;
         };
     };
     storage: {

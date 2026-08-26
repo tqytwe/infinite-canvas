@@ -330,7 +330,7 @@ S3/R2、WebDAV 与本地持久卷共用的媒体文件索引表，不保存画�
 | --- | --- | --- |
 | `enabled` | bool | 是否开启 Linux.do 登录 |
 
-`auth.platform` 是运行时派生的公开状态，不持久化在 `settings` 中：当 Canvas 同时配置 `CANVAS_PLATFORM_API_BASE_URL` 和 `CANVAS_EXCHANGE_SECRET` 时，接口返回 `{ enabled: true, loginUrl }`。此模式下普通用户注册、普通账号密码登录、Linux.do 登录和 Canvas 内置云端渠道都会关闭；用户只使用自己保存在 `user_configs.model_config` 中的本地模型渠道。
+`auth.platform` 是运行时派生的公开状态，不持久化在 `settings` 中：当 Canvas 同时配置 `CANVAS_PLATFORM_API_BASE_URL` 和 `CANVAS_EXCHANGE_SECRET` 时，接口返回 `{ enabled: true, loginUrl, entryUrl }`。`entryUrl` 指向主站受保护的 `/ai-creation-space`，用于在兑换失败后重新签发一次性令牌。此模式下普通用户注册、普通账号密码登录、Linux.do 登录和 Canvas 内置云端渠道都会关闭；用户只使用自己保存在 `user_configs.model_config` 中的本地模型渠道。
 
 `private.value` 当前字段：
 

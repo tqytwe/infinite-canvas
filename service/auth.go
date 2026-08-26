@@ -150,11 +150,7 @@ func PlatformLoginURL() string {
 	if !PlatformAuthEnabled() {
 		return ""
 	}
-	base := strings.TrimSpace(config.Cfg.PlatformWebURL)
-	if base == "" {
-		base = "https://www.jisudeng.com"
-	}
-	parsed, err := url.Parse(base)
+	parsed, err := platformWebURL()
 	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
 		return ""
 	}
@@ -171,6 +167,35 @@ func PlatformLoginURL() string {
 	query.Set("redirect", entryPath)
 	parsed.RawQuery = query.Encode()
 	return parsed.String()
+}
+
+// PlatformEntryURL points users back to the authenticated platform entry.
+// Unlike PlatformLoginURL it does not force the main site's login page, so an
+// already authenticated user receives a fresh launch token instead of looping
+// through the Canvas login screen.
+func PlatformEntryURL() string {
+	if !PlatformAuthEnabled() {
+		return ""
+	}
+	parsed, err := platformWebURL()
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return ""
+	}
+	entryPath := strings.TrimSpace(config.Cfg.PlatformEntryPath)
+	if entryPath == "" {
+		entryPath = "/ai-creation-space"
+	}
+	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/" + strings.TrimLeft(entryPath, "/")
+	parsed.RawQuery = ""
+	return parsed.String()
+}
+
+func platformWebURL() (*url.URL, error) {
+	base := strings.TrimSpace(config.Cfg.PlatformWebURL)
+	if base == "" {
+		base = "https://www.jisudeng.com"
+	}
+	return url.Parse(base)
 }
 
 func platformIdentityExchangeURL() (string, error) {
@@ -219,6 +244,9 @@ func LoginWithPlatformLaunchToken(ctx context.Context, launchToken string) (mode
 	}
 	defer resp.Body.Close()
 	var payload platformIdentityExchangeResponse
+	if resp.StatusCode == http.StatusServiceUnavailable || resp.StatusCode == http.StatusGatewayTimeout || resp.StatusCode == http.StatusBadGateway {
+		return model.AuthSession{}, safeMessageError{message: "极速蹬登录服务暂时不可用"}
+	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 256*1024)).Decode(&payload); err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 || payload.Code != 0 || payload.Data.UserID <= 0 {
 		return model.AuthSession{}, safeMessageError{message: "极速蹬登录令牌无效或已过期"}
 	}

@@ -200,6 +200,7 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 	setting.Auth.Platform = model.PublicPlatformAuthSetting{
 		Enabled:  PlatformAuthEnabled(),
 		LoginURL: PlatformLoginURL(),
+		EntryURL: PlatformEntryURL(),
 	}
 	if PlatformAuthEnabled() {
 		disabled := false
