@@ -100,6 +100,8 @@ const QUALITY_ALIASES: Record<string, string> = {
 const IMAGE_MIME = "image/png";
 const IMAGE_REQUEST_TIMEOUT_SECONDS = 600;
 const PROMPT_REWRITE_GUARD_PREFIX = "Use the following text as the complete prompt. Do not rewrite it:";
+const SENSENOVA_U15_LITE_MODEL = "sensenova-u1.5-lite";
+const SENSENOVA_U1_FAST_MODEL = "sensenova-u1-fast";
 
 function normalizeQuality(quality: string) {
     const value = quality.trim().toLowerCase();
@@ -171,6 +173,19 @@ function isZhipuImageModel(model: string) {
     return value === "glm-image" || value.startsWith("cogview-");
 }
 
+function isSenseNovaImageModel(model: string) {
+    const value = model.trim().toLowerCase();
+    return value === SENSENOVA_U15_LITE_MODEL || value === SENSENOVA_U1_FAST_MODEL;
+}
+
+function isSenseNovaU1FastModel(model: string) {
+    return model.trim().toLowerCase() === SENSENOVA_U1_FAST_MODEL;
+}
+
+function isSenseNovaU15LiteModel(model: string) {
+    return model.trim().toLowerCase() === SENSENOVA_U15_LITE_MODEL;
+}
+
 function normalizeZhipuImageQuality(model: string, quality: string) {
     if (model.trim().toLowerCase() === "glm-image") return "hd";
     if (quality === "auto") return quality;
@@ -213,7 +228,9 @@ function applyImageGenerationParams(body: Record<string, unknown>, config: AiCon
 function applyImageGenerationOptions(body: Record<string, unknown>, config: AiConfig, params: ImageRequestParams) {
     if (isZhipuImageModel(config.model)) return;
     if (params.n > 1) body.n = params.n;
+    if (isSenseNovaU1FastModel(config.model)) return;
     if (config.responseFormatB64Json) body.response_format = "b64_json";
+    if (isSenseNovaImageModel(config.model)) return;
     if (config.streamImages) {
         body.stream = true;
         body.partial_images = params.streamPartialImages;
@@ -222,6 +239,7 @@ function applyImageGenerationOptions(body: Record<string, unknown>, config: AiCo
 
 function assertImageReferencesSupported(model: string, references: ReferenceImage[]) {
     if (references.length && isZhipuImageModel(model)) throw new ImageRequestError("智谱 GLM-Image 和 CogView 仅支持文生图");
+    if (references.length && isSenseNovaU1FastModel(model)) throw new ImageRequestError("SenseNova U1 Fast 仅支持文生图，不支持参考图或编辑");
 }
 
 function normalizeBase64Image(value: string, fallbackMime: string) {
@@ -437,8 +455,7 @@ async function parseImagesStreamResponse(response: Response, mime: string): Prom
             resultPayload = event as ImageApiResponse;
         }
         if (resolveImageDataUrl(event, mime)) {
-            const imageIndex =
-                typeof event.image_index === "number" || typeof event.image_index === "string" ? String(event.image_index) : `event-${imageItems.size}`;
+            const imageIndex = typeof event.image_index === "number" || typeof event.image_index === "string" ? String(event.image_index) : `event-${imageItems.size}`;
             imageItems.set(imageIndex, event);
         }
     });
@@ -564,7 +581,7 @@ async function writeLocalAICallLog(config: AiConfig, endpoint: string, startedAt
             responseBody,
             error,
         }),
-    }).catch(() => { });
+    }).catch(() => {});
 }
 
 function stringifyLogPayload(value: unknown) {
@@ -587,7 +604,7 @@ function redactLogImages(value: unknown) {
     const record = value as Record<string, unknown>;
     for (const key of Object.keys(record)) {
         const item = record[key];
-        if (typeof item === "string" && (item.startsWith("data:image/") || item.length > 2048 && looksLikeBase64(item))) {
+        if (typeof item === "string" && (item.startsWith("data:image/") || (item.length > 2048 && looksLikeBase64(item)))) {
             record[key] = `[redacted image/string len=${item.length}]`;
             continue;
         }
@@ -892,6 +909,9 @@ async function requestAndParseImages(config: AiConfig, endpoint: string, request
 async function requestImages(config: AiConfig & { seedIndex?: number; seedCount?: number }, prompt: string, references: ReferenceImage[]): Promise<GeneratedImage[]> {
     assertImageReferencesSupported(config.model, references);
     const params = createImageRequestParams(config);
+    if (isSenseNovaU15LiteModel(config.model) && params.n !== 1) {
+        throw new ImageRequestError("SenseNova U1.5 Lite 每次请求仅支持生成 1 张图片");
+    }
     const inputImageDataUrls = references.length ? await Promise.all(references.map((image) => imageToDataUrl(image))) : [];
     const useConcurrentSingleRequests = config.apiMode === "responses" || config.codexCli || config.streamImages || isZhipuImageModel(config.model);
     if (params.n > 1 && useConcurrentSingleRequests) {
@@ -1177,21 +1197,20 @@ function normalizeAgnesImage21Ratio(value: string) {
     return "1:1";
 }
 
-function applyAgnesImageSize(
-    body: Record<string, unknown>,
-    config: AiConfig,
-    params: ImageRequestParams,
-) {
+function applyAgnesImageSize(body: Record<string, unknown>, config: AiConfig, params: ImageRequestParams) {
     if (!isAgnesImage21Model(config.model)) {
         if (params.size) body.size = params.size;
         return;
     }
-    body.size = ({
-        auto: "1K",
-        low: "2K",
-        medium: "3K",
-        high: "4K",
-    } as Record<string, string>)[params.quality] || "1K";
+    body.size =
+        (
+            {
+                auto: "1K",
+                low: "2K",
+                medium: "3K",
+                high: "4K",
+            } as Record<string, string>
+        )[params.quality] || "1K";
     body.ratio = normalizeAgnesImage21Ratio(config.size);
 }
 
@@ -1219,7 +1238,7 @@ async function requestAgnesImageEdit(config: AiConfig & { seedIndex?: number; se
                 if (publicUrl) return publicUrl;
             }
             return imageToDataUrl(ref);
-        })
+        }),
     );
 
     const body: Record<string, unknown> = {

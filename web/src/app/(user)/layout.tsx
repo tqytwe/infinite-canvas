@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { Suspense, useEffect, useRef, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { AppTopNav } from "@/components/layout/app-top-nav";
 import { fetchUserConfig } from "@/services/api/user-config";
@@ -9,18 +9,28 @@ import { useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
 export default function UserLayout({ children }: { children: ReactNode }) {
+    return (
+        <Suspense fallback={null}>
+            <UserLayoutContent>{children}</UserLayoutContent>
+        </Suspense>
+    );
+}
+
+function UserLayoutContent({ children }: { children: ReactNode }) {
     const pathname = usePathname();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const user = useUserStore((state) => state.user);
     const isReady = useUserStore((state) => state.isReady);
     const platformAuthEnabled = useConfigStore((state) => state.publicSettings?.auth?.platform?.enabled === true);
     const wasLoggedOutRef = useRef(false);
     const isProtectedPage = pathname !== "/login";
+    const hasPlatformLaunchState = Boolean(searchParams.get("launch_token") || searchParams.get("launch_error"));
 
     useEffect(() => {
-        if (!isReady || !isProtectedPage || user || !platformAuthEnabled) return;
+        if (!isReady || !isProtectedPage || user || !platformAuthEnabled || hasPlatformLaunchState) return;
         router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
-    }, [isProtectedPage, isReady, pathname, platformAuthEnabled, router, user]);
+    }, [hasPlatformLaunchState, isProtectedPage, isReady, pathname, platformAuthEnabled, router, user]);
 
     useEffect(() => {
         if (!isReady) return;
@@ -32,21 +42,19 @@ export default function UserLayout({ children }: { children: ReactNode }) {
         const token = useUserStore.getState().token;
         if (!token) return;
         wasLoggedOutRef.current = false;
-        fetchUserConfig(token).then(async (config) => {
-            const syncEnabled = config.syncCapabilities?.userData === true;
-            const { useCanvasStore } = await import("@/app/(user)/canvas/stores/use-canvas-store");
-            const canvasStore = useCanvasStore.getState();
-            canvasStore.setSyncEnabled(syncEnabled);
-            if (
-                syncCanvasAfterLogin &&
-                syncEnabled &&
-                canvasStore.hydrated
-            ) {
-                void canvasStore.syncWithRemote(token, true);
-            }
-            const { useAssetStore } = await import("@/stores/use-asset-store");
-            void useAssetStore.getState().hydrateAccountAssets(token, syncEnabled);
-        }).catch(() => { });
+        fetchUserConfig(token)
+            .then(async (config) => {
+                const syncEnabled = config.syncCapabilities?.userData === true;
+                const { useCanvasStore } = await import("@/app/(user)/canvas/stores/use-canvas-store");
+                const canvasStore = useCanvasStore.getState();
+                canvasStore.setSyncEnabled(syncEnabled);
+                if (syncCanvasAfterLogin && syncEnabled && canvasStore.hydrated) {
+                    void canvasStore.syncWithRemote(token, true);
+                }
+                const { useAssetStore } = await import("@/stores/use-asset-store");
+                void useAssetStore.getState().hydrateAccountAssets(token, syncEnabled);
+            })
+            .catch(() => {});
     }, [isReady, user]);
 
     return (

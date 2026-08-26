@@ -5,10 +5,21 @@ import { useEffect, useState } from "react";
 
 import { ModelPicker } from "@/components/model-picker";
 import { applyModelDiscovery, modelDiscoveryFailure } from "@/lib/model-capabilities";
+import { platformManagedCapabilityIssue } from "@/lib/platform-managed-models";
 import { fetchImageModels } from "@/services/api/image";
 import { fetchUserConfig, measureUserStorageProvider, syncUserModelConfig, syncUserStorageProvider } from "@/services/api/user-config";
 import { clearStorageConfigCache as clearFileStorageCache } from "@/services/file-storage";
-import { clearStorageConfigCache as clearImageStorageCache, defaultUserStorageProvider, defaultUserWebDAVStorageProvider, loadStorageConfig, loadUserS3StorageProvider, loadUserWebDAVStorageProvider, saveUserStorageProvider, saveUserWebDAVStorageProvider, type UserStorageProvider } from "@/services/image-storage";
+import {
+    clearStorageConfigCache as clearImageStorageCache,
+    defaultUserStorageProvider,
+    defaultUserWebDAVStorageProvider,
+    loadStorageConfig,
+    loadUserS3StorageProvider,
+    loadUserWebDAVStorageProvider,
+    saveUserStorageProvider,
+    saveUserWebDAVStorageProvider,
+    type UserStorageProvider,
+} from "@/services/image-storage";
 import { audioFormatOptions, audioVoiceOptions, glmTtsFormatOptions, glmTtsVoiceOptions, isGlmTtsModel, normalizeAudioSpeedValue, normalizeGlmTtsFormat, normalizeGlmTtsSpeed, normalizeGlmTtsVoice } from "@/lib/audio-generation";
 import { isMimoPresetTtsModel, isMimoTtsModel, isMimoVoiceCloneModel, isMimoVoiceDesignModel, mimoTtsFormatOptions, mimoTtsVoiceOptions } from "@/lib/mimo-tts";
 import { localModelsByCapability, modelMatchesCapability, normalizeLocalChannels, useConfigStore, useEffectiveConfig, type AiConfig, type LocalModelChannel, type ModelCapability } from "@/stores/use-config-store";
@@ -49,6 +60,10 @@ export function AppConfigModal() {
     const setConfigDialogOpen = useConfigStore((state) => state.setConfigDialogOpen);
     const clearPromptContinue = useConfigStore((state) => state.clearPromptContinue);
     const publicSettings = useConfigStore((state) => state.publicSettings);
+    const platformBootstrap = useConfigStore((state) => state.platformBootstrap);
+    const platformBootstrapError = useConfigStore((state) => state.platformBootstrapError);
+    const isPlatformBootstrapLoading = useConfigStore((state) => state.isPlatformBootstrapLoading);
+    const loadPlatformBootstrap = useConfigStore((state) => state.loadPlatformBootstrap);
     const token = useUserStore((state) => state.token);
     const user = useUserStore((state) => state.user);
     const effectiveConfig = useEffectiveConfig();
@@ -57,11 +72,13 @@ export function AppConfigModal() {
     const isLoggedIn = Boolean(token && user);
     const canUseRemoteChannel = !platformAuthEnabled && isLoggedIn && (user?.role === "admin" || modelChannel?.allowUserRemoteChannel === true);
     const allowCustomChannel = isLoggedIn && modelChannel?.allowCustomChannel === true;
-    const effectiveMode = canUseRemoteChannel ? (allowCustomChannel ? config.channelMode : "remote") : "local";
+    const isPlatformManagedUser = platformAuthEnabled && isLoggedIn && user?.role !== "admin";
+    const effectiveMode = isPlatformManagedUser ? "managed" : canUseRemoteChannel ? (allowCustomChannel ? config.channelMode : "remote") : "local";
     const localModelConfig: AiConfig = effectiveMode === "local" && config.channelMode !== "local" ? { ...config, channelMode: "local" } : config;
-    const modelConfig = effectiveMode === "remote" ? effectiveConfig : localModelConfig;
+    const modelConfig = isPlatformManagedUser || effectiveMode === "remote" ? effectiveConfig : localModelConfig;
     const canUseUserStorageProvider = isLoggedIn && allowUserStorageProvider;
     const glmTts = isGlmTtsModel(config.audioModel);
+    const platformCapabilityIssues = isPlatformManagedUser ? (["image", "video"] as const).map((capability) => ({ capability, message: platformManagedCapabilityIssue(platformBootstrap, capability) })).filter((issue) => issue.message) : [];
 
     useEffect(() => {
         setUserStorage(loadUserS3StorageProvider() || defaultUserStorageProvider());
@@ -77,8 +94,7 @@ export function AppConfigModal() {
                 setRemoteStorageSyncEnabled(syncS3);
                 setRemoteWebDAVStorageSyncEnabled(syncWebDAV);
                 if (remoteConfig) {
-                    Object.entries(remoteConfig)
-                        .forEach(([key, value]) => updateConfig(key as keyof AiConfig, value as never));
+                    Object.entries(remoteConfig).forEach(([key, value]) => updateConfig(key as keyof AiConfig, value as never));
                 }
                 updateConfig("syncStorageConfig", syncS3);
                 updateConfig("syncWebDAVStorageConfig", syncWebDAV);
@@ -93,7 +109,7 @@ export function AppConfigModal() {
                     saveUserWebDAVStorageProvider(next);
                 }
             })
-            .catch(() => { });
+            .catch(() => {});
         return () => {
             canceled = true;
         };
@@ -121,7 +137,7 @@ export function AppConfigModal() {
             message.error("S3/R2 与 WebDAV 不能同时启用");
             return;
         }
-        if (!canUseRemoteChannel && config.channelMode !== "local") updateConfig("channelMode", "local");
+        if (!isPlatformManagedUser && !canUseRemoteChannel && config.channelMode !== "local") updateConfig("channelMode", "local");
         else if (canUseRemoteChannel && !allowCustomChannel && config.channelMode !== "remote") updateConfig("channelMode", "remote");
         if (canUseUserStorageProvider) {
             saveUserStorageProvider(userStorage);
@@ -292,7 +308,25 @@ export function AppConfigModal() {
                             />
                         </Form.Item>
                     ) : null}
-                    {effectiveMode === "local" ? (
+                    {isPlatformManagedUser ? (
+                        <div className="mb-5 rounded-lg border border-stone-200 p-3 text-sm dark:border-stone-800">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div>
+                                    <div className="font-medium">极速蹬受管创作能力</div>
+                                    <div className="mt-1 text-xs text-stone-500">模型、分组和能力均由平台服务端提供，Canvas 不会根据模型名称猜测图片或视频能力。</div>
+                                </div>
+                                <Button size="small" loading={isPlatformBootstrapLoading} disabled={!token} onClick={() => token && void loadPlatformBootstrap(token)}>
+                                    重新加载
+                                </Button>
+                            </div>
+                            {platformBootstrapError ? <div className="mt-3 text-sm text-red-600 dark:text-red-400">创作能力加载失败：{platformBootstrapError}</div> : null}
+                            {platformCapabilityIssues.map((issue) => (
+                                <div key={issue.capability} className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+                                    {issue.message}
+                                </div>
+                            ))}
+                        </div>
+                    ) : effectiveMode === "local" ? (
                         <>
                             <div className="mb-5 space-y-3 rounded-lg border border-stone-200 p-3 dark:border-stone-800">
                                 <div className="flex items-center justify-between gap-3">
@@ -365,7 +399,17 @@ export function AppConfigModal() {
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         {modelGroups.map((group) => (
                             <Form.Item key={group.modelKey} label={group.defaultLabel} className="mb-4">
-                                <ModelPicker config={modelConfig} value={modelConfig[group.modelKey]} channelId={modelConfig[group.channelKey]} onChange={(model, channelId) => { updateConfig(group.modelKey, model); if (channelId) updateConfig(group.channelKey, channelId); }} capability={group.capability} fullWidth />
+                                <ModelPicker
+                                    config={modelConfig}
+                                    value={modelConfig[group.modelKey]}
+                                    channelId={modelConfig[group.channelKey]}
+                                    onChange={(model, channelId) => {
+                                        updateConfig(group.modelKey, model);
+                                        if (channelId) updateConfig(group.channelKey, channelId);
+                                    }}
+                                    capability={group.capability}
+                                    fullWidth
+                                />
                             </Form.Item>
                         ))}
                     </div>
@@ -390,11 +434,19 @@ export function AppConfigModal() {
                             </Form.Item>
                         ) : isMimoTtsModel(config.audioModel) ? null : (
                             <Form.Item label="默认音频声音" className="mb-4">
-                                <Select value={glmTts ? normalizeGlmTtsVoice(config.glmTtsVoice) : config.audioVoice} options={glmTts ? glmTtsVoiceOptions : audioVoiceOptions} onChange={(value) => updateConfig(glmTts ? "glmTtsVoice" : "audioVoice", value)} />
+                                <Select
+                                    value={glmTts ? normalizeGlmTtsVoice(config.glmTtsVoice) : config.audioVoice}
+                                    options={glmTts ? glmTtsVoiceOptions : audioVoiceOptions}
+                                    onChange={(value) => updateConfig(glmTts ? "glmTtsVoice" : "audioVoice", value)}
+                                />
                             </Form.Item>
                         )}
                         <Form.Item label="默认音频格式" className="mb-4">
-                            <Select value={isMimoTtsModel(config.audioModel) ? config.mimoTtsFormat : glmTts ? normalizeGlmTtsFormat(config.glmTtsFormat) : config.audioFormat} options={isMimoTtsModel(config.audioModel) ? [...mimoTtsFormatOptions] : glmTts ? glmTtsFormatOptions : audioFormatOptions} onChange={(value) => isMimoTtsModel(config.audioModel) ? updateConfig("mimoTtsFormat", value) : updateConfig(glmTts ? "glmTtsFormat" : "audioFormat", value)} />
+                            <Select
+                                value={isMimoTtsModel(config.audioModel) ? config.mimoTtsFormat : glmTts ? normalizeGlmTtsFormat(config.glmTtsFormat) : config.audioFormat}
+                                options={isMimoTtsModel(config.audioModel) ? [...mimoTtsFormatOptions] : glmTts ? glmTtsFormatOptions : audioFormatOptions}
+                                onChange={(value) => (isMimoTtsModel(config.audioModel) ? updateConfig("mimoTtsFormat", value) : updateConfig(glmTts ? "glmTtsFormat" : "audioFormat", value))}
+                            />
                         </Form.Item>
                         {!isMimoTtsModel(config.audioModel) ? (
                             <Form.Item label="默认音频语速" className="mb-4">
@@ -412,7 +464,12 @@ export function AppConfigModal() {
                     </div>
                     <div className="mb-4 grid gap-3 md:grid-cols-3">
                         <FeatureSwitch title="流式传输" description="开启后请求中追加 stream，支持读取中间图片事件并避免长时间无数据。" checked={Boolean(config.streamImages)} onChange={(checked) => updateConfig("streamImages", checked ? "1" : "")} />
-                        <FeatureSwitch title="返回 Base64 图片数据" description="开启后 Image API 请求会追加 response_format: b64_json。" checked={Boolean(config.responseFormatB64Json)} onChange={(checked) => updateConfig("responseFormatB64Json", checked ? "1" : "")} />
+                        <FeatureSwitch
+                            title="返回 Base64 图片数据"
+                            description="开启后 Image API 请求会追加 response_format: b64_json。"
+                            checked={Boolean(config.responseFormatB64Json)}
+                            onChange={(checked) => updateConfig("responseFormatB64Json", checked ? "1" : "")}
+                        />
                         <FeatureSwitch title="Codex CLI 兼容模式" description="开启后减少不兼容参数，并追加防提示词改写前缀。" checked={Boolean(config.codexCli)} onChange={(checked) => updateConfig("codexCli", checked ? "1" : "")} />
                     </div>
                     {canUseUserStorageProvider ? (

@@ -5,6 +5,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { filterModelsByCapability as filterDiscoveredModelsByCapability, modelMatchesCapability as discoveredModelMatchesCapability, type ModelCapabilities, type ModelCapability } from "@/lib/model-capabilities";
+import { platformManagedChannelForCapability, platformManagedChannels, type PlatformManagedBootstrap } from "@/lib/platform-managed-models";
 import { apiGet } from "@/services/api/request";
 import type { AdminPublicSettings } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
@@ -22,6 +23,10 @@ export type LocalModelChannel = {
         state: "declared" | "legacy" | "error";
         message?: string;
     };
+    managedPlatform?: boolean;
+    platformPurpose?: "chat" | "image" | "video";
+    platformGroupID?: string;
+    isCurrent?: boolean;
 };
 
 export type PublicModelChannel = {
@@ -177,17 +182,23 @@ type ConfigStore = {
     config: AiConfig;
     publicSettings: AdminPublicSettings | null;
     isPublicSettingsLoading: boolean;
+    platformBootstrap: PlatformManagedBootstrap | null;
+    platformBootstrapError: string;
+    isPlatformBootstrapLoading: boolean;
     isConfigOpen: boolean;
     shouldPromptContinue: boolean;
     updateConfig: <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
     loadPublicSettings: () => Promise<void>;
+    loadPlatformBootstrap: (token: string) => Promise<void>;
+    clearPlatformBootstrap: () => void;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
     openConfigDialog: (shouldPromptContinue?: boolean) => void;
     setConfigDialogOpen: (isOpen: boolean) => void;
     clearPromptContinue: () => void;
 };
 
-function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSettings["modelChannel"] | null, canUseRemoteChannel: boolean) {
+function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSettings["modelChannel"] | null, canUseRemoteChannel: boolean, isPlatformManagedUser: boolean, platformBootstrap: PlatformManagedBootstrap | null, platformToken: string) {
+    if (isPlatformManagedUser) return resolvePlatformManagedConfig(config, platformBootstrap, platformToken);
     const channelMode = canUseRemoteChannel ? (modelChannel?.allowCustomChannel ? config.channelMode : "remote") : "local";
     if (channelMode === "local" || !modelChannel) {
         const localChannels = normalizeLocalChannels(config);
@@ -230,6 +241,51 @@ function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSetti
         audioModel: audioModels.includes(config.audioModel) ? config.audioModel : fallbackAudioModel,
         systemPrompt: modelChannel.systemPrompt,
         publicChannels: modelChannel.channels || [],
+    };
+}
+
+function resolvePlatformManagedConfig(config: AiConfig, bootstrap: PlatformManagedBootstrap | null, token: string) {
+    // The Canvas JWT is injected only into this calculated runtime config. It
+    // is never copied into the persisted AI configuration, and the platform
+    // API keys are never available to the browser.
+    const managedChannels = platformManagedChannels(bootstrap);
+    const localChannels = managedChannels.map((channel) => ({ ...channel, apiKey: token }));
+    const models = normalizeModelList(localChannels.flatMap((channel) => channel.models));
+    const imageModels = localModelsByCapability(localChannels, "image");
+    const videoModels = localModelsByCapability(localChannels, "video");
+    const textModels = localModelsByCapability(localChannels, "text");
+    const audioModels = localModelsByCapability(localChannels, "audio");
+    const imageChannel = platformManagedChannelForCapability(managedChannels, "image", config.imageChannelId);
+    const videoChannel = platformManagedChannelForCapability(managedChannels, "video", config.videoChannelId);
+    const textChannel = platformManagedChannelForCapability(managedChannels, "text", config.textChannelId);
+    const audioChannel = platformManagedChannelForCapability(managedChannels, "audio", config.audioChannelId);
+    const selectModel = (current: string, options: string[]) => (options.includes(current) ? current : options[0] || "");
+    const imageModel = selectModel(config.imageModel, imageModels);
+    const videoModel = selectModel(config.videoModel, videoModels);
+    const textModel = selectModel(config.textModel, textModels);
+    const audioModel = selectModel(config.audioModel, audioModels);
+    return {
+        ...config,
+        channelMode: "local" as const,
+        baseUrl: "/api",
+        apiKey: token,
+        localChannels,
+        publicChannels: [],
+        models,
+        imageModels,
+        videoModels,
+        textModels,
+        audioModels,
+        imageModel,
+        videoModel,
+        textModel,
+        audioModel,
+        model: textModel || imageModel || videoModel || audioModel,
+        imageChannelId: imageChannel?.id || "",
+        videoChannelId: videoChannel?.id || "",
+        textChannelId: textChannel?.id || "",
+        audioChannelId: audioChannel?.id || "",
+        activeChannelId: textChannel?.id || imageChannel?.id || videoChannel?.id || "",
     };
 }
 
@@ -280,6 +336,9 @@ export const useConfigStore = create<ConfigStore>()(
             config: defaultConfig,
             publicSettings: null,
             isPublicSettingsLoading: false,
+            platformBootstrap: null,
+            platformBootstrapError: "",
+            isPlatformBootstrapLoading: false,
             isConfigOpen: false,
             shouldPromptContinue: false,
             updateConfig: (key, value) =>
@@ -298,6 +357,19 @@ export const useConfigStore = create<ConfigStore>()(
                     set({ isPublicSettingsLoading: false });
                 }
             },
+            loadPlatformBootstrap: async (token) => {
+                if (!token || get().isPlatformBootstrapLoading) return;
+                set({ isPlatformBootstrapLoading: true, platformBootstrapError: "" });
+                try {
+                    const platformBootstrap = await apiGet<PlatformManagedBootstrap>("/api/v1/platform/bootstrap", undefined, token);
+                    set({ platformBootstrap, platformBootstrapError: "" });
+                } catch (error) {
+                    set({ platformBootstrap: null, platformBootstrapError: error instanceof Error ? error.message : "创作能力加载失败" });
+                } finally {
+                    set({ isPlatformBootstrapLoading: false });
+                }
+            },
+            clearPlatformBootstrap: () => set({ platformBootstrap: null, platformBootstrapError: "", isPlatformBootstrapLoading: false }),
             isAiConfigReady: (config, model) => isAiConfigReady(config, model),
             openConfigDialog: (shouldPromptContinue = false) => set({ isConfigOpen: true, shouldPromptContinue }),
             setConfigDialogOpen: (isConfigOpen) => set({ isConfigOpen }),
@@ -371,10 +443,13 @@ export function useEffectiveConfig() {
     const config = useConfigStore((state) => state.config);
     const modelChannel = useConfigStore((state) => state.publicSettings?.modelChannel || null);
     const platformAuthEnabled = useConfigStore((state) => state.publicSettings?.auth?.platform?.enabled === true);
+    const platformBootstrap = useConfigStore((state) => state.platformBootstrap);
     const token = useUserStore((state) => state.token);
     const user = useUserStore((state) => state.user);
     const canUseRemoteChannel = !platformAuthEnabled && Boolean(token && user && (user.role === "admin" || modelChannel?.allowUserRemoteChannel === true));
-    return useMemo(() => resolveEffectiveConfig(config, modelChannel, canUseRemoteChannel), [canUseRemoteChannel, config, modelChannel]);
+    const isPlatformManagedUser = platformAuthEnabled && Boolean(user) && user?.role !== "admin";
+    const managedBootstrap = isPlatformManagedUser ? platformBootstrap : null;
+    return useMemo(() => resolveEffectiveConfig(config, modelChannel, canUseRemoteChannel, isPlatformManagedUser, managedBootstrap, token), [canUseRemoteChannel, config, isPlatformManagedUser, managedBootstrap, modelChannel, token]);
 }
 
 export function buildApiUrl(baseUrl: string, path: string) {
@@ -411,9 +486,7 @@ export function normalizeLocalChannels(config: Partial<AiConfig>): LocalModelCha
     const normalized: LocalModelChannel[] = channels.map((channel, index) => {
         const models = Array.isArray(channel.models) ? channel.models.filter(Boolean) : [];
         const declaredModelIds = Array.isArray(channel.declaredModelIds) ? channel.declaredModelIds.filter((model): model is string => typeof model === "string" && Boolean(model.trim())) : [];
-        const modelCapabilities = declaredModelIds.length
-            ? Object.fromEntries(models.map((model) => [model, declaredModelIds.includes(model) ? channel.modelCapabilities?.[model] || [] : []]))
-            : channel.modelCapabilities;
+        const modelCapabilities = declaredModelIds.length ? Object.fromEntries(models.map((model) => [model, declaredModelIds.includes(model) ? channel.modelCapabilities?.[model] || [] : []])) : channel.modelCapabilities;
         return {
             id: channel.id || `local-${index + 1}`,
             protocol: channel.protocol === "kie" || channel.protocol === "mimo" ? channel.protocol : "openai",
@@ -424,6 +497,10 @@ export function normalizeLocalChannels(config: Partial<AiConfig>): LocalModelCha
             modelCapabilities,
             declaredModelIds,
             modelDiscovery: channel.modelDiscovery,
+            managedPlatform: channel.managedPlatform === true,
+            platformPurpose: channel.platformPurpose,
+            platformGroupID: channel.platformGroupID,
+            isCurrent: channel.isCurrent === true,
         };
     });
     if (!normalized.length) {
@@ -481,11 +558,7 @@ export function directAIProviderForConfig(config: AiConfig): DirectAIProvider | 
     const model = (config.model || "").trim().toLowerCase();
     const key = `${protocol}\n${baseUrl}\n${model}`;
     if (directAIProviderCache.has(key)) return directAIProviderCache.get(key) || null;
-    const provider = protocol === "kie" || baseUrl.includes("kie.ai") || model.includes("kie/")
-        ? "kie"
-        : baseUrl.includes("apimart.ai") || model.includes("apimart")
-            ? "apimart"
-            : null;
+    const provider = protocol === "kie" || baseUrl.includes("kie.ai") || model.includes("kie/") ? "kie" : baseUrl.includes("apimart.ai") || model.includes("apimart") ? "apimart" : null;
     directAIProviderCache.set(key, provider);
     return provider;
 }

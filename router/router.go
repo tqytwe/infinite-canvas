@@ -41,6 +41,7 @@ func New() *gin.Engine {
 	})
 	api.POST("/ai/direct-request", gin.WrapF(handler.PrepareDirectAIRequest))
 	v1 := api.Group("/v1", middleware.UserAuth)
+	v1.GET("/platform/bootstrap", gin.WrapF(handler.PlatformBootstrap))
 	v1.POST("/images/generations", gin.WrapF(handler.AIImagesGenerations))
 	v1.POST("/images/edits", gin.WrapF(handler.AIImagesEdits))
 	v1.POST("/responses", gin.WrapF(handler.AIResponses))

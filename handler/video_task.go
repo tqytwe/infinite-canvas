@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -67,14 +68,14 @@ func proxyAIVideoTaskRequest(w http.ResponseWriter, r *http.Request) {
 		Fail(w, "未登录或权限不足")
 		return
 	}
-	channel, userChannelID, err := selectAIRequestChannel(user, modelName, r.Header.Get("X-Model-Channel-ID"), r.Header.Get(userModelChannelHeader))
+	channel, userChannelID, err := selectAIRequestChannel(r.Context(), user, modelName, r.Header.Get("X-Model-Channel-ID"), r.Header.Get(userModelChannelHeader), "video", "generate")
 	if err != nil {
 		log.Printf("AI video select channel failed: model=%s err=%v", modelName, err)
 		failAIChannelSelect(w, err, "AI 接口请求失败")
 		return
 	}
 	credits := 0
-	if userChannelID == "" {
+	if userChannelID == "" && !service.IsPlatformManagedChannel(channel) {
 		credits, err = service.ModelCost(modelName)
 		if err != nil {
 			log.Printf("AI video read model cost failed: model=%s err=%v", modelName, err)
@@ -229,10 +230,7 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 	if strings.TrimSpace(task.UserChannelID) != "" {
 		channel, err = service.SelectUserLocalModelChannelForModel(task.UserID, task.Model, task.UserChannelID)
 	} else if service.PlatformAuthEnabled() {
-		return service.VideoTaskPollUpdate{
-			Status: "failed",
-			Error:  "任务无法继续：Canvas 已切换为用户自有密钥，请重新配置后创建任务",
-		}, nil
+		channel, err = service.PlatformManagedChannelForTask(context.Background(), task.UserID, task.ChannelID)
 	} else {
 		channel, err = service.SelectModelChannelForModel(task.Model, task.ChannelID)
 	}
