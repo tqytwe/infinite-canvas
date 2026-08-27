@@ -103,12 +103,10 @@ async function uploadMediaBlobToServer(blob: Blob, filename: string): Promise<Up
     const config = await loadStorageConfig().catch(() => null);
     const userProvider = config?.allowUserProvider ? loadUserStorageProvider() : null;
     if (!config || (!canUseGlobalStorage(config) && !userProvider)) throw new Error("服务端对象存储未启用");
-    const token = useUserStore.getState().token;
-    if (!token) throw new Error("请先登录后再同步媒体");
     const formData = new FormData();
     formData.append("file", blob, filename);
     if (userProvider) formData.append("provider", JSON.stringify(toProviderPayload(userProvider)));
-    const response = await fetch("/api/v1/files", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData });
+    const response = await fetch("/api/storage/files", { method: "POST", body: formData });
     const payload = (await response.json().catch(() => null)) as { code?: number; msg?: string; data?: UploadedFile } | null;
     if (!response.ok || payload?.code !== 0 || !payload.data) throw new Error(payload?.msg || "媒体同步失败");
     const meta = payload.data.mimeType?.startsWith("video/") ? await readVideoMeta(payload.data.url) : {};
@@ -143,8 +141,7 @@ export async function resolveMediaUrl(storageKey?: string, fallback = "") {
         const id = storageKey.slice("server:".length);
         const cachedURL = serverUrls.get(id);
         if (cachedURL && cachedURL.expiresAt > Date.now() + 60_000) return cachedURL.url;
-        const token = useUserStore.getState().token;
-        const info = await apiGet<{ contentUrl?: string; publicUrl?: string }>(`/api/files/${encodeURIComponent(id)}`, undefined, token).catch(() => null);
+        const info = await apiGet<{ contentUrl?: string; publicUrl?: string }>(`/api/files/${encodeURIComponent(id)}`).catch(() => null);
         if (!info) return fallback;
         const url = info.contentUrl || info.publicUrl || fallback || `/api/files/${encodeURIComponent(id)}/content`;
         cacheServerURL(id, url);
@@ -179,12 +176,10 @@ export async function setMediaBlob(storageKey: string, blob: Blob) {
 async function deleteServerMedia(storageKey: string) {
     const id = storageKey.slice("server:".length);
     if (!id) return;
-    const token = useUserStore.getState().token;
-    if (!token) return;
     const provider = loadUserStorageProvider();
-    const response = await fetch(`/api/v1/files/${encodeURIComponent(id)}`, {
+    const response = await fetch(`/api/storage/files/${encodeURIComponent(id)}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(provider ? { provider: toProviderPayload(provider) } : {}),
     });
     const payload = (await response.json().catch(() => null)) as { code?: number; msg?: string } | null;

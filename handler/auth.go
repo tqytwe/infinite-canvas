@@ -60,6 +60,31 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	OK(w, session)
 }
 
+func CreateStorageSession(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		BaseURL string `json:"baseUrl"`
+		APIKey  string `json:"apiKey"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 32<<10)).Decode(&request); err != nil {
+		Fail(w, "API 配置格式错误")
+		return
+	}
+	token, err := service.CreateStorageSession(r.Context(), request.BaseURL, request.APIKey)
+	if err != nil {
+		http.SetCookie(w, &http.Cookie{Name: service.StorageSessionCookieName, Value: "", Path: "/api", MaxAge: -1, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
+		FailError(w, err)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{Name: service.StorageSessionCookieName, Value: token, Path: "/api", MaxAge: 7 * 24 * 60 * 60, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
+	OK(w, map[string]bool{"storage_ready": true})
+}
+
+// StorageSessionStatus deliberately returns no identity detail. The storage
+// session only proves that private Canvas storage is available to this browser.
+func StorageSessionStatus(w http.ResponseWriter, _ *http.Request) {
+	OK(w, map[string]bool{"storage_ready": true})
+}
+
 func PlatformExchange(w http.ResponseWriter, r *http.Request) {
 	var request platformExchangeRequest
 	_ = json.NewDecoder(r.Body).Decode(&request)

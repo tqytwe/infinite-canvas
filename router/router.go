@@ -18,7 +18,11 @@ func New() *gin.Engine {
 	})
 	api.POST("/auth/register", gin.WrapF(handler.Register))
 	api.POST("/auth/login", gin.WrapF(handler.Login))
+	// Retain legacy managed endpoints for existing integrations. Regular Canvas
+	// pages no longer call them, and storage-only cookies cannot use this group.
 	api.POST("/auth/platform/exchange", gin.WrapF(handler.PlatformExchange))
+	api.POST("/auth/storage-session", gin.WrapF(handler.CreateStorageSession))
+	api.GET("/auth/storage-session", middleware.StorageSessionAuth, gin.WrapF(handler.StorageSessionStatus))
 	api.GET("/auth/linux-do/authorize", gin.WrapF(handler.LinuxDoAuthorize))
 	api.GET("/auth/linux-do/callback", gin.WrapF(handler.LinuxDoCallback))
 	api.GET("/auth/me", middleware.OptionalAuth, gin.WrapF(handler.CurrentUser))
@@ -30,13 +34,13 @@ func New() *gin.Engine {
 	api.HEAD("/media/references/:id", func(c *gin.Context) {
 		handler.ReferenceMedia(c.Writer, c.Request, c.Param("id"))
 	})
-	api.GET("/files/:id", middleware.OptionalAuth, func(c *gin.Context) {
+	api.GET("/files/:id", middleware.OptionalStorageSessionAuth, func(c *gin.Context) {
 		handler.FileInfo(c.Writer, c.Request, c.Param("id"))
 	})
-	api.GET("/files/:id/content", middleware.OptionalAuth, func(c *gin.Context) {
+	api.GET("/files/:id/content", middleware.OptionalStorageSessionAuth, func(c *gin.Context) {
 		handler.FileContent(c.Writer, c.Request, c.Param("id"))
 	})
-	api.HEAD("/files/:id/content", middleware.OptionalAuth, func(c *gin.Context) {
+	api.HEAD("/files/:id/content", middleware.OptionalStorageSessionAuth, func(c *gin.Context) {
 		handler.FileContent(c.Writer, c.Request, c.Param("id"))
 	})
 	api.POST("/ai/direct-request", gin.WrapF(handler.PrepareDirectAIRequest))
@@ -109,6 +113,38 @@ func New() *gin.Engine {
 	v1.GET("/user-data/assets", gin.WrapF(handler.UserAssetData))
 	v1.POST("/user-data/assets", gin.WrapF(handler.SaveUserAssetData))
 	v1.GET("/user-assets", gin.WrapF(handler.UserAssets))
+
+	storage := api.Group("/storage", middleware.StorageSessionAuth)
+	storage.POST("/files", gin.WrapF(handler.UploadFile))
+	storage.DELETE("/files/:id", func(c *gin.Context) {
+		handler.DeleteFile(c.Writer, c.Request, c.Param("id"))
+	})
+	storage.GET("/canvas/projects", gin.WrapF(handler.UserCanvasProjects))
+	storage.POST("/canvas/projects", gin.WrapF(handler.SaveUserCanvasProject))
+	storage.POST("/canvas/projects/sync", gin.WrapF(handler.SyncUserCanvasProjects))
+	storage.POST("/canvas/projects/delete", gin.WrapF(handler.DeleteUserCanvasProjects))
+	storage.GET("/user-data/image-history", gin.WrapF(handler.UserImageHistory))
+	storage.POST("/user-data/image-history", gin.WrapF(handler.SaveUserImageHistory))
+	storage.GET("/user-data/assets", gin.WrapF(handler.UserAssetData))
+	storage.POST("/user-data/assets", gin.WrapF(handler.SaveUserAssetData))
+	storage.GET("/user-assets", gin.WrapF(handler.UserAssets))
+	storage.GET("/generation-logs/videos", gin.WrapF(handler.UserVideoGenerationLogs))
+	storage.POST("/generation-logs/videos", gin.WrapF(handler.SaveUserVideoGenerationLogs))
+	storage.POST("/generation-logs/videos/delete", gin.WrapF(handler.DeleteUserVideoGenerationLogs))
+	storage.DELETE("/generation-logs/videos/:id", func(c *gin.Context) {
+		handler.DeleteUserVideoGenerationLog(c.Writer, c.Request, c.Param("id"))
+	})
+	storage.GET("/generation-logs/images", gin.WrapF(handler.UserImageGenerationLogs))
+	storage.POST("/generation-logs/images", gin.WrapF(handler.SaveUserImageGenerationLogs))
+	storage.POST("/generation-logs/images/delete", gin.WrapF(handler.DeleteUserImageGenerationLogs))
+	storage.DELETE("/generation-logs/images/:id", func(c *gin.Context) {
+		handler.DeleteUserImageGenerationLog(c.Writer, c.Request, c.Param("id"))
+	})
+	storage.GET("/workflows", gin.WrapF(handler.UserWorkflows))
+	storage.POST("/workflows", gin.WrapF(handler.SaveUserWorkflow))
+	storage.DELETE("/workflows/:id", func(c *gin.Context) {
+		handler.DeleteUserWorkflow(c.Writer, c.Request, c.Param("id"))
+	})
 	api.GET("/proxy-image", gin.WrapF(handler.ProxyImage))
 	api.GET("/prompts", middleware.OptionalAuth, gin.WrapF(handler.Prompts))
 	api.GET("/assets", middleware.OptionalAuth, gin.WrapF(handler.Assets))

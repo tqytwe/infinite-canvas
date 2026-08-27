@@ -538,8 +538,7 @@ function withPromptGuard(config: AiConfig, prompt: string) {
 }
 
 function usesAccountProxy(config: AiConfig) {
-    const token = useUserStore.getState().token;
-    return config.channelMode === "remote" || (config.channelMode === "local" && Boolean(token));
+    return config.channelMode === "remote";
 }
 
 export function aiApiUrl(config: AiConfig, path: string) {
@@ -556,13 +555,6 @@ export function aiHeaders(config: AiConfig, contentType?: string) {
         return {
             Authorization: `Bearer ${token}`,
             ...(channelID ? { "X-Model-Channel-ID": channelID } : {}),
-            ...(contentType ? { "Content-Type": contentType } : {}),
-        };
-    }
-    if (token) {
-        return {
-            Authorization: `Bearer ${token}`,
-            ...(channelID ? { "X-User-Model-Channel-ID": channelID } : {}),
             ...(contentType ? { "Content-Type": contentType } : {}),
         };
     }

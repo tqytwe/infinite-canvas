@@ -1,11 +1,9 @@
 "use client";
 
 import { Suspense, useEffect, useRef, type ReactNode } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { AppTopNav } from "@/components/layout/app-top-nav";
 import { fetchUserConfig } from "@/services/api/user-config";
-import { useConfigStore } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
 export default function UserLayout({ children }: { children: ReactNode }) {
@@ -17,20 +15,9 @@ export default function UserLayout({ children }: { children: ReactNode }) {
 }
 
 function UserLayoutContent({ children }: { children: ReactNode }) {
-    const pathname = usePathname();
-    const router = useRouter();
-    const searchParams = useSearchParams();
     const user = useUserStore((state) => state.user);
     const isReady = useUserStore((state) => state.isReady);
-    const platformAuthEnabled = useConfigStore((state) => state.publicSettings?.auth?.platform?.enabled === true);
     const wasLoggedOutRef = useRef(false);
-    const isProtectedPage = pathname !== "/login";
-    const hasPlatformLaunchState = Boolean(searchParams.get("launch_token") || searchParams.get("launch_error"));
-
-    useEffect(() => {
-        if (!isReady || !isProtectedPage || user || !platformAuthEnabled || hasPlatformLaunchState) return;
-        router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
-    }, [hasPlatformLaunchState, isProtectedPage, isReady, pathname, platformAuthEnabled, router, user]);
 
     useEffect(() => {
         if (!isReady) return;
@@ -60,7 +47,7 @@ function UserLayoutContent({ children }: { children: ReactNode }) {
     return (
         <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
             <AppTopNav />
-            <div className="min-h-0 flex-1 overflow-hidden">{isProtectedPage && (!isReady || !user) ? null : children}</div>
+            <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
         </div>
     );
 }

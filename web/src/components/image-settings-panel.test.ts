@@ -4,37 +4,36 @@ import test from "node:test";
 import { imageSizeOptionsForConfig } from "./image-settings-panel";
 import { defaultConfig, type AiConfig } from "@/stores/use-config-store";
 
-test("image settings use the selected image model rather than the chat model", () => {
+test("direct image settings retain a stable generic size list without a managed model session", () => {
     const config: AiConfig = {
         ...defaultConfig,
+        channelMode: "local",
         model: "chat-model",
         textModel: "chat-model",
         imageModel: "sensenova-u1-fast",
-        imageChannelId: "platform-managed:image:17",
+        imageChannelId: "jisudeng-api",
         localChannels: [
             {
-                id: "platform-managed:image:17",
+                id: "jisudeng-api",
                 protocol: "openai",
-                name: "图片",
-                baseUrl: "/api",
-                apiKey: "",
-                models: ["sensenova-u1-fast"],
-                modelCapabilities: { "sensenova-u1-fast": ["image"] },
-                modelMediaCapabilities: {
-                    "sensenova-u1-fast": {
-                        adapter: "sensenova",
-                        capabilityVersion: "v1",
-                        modalities: ["image"],
-                        image: { operations: ["create"], supportedSizes: ["1024x1024"], supportedRatios: ["1:1"], supportedFormats: ["png"] },
-                    },
-                },
-                declaredModelIds: ["sensenova-u1-fast"],
-                managedPlatform: true,
-                platformPurpose: "image",
-                platformGroupID: "17",
+                name: "极速蹬 API",
+                baseUrl: "https://api.jisudeng.com",
+                apiKey: "user-api-key",
+                models: ["chat-model", "sensenova-u1-fast"],
+                modelCapabilities: { "chat-model": ["text"], "sensenova-u1-fast": ["image"] },
+                declaredModelIds: ["chat-model", "sensenova-u1-fast"],
             },
         ],
     };
 
-    assert.deepEqual(imageSizeOptionsForConfig(config), [{ value: "1024x1024", label: "1024x1024" }]);
+    const sizes = imageSizeOptionsForConfig(config);
+    assert.equal(sizes[0]?.value, "1:1");
+    assert.equal(
+        sizes.some((size) => size.value === "auto"),
+        true,
+    );
+    assert.equal(
+        sizes.some((size) => size.value === "1024x1024"),
+        false,
+    );
 });

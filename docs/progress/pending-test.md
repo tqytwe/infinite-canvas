@@ -14,11 +14,14 @@ description: 当前版本已实现但仍需人工验证的变更项
 - 极速蹬受管会话通过 Canvas 服务端读取 `nextchat/bootstrap` 的 `modalities`、图片/视频操作、适配器和能力版本；缺失任一媒体合同字段时不得按名称猜测能力，配置页必须显示可重试的明确原因。
 - 受管图片和视频请求必须在 Canvas 服务端再次按会话、分组、模型、操作和适配器校验。`sensenova-u1.5-lite` 可生成和编辑，`sensenova-u1-fast` 仅可生成；U1.5 多图和 U1 Fast 参考图/编辑均应在请求前明确拒绝。
 
-## 创作空间统一登录终态
+## Canvas 浏览器直连与私有文件存储
 
-- 从极速蹬 `/ai-creation-space` 进入 Canvas 后，成功兑换只写入 Canvas 本地会话并清理地址栏中的 `launch_token`。
-- 重复兑换、过期令牌、错误密钥、缺少统一登录配置和平台暂时不可用时，Canvas 显示对应终态错误；刷新或重复点击不会在 Canvas 与控制台之间循环。
-- 直接访问 Canvas 未登录时跳主站登录，登录成功后只通过 `/ai-creation-space` 返回一次 Canvas；生产环境需核对平台 URL、managed mode 和交换密钥一致性。
+- 极速蹬 `/ai-creation-space` 在保持主站登录保护的前提下直接进入 `https://canvas.jisudeng.com`；地址栏不得包含 `launch_token`、用户名、密码或交换密钥。提示词入口只允许携带 `creation_prompt` 与 `creation_prompt_version`。
+- Canvas 普通创作页面不得跳到 Canvas 账号密码登录页。用户在设置中只能填写 `https://api.jisudeng.com` 和自己的 API Key，浏览器直接请求 `/v1/models`、图片和视频接口；Key 只保存在该浏览器本地配置中。
+- 首次填写 Key 或 7 天存储 Cookie 过期后，Canvas 只调用一次 `/api/auth/storage-session` 校验 `/v1/models` 并签发存储 Cookie。服务端、Cookie、日志和持久化数据中不得出现原始 API Key 或 Authorization；不同 Key 的文件空间必须相互隔离。
+- 存储 Cookie 只可访问 Canvas 文件、素材、项目和生成历史接口，不能访问 Canvas AI 代理、平台 bootstrap 或管理员接口。管理员仍可使用既有登录进入 `/admin/*`。
+- 图片、视频、参考素材和生成历史应保存到本站持久化盘。保存失败时结果必须保留，显示“生成成功但保存失败”，并可通过“重新保存到本站存储”重试。
+- `sensenova-u1.5-lite` 生成时应原样透传用户选择的 `watermark: false`；`sensenova-u1-fast` 不得发送水印字段。
 
 ## 视频状态查询模型路由
 
