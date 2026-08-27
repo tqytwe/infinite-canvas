@@ -46,6 +46,7 @@ test("multiple direct channels retain their IDs and model capabilities", () => {
                 baseUrl: "https://image.example.test",
                 apiKey: "image-key",
                 models: ["multi-modal"],
+                purpose: "image",
                 modelCapabilities: { "multi-modal": ["image"] },
                 declaredModelIds: ["multi-modal"],
             },
@@ -56,6 +57,7 @@ test("multiple direct channels retain their IDs and model capabilities", () => {
                 baseUrl: "https://video.example.test",
                 apiKey: "video-key",
                 models: ["multi-modal"],
+                purpose: "video",
                 modelCapabilities: { "multi-modal": ["video"] },
                 declaredModelIds: ["multi-modal"],
             },
@@ -91,27 +93,44 @@ test("persisted mixed declarations do not retain legacy classifications", () => 
         "declared-text": ["text"],
         "sensenova-u1.5-lite": [],
     });
+    assert.equal(channel.purpose, "image");
     assert.equal(modelMatchesCapability("sensenova-u1.5-lite", "image", channel), false);
 });
 
-test("direct image channels retain every model returned by their API key", () => {
-    const channel: LocalModelChannel = {
+test("direct channels place every returned model in their selected workspace", () => {
+    const imageChannel: LocalModelChannel = {
         id: "image-group",
         protocol: "openai",
         name: "图片生成",
         baseUrl: "https://api.jisudeng.com",
         apiKey: "test-key",
         models: ["sensenova-u1-fast", "provider-image-v-next", "future-image-model"],
+        purpose: "image",
         modelCapabilities: { "sensenova-u1-fast": ["image"], "provider-image-v-next": [], "future-image-model": [] },
         declaredModelIds: ["sensenova-u1-fast"],
         modelDiscovery: { state: "declared" },
     };
 
-    assert.deepEqual(localModelsByCapability([channel], "image"), channel.models);
-    assert.equal(localChannelMatchesCapability(channel, "future-image-model", "image"), true);
-    assert.equal(localChannelMatchesCapability(channel, "future-image-model", "video"), false);
+    const videoChannel: LocalModelChannel = {
+        ...imageChannel,
+        id: "video-group",
+        name: "视频生成",
+        apiKey: "video-key",
+        models: ["future-video-model"],
+        purpose: "video",
+    };
+    const textChannel: LocalModelChannel = { ...imageChannel, id: "text-group", name: "文本生成", models: ["future-text-model"], purpose: "text" };
+    const audioChannel: LocalModelChannel = { ...imageChannel, id: "audio-group", name: "音频生成", models: ["future-audio-model"], purpose: "audio" };
 
-    const config: AiConfig = { ...defaultConfig, channelMode: "local", model: "future-image-model", imageModel: "future-image-model", imageChannelId: "image-group", localChannels: [channel] };
+    assert.deepEqual(localModelsByCapability([imageChannel, videoChannel, textChannel, audioChannel], "image"), imageChannel.models);
+    assert.deepEqual(localModelsByCapability([imageChannel, videoChannel, textChannel, audioChannel], "video"), videoChannel.models);
+    assert.deepEqual(localModelsByCapability([imageChannel, videoChannel, textChannel, audioChannel], "text"), textChannel.models);
+    assert.deepEqual(localModelsByCapability([imageChannel, videoChannel, textChannel, audioChannel], "audio"), audioChannel.models);
+    assert.equal(localChannelMatchesCapability(imageChannel, "future-image-model", "image"), true);
+    assert.equal(localChannelMatchesCapability(imageChannel, "future-image-model", "video"), false);
+    assert.equal(localChannelMatchesCapability(videoChannel, "future-video-model", "video"), true);
+
+    const config: AiConfig = { ...defaultConfig, channelMode: "local", model: "future-image-model", imageModel: "future-image-model", imageChannelId: "image-group", localChannels: [imageChannel, videoChannel] };
     assert.equal(channelIdForActiveModel(config, "image"), "image-group");
     assert.equal(localChannelForActiveModel(config, "image")?.apiKey, "test-key");
 });
@@ -145,6 +164,7 @@ test("normalization keeps user channels and removes only old managed channels", 
                 baseUrl: "https://custom.example.test/v1",
                 apiKey: "custom-key",
                 models: ["custom-image"],
+                purpose: "image",
                 modelCapabilities: { "custom-image": ["image"] },
                 declaredModelIds: ["custom-image"],
             },
@@ -213,6 +233,7 @@ test("normalization keeps user channels and removes only old managed channels", 
         baseUrl: "https://custom.example.test/v1",
         apiKey: "custom-key",
         models: ["custom-image"],
+        purpose: "image",
         modelCapabilities: { "custom-image": ["image"] },
         declaredModelIds: ["custom-image"],
         modelDiscovery: undefined,

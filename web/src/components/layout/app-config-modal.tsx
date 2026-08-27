@@ -43,6 +43,13 @@ const modelGroups: ModelGroup[] = [
     { capability: "audio", modelKey: "audioModel", channelKey: "audioChannelId", modelsKey: "audioModels", defaultLabel: "默认音频模型", optionsLabel: "音频模型可选项" },
 ];
 
+const channelPurposeOptions: Array<{ value: ModelCapability; label: string }> = [
+    { value: "image", label: "图片" },
+    { value: "video", label: "视频" },
+    { value: "text", label: "文本" },
+    { value: "audio", label: "音频" },
+];
+
 export function AppConfigModal() {
     const { message } = App.useApp();
     const [loadingModels, setLoadingModels] = useState(false);
@@ -265,8 +272,9 @@ export function AppConfigModal() {
                             </div>
                             {normalizeLocalChannels(config).map((channel) => (
                                 <div key={channel.id} className="space-y-2 rounded-md bg-stone-50 p-2 dark:bg-stone-900">
-                                    <div className="grid gap-2 md:grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+                                    <div className="grid gap-2 md:grid-cols-[minmax(0,0.6fr)_minmax(0,0.55fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
                                         <Input value={channel.name} aria-label="渠道名称" placeholder="渠道名称" onChange={(event) => patchLocalChannel(channel.id, { name: event.target.value })} />
+                                        <Select value={channel.purpose || "image"} aria-label={`${channel.name} 模型用途`} options={channelPurposeOptions} onChange={(purpose) => patchLocalChannel(channel.id, { purpose })} />
                                         <Input value={channel.baseUrl} aria-label={`${channel.name} API 地址`} placeholder="https://api.example.com" onChange={(event) => patchLocalChannel(channel.id, { baseUrl: event.target.value })} />
                                         <Input.Password value={channel.apiKey} placeholder="API Key" onChange={(event) => patchLocalChannel(channel.id, { apiKey: event.target.value })} />
                                         <div className="flex gap-2">
@@ -278,11 +286,10 @@ export function AppConfigModal() {
                                     </div>
                                     <div className="flex flex-wrap items-center gap-x-2 text-xs text-stone-500">
                                         <span>已保存 {channel.models.length} 个模型</span>
-                                        {channel.modelDiscovery?.state === "declared" ? <span>已按接口声明识别图片、视频等能力</span> : null}
-                                        {channel.modelDiscovery?.state === "legacy" ? <span>接口未声明模型能力，正在使用兼容识别</span> : null}
+                                        <span>用途：{channelPurposeOptions.find((option) => option.value === (channel.purpose || "image"))?.label}</span>
                                         {channel.modelDiscovery?.state === "error" ? (
                                             <>
-                                                <span className="text-red-600 dark:text-red-400">读取失败：{channel.modelDiscovery.message || "请检查接口、分组和图片权限"}</span>
+                                                <span className="text-red-600 dark:text-red-400">读取失败：{channel.modelDiscovery.message || "请检查接口、分组和访问权限"}</span>
                                                 <Button type="link" size="small" className="h-auto p-0" onClick={() => void refreshLocalChannelModels(channel)}>
                                                     重试
                                                 </Button>
@@ -511,7 +518,7 @@ function uniqueModels(models: string[]) {
 }
 
 function emptyLocalChannel(): LocalModelChannel {
-    return { id: "jisudeng-api", protocol: "openai", name: "极速蹬 API", baseUrl: "https://api.jisudeng.com", apiKey: "", models: [] };
+    return { id: "jisudeng-api", protocol: "openai", name: "极速蹬 API", baseUrl: "https://api.jisudeng.com", apiKey: "", models: [], purpose: "image" };
 }
 
 function formatBytes(bytes: number) {
