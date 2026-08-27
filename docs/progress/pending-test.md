@@ -42,7 +42,9 @@ description: 当前版本已实现但仍需人工验证的变更项
 
 ## Agnes 视频请求字段
 
-- `agnes-video-v2.0` 创建请求只发送网关当前接受的 `model`、`prompt`、`num_frames`、尺寸和参考图字段；不得发送 `frame_rate`。创建成功后仍使用 `/agnesapi?video_id=...&model_name=...` 查询原任务。
+- `agnes-video-v2.0` 使用其旧协议：`num_frames`、`frame_rate: 24` 和像素尺寸。创建成功后仍使用 `/agnesapi?video_id=...&model_name=...` 查询原任务。
+- `agnes-video-2.5` 与 `agnes-video-2.5-flash` 使用独立协议：`seconds`、`size`、`aspect_ratio`、`n: 1` 和 `mode`，绝不能发送 `num_frames`、`frame_rate`、`width` 或 `height`。Flash 固定 720P、最多 5 张图片参考且不支持参考视频。
+- `minimax_h3-10s` 与 `minimax_h3` 都必须使用 JSON 创建与 `video_*` 任务轮询。该别名是否由上游强制 10 秒须以真实受控请求确认，Canvas 不臆造额外时长字段。
 
 ## Seedance 与 Veo 文档协议
 

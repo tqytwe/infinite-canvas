@@ -4,7 +4,19 @@ import { dataUrlToFile } from "@/lib/image-utils";
 import { boolConfig, isSeedanceVideoConfig, normalizeSeedanceRatio, normalizeSeedanceResolution } from "@/lib/seedance-video";
 import { isKIEGrokVideoModel, isKIEKlingV3Config, kieKlingOmniVariant } from "@/components/video-settings-panel";
 import { platformAspectRatio, platformVideoRequestIssue } from "@/lib/platform-managed-models";
-import { isCogVideoX3Model, isDocumentedJSONVideoModel, isDocumentedSeedanceVideoModel, isSeedanceVideoModel, isSora2VideoModel, isVeoVideoModel, modelKey, normalizeCogVideoX3Duration, supportsVideoAudioGeneration } from "@/lib/video-model-capabilities";
+import {
+    isAgnesVideoModel,
+    isCogVideoX3Model,
+    isDocumentedJSONVideoModel,
+    isDocumentedSeedanceVideoModel,
+    isSeedanceVideoModel,
+    isSora2VideoModel,
+    isVeoVideoModel,
+    modelKey,
+    normalizeCogVideoX3Duration,
+    supportsVideoAudioGeneration,
+    videoRequestProfile,
+} from "@/lib/video-model-capabilities";
 import { resolveMediaUrl, uploadMediaFile } from "@/services/file-storage";
 import { imageToDataUrl, resolveImageUrl } from "@/services/image-storage";
 import { buildApiUrl, channelIdForActiveModel, directAIProviderForConfig, localChannelForActiveModel, platformManagedVideoCapabilitiesForConfig, type AiConfig, type VideoElementReference } from "@/stores/use-config-store";
@@ -277,23 +289,8 @@ export async function createVideoRequestBody(config: AiConfig, model: string, pr
     if (!managedCapabilities && isGrok2APIVideoConfig(config, model)) return createGrok2APIVideoRequestBody(config, model, prompt, input);
     if (!managedCapabilities && isCogVideoX3Model(model)) return createCogVideoX3RequestBody(config, model, prompt, input);
     if (!managedCapabilities && isDocumentedJSONVideoModel(model)) return createDocumentedJSONVideoRequestBody(config, model, prompt, input, size);
-    if (!managedCapabilities && isAgnesVideoModel(model)) {
-        const references = input.references;
-        const inputReferences = await Promise.all(references.slice(0, 7).map(imageToAgnesReference));
-        const dimensions = size ? parseVideoDimensions(size) : null;
-        const body: Record<string, unknown> = {
-            model,
-            prompt,
-            num_frames: agnesNumFrames(config.videoSeconds),
-        };
-        if (dimensions) {
-            body.width = dimensions.width;
-            body.height = dimensions.height;
-        }
-        if (inputReferences.length === 1) body.image = inputReferences[0];
-        if (inputReferences.length > 1) body.extra_body = { image: inputReferences, mode: "keyframes" };
-        return body;
-    }
+    if (!managedCapabilities && videoRequestProfile(model) === "agnes-v20") return createAgnesV20VideoRequestBody(config, model, prompt, input, size);
+    if (!managedCapabilities && videoRequestProfile(model) === "agnes-v25") return createAgnesV25VideoRequestBody(config, model, prompt, input);
 
     const klingV26 = !managedCapabilities && isAPIMartKlingV26VideoConfig(config, model);
     const apimartKlingV3 = !managedCapabilities && isAPIMartKlingV3VideoConfig(config, model);
@@ -350,6 +347,70 @@ export async function createVideoRequestBody(config: AiConfig, model: string, pr
     const audioFiles = kling ? [] : await Promise.all(input.audioReferences.map(mediaReferenceToFormValue));
     audioFiles.forEach((file) => body.append("audio_reference[]", file));
     return body;
+}
+
+async function createAgnesV20VideoRequestBody(config: AiConfig, model: string, prompt: string, input: Required<VideoReferenceInput>, size: string | null) {
+    const inputReferences = await Promise.all(input.references.slice(0, 7).map(imageToAgnesReference));
+    const dimensions = size ? parseVideoDimensions(size) : null;
+    const body: Record<string, unknown> = {
+        model,
+        prompt,
+        num_frames: agnesNumFrames(config.videoSeconds),
+        frame_rate: 24,
+    };
+    if (dimensions) {
+        body.width = dimensions.width;
+        body.height = dimensions.height;
+    }
+    if (inputReferences.length === 1) body.image = inputReferences[0];
+    if (inputReferences.length > 1) body.extra_body = { image: inputReferences, mode: "keyframes" };
+    return body;
+}
+
+async function createAgnesV25VideoRequestBody(config: AiConfig, model: string, prompt: string, input: Required<VideoReferenceInput>) {
+    const isFlash = modelKey(model) === "agnes-video-2-5-flash";
+    const images = [input.firstFrame, ...input.references, input.lastFrame].filter((reference): reference is ReferenceImage => Boolean(reference));
+    if (isFlash && images.length > 5) throw new VideoRequestError("Agnes Video 2.5 Flash 最多支持 5 张图片参考");
+    if (isFlash && input.videoReferences.length) throw new VideoRequestError("Agnes Video 2.5 Flash 不支持参考视频");
+
+    const body: Record<string, unknown> = {
+        model,
+        prompt,
+        seconds: normalizeAgnesV25Seconds(config.videoSeconds),
+        size: isFlash ? "720P" : normalizeAgnesV25Size(config.vquality),
+        aspect_ratio: normalizeAgnesV25AspectRatio(config.size),
+        n: 1,
+        mode: "text",
+    };
+    if (input.firstFrame || input.lastFrame) {
+        body.mode = "keyframe";
+        if (input.firstFrame) body.first_frame = await imageToDataUrl(input.firstFrame);
+        if (input.lastFrame) body.last_frame = await imageToDataUrl(input.lastFrame);
+        if (input.references.length) body.images = await Promise.all(input.references.slice(0, isFlash ? 3 : 5).map(imageToDataUrl));
+    } else if (images.length || input.videoReferences.length || input.audioReferences.length) {
+        body.mode = "reference";
+        if (images.length) body.images = await Promise.all(images.map(imageToDataUrl));
+        if (input.videoReferences.length) body.videos = await Promise.all(input.videoReferences.map(mediaReferenceToJSONValue));
+        if (input.audioReferences.length) body.audios = await Promise.all(input.audioReferences.map(mediaReferenceToJSONValue));
+    }
+    return body;
+}
+
+function normalizeAgnesV25Seconds(value: string) {
+    const seconds = Math.floor(Number(value) || 5);
+    return String(Math.max(4, Math.min(12, seconds)));
+}
+
+function normalizeAgnesV25Size(value: string) {
+    const resolution = normalizeVideoResolution(value).toLowerCase();
+    if (resolution === "2k" || resolution === "4k") return "2K";
+    if (resolution === "960p" || resolution === "1080p") return "960P";
+    return "720P";
+}
+
+function normalizeAgnesV25AspectRatio(value: string) {
+    const ratio = normalizeSeedanceRatio(value);
+    return ratio === "adaptive" ? "16:9" : ratio;
 }
 
 async function createDocumentedJSONVideoRequestBody(config: AiConfig, model: string, prompt: string, input: Required<VideoReferenceInput>, size: string | null) {
@@ -631,10 +692,6 @@ function agnesNumFrames(secondsValue: string) {
     const target = Math.round(Number(normalizeVideoSeconds(secondsValue)) * 24) + 1;
     const capped = Math.min(441, Math.max(9, target));
     return capped - ((capped - 1) % 8);
-}
-
-function isAgnesVideoModel(model: string) {
-    return model.toLowerCase().includes("agnes-video");
 }
 
 function videoPollId(model: string, task: VideoResponse) {

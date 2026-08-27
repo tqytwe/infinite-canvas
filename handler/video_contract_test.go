@@ -20,6 +20,19 @@ func TestSeedanceUsesOpenAIVideoPathOutsideArkPlan(t *testing.T) {
 	}
 }
 
+func TestAgnesVideoRecognitionUsesExactSupportedIDs(t *testing.T) {
+	for _, modelName := range []string{"agnes-video-v2.0", "agnes-video-2.5", "agnes-video-2.5-flash"} {
+		if !isAgnesVideoModel(modelName) {
+			t.Fatalf("%q should use the Agnes polling contract", modelName)
+		}
+	}
+	for _, modelName := range []string{"custom-agnes-video", "agnes-video-3.0", "not-agnes-video"} {
+		if isAgnesVideoModel(modelName) {
+			t.Fatalf("%q must not inherit an unreviewed Agnes contract", modelName)
+		}
+	}
+}
+
 func TestSeedanceKeepsArkPlanTaskPath(t *testing.T) {
 	ark := model.ModelChannel{BaseURL: "https://ark.cn-beijing.volces.com/api/plan/v3"}
 	if got := resolveAIProxyPath(ark, "seedance2.5", "/videos"); got != "/contents/generations/tasks" {
@@ -105,7 +118,7 @@ func TestVideoTaskPollURLPreservesKIEStatusRoute(t *testing.T) {
 }
 
 func TestTransientDocumentedVideoTaskNotFound(t *testing.T) {
-	for _, modelName := range []string{"manxue2.5", "minimax_h3", "seedance2.5", "sd2.5", "veo-3.1", "veo-3.1-fast", "veo-3.1-i2v"} {
+	for _, modelName := range []string{"manxue2.5", "minimax_h3", "minimax_h3-10s", "seedance2.5", "sd2.5", "veo-3.1", "veo-3.1-fast", "veo-3.1-i2v"} {
 		task := model.VideoTask{Model: modelName, CreatedAt: time.Now().UTC().Format(time.RFC3339Nano)}
 		if !isTransientVideoTaskNotFound(task, "task_not_exist") {
 			t.Fatalf("fresh task_not_exist for %s should be retried", modelName)
