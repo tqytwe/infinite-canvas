@@ -206,6 +206,12 @@ func isClientVideoTaskID(id string) bool {
 	return strings.HasPrefix(strings.TrimSpace(id), "client_video_task_")
 }
 
+func shouldPollVideoTaskFromPlatform(task model.VideoTask) bool {
+	return strings.TrimSpace(task.UserChannelID) == "" &&
+		service.PlatformAuthEnabled() &&
+		strings.HasPrefix(strings.TrimSpace(task.ChannelID), "platform-managed:")
+}
+
 func serveAIVideoTask(w http.ResponseWriter, r *http.Request, id string) bool {
 	user, ok := service.UserFromContext(r.Context())
 	if !ok {
@@ -229,7 +235,7 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 	var err error
 	if strings.TrimSpace(task.UserChannelID) != "" {
 		channel, err = service.SelectUserLocalModelChannelForModel(task.UserID, task.Model, task.UserChannelID)
-	} else if service.PlatformAuthEnabled() {
+	} else if shouldPollVideoTaskFromPlatform(task) {
 		channel, err = service.PlatformManagedChannelForTask(context.Background(), task.UserID, task.ChannelID)
 	} else {
 		channel, err = service.SelectModelChannelForModel(task.Model, task.ChannelID)

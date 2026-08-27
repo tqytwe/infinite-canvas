@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/tigerowo/infinite-canvas/config"
+	"github.com/tigerowo/infinite-canvas/model"
 )
 
 func withPlatformSessionTestConfig(t *testing.T, apiURL string) {
@@ -163,6 +164,203 @@ func TestPlatformBootstrapUsesBFFHeadersAndLeavesCapabilitiesIntact(t *testing.T
 	}
 }
 
+func TestPlatformBootstrapRetainsVideoAvailabilityDiagnostics(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"code":0,"data":{"models":{"groups":[{"id":23,"video_available":false,"video_unavailable_code":"no_schedulable_account","models":[{"id":"grok-video","modalities":["video"],"adapter":"grok_video","capability_version":"v1","video_capabilities":{"operations":["generate"]}}]}]}}}`))
+	}))
+	defer server.Close()
+	withPlatformSessionTestConfig(t, server.URL)
+
+	payload, err := platformBootstrapForSession(context.Background(), PlatformManagedSessionKey{UserID: 7, APIKeyID: 13, APIKey: "never-sent", Purpose: "video"})
+	if err != nil {
+		t.Fatalf("bootstrap = %v", err)
+	}
+	raw, _ := json.Marshal(payload)
+	if !strings.Contains(string(raw), `"video_available":false`) || !strings.Contains(string(raw), `"video_unavailable_code":"no_schedulable_account"`) {
+		t.Fatalf("video availability diagnostics missing = %s", raw)
+	}
+}
+
+func TestPlatformGroupSwitchRequiresPinnedReplacementAndPersistsPurposeSession(t *testing.T) {
+	withPlatformSessionTestConfig(t, "https://api.example.test")
+	session := PlatformManagedSession{
+		ExpiresAt: time.Now().UTC().Add(time.Hour),
+		Sessions: map[string]PlatformManagedSessionKey{
+			"chat":  {UserID: 7, APIKey: "chat-key", APIKeyID: 11, Purpose: "chat"},
+			"image": {UserID: 7, APIKey: "old-image-key", APIKeyID: 12, Purpose: "image"},
+			"video": {UserID: 7, APIKey: "video-key", APIKeyID: 13, Purpose: "video"},
+		},
+		Groups: map[string]int64{},
+	}
+	user := &model.User{ID: "canvas-user"}
+	replacement, err := decodePlatformManagedGroupSwitchResponse(json.RawMessage(`{"purpose":"image","session_binding":"group-pinned-v1","session":{"user_id":7,"api_key":"new-image-key","api_key_id":42,"purpose":"image","group_id":8,"binding":"group-pinned-v1"}}`), "image", session.Sessions["image"], 8)
+	if err != nil {
+		t.Fatalf("decode replacement = %v", err)
+	}
+	if err := persistPlatformManagedReplacementSession(user, &session, "image", replacement); err != nil {
+		t.Fatalf("persist replacement = %v", err)
+	}
+	if strings.Contains(user.Extra, "new-image-key") {
+		t.Fatal("encrypted Canvas user session exposed replacement API key")
+	}
+	if got := session.Sessions["image"]; got.APIKey != "old-image-key" || got.APIKeyID != 12 || got.GroupID != 0 || got.Binding != "" {
+		t.Fatalf("base image session changed = %#v", got)
+	}
+	if got, found := platformManagedSessionForGroup(session, "image", 8); !found || got.APIKey != "new-image-key" || got.APIKeyID != 42 || got.GroupID != 8 || got.Binding != "group-pinned-v1" {
+		t.Fatalf("persisted image group session = %#v, found=%t", got, found)
+	}
+	if got := session.Sessions["video"].APIKey; got != "video-key" {
+		t.Fatalf("unrelated video session changed = %q", got)
+	}
+}
+
+func TestPlatformGroupPinnedSessionsRemainDistinctAcrossConcurrentGroups(t *testing.T) {
+	withPlatformSessionTestConfig(t, "https://api.example.test")
+	session := PlatformManagedSession{
+		ExpiresAt: time.Now().UTC().Add(time.Hour),
+		Sessions: map[string]PlatformManagedSessionKey{
+			"chat":  {UserID: 7, APIKey: "chat-key", APIKeyID: 11, Purpose: "chat"},
+			"image": {UserID: 7, APIKey: "base-image-key", APIKeyID: 12, Purpose: "image"},
+		},
+	}
+	user := &model.User{ID: "canvas-user"}
+	for _, replacement := range []PlatformManagedSessionKey{
+		{UserID: 7, APIKey: "image-group-8", APIKeyID: 42, Purpose: "image", GroupID: 8, Binding: platformGroupPinnedSessionBinding},
+		{UserID: 7, APIKey: "image-group-9", APIKeyID: 43, Purpose: "image", GroupID: 9, Binding: platformGroupPinnedSessionBinding},
+	} {
+		if err := persistPlatformManagedReplacementSession(user, &session, "image", replacement); err != nil {
+			t.Fatalf("persist group %d = %v", replacement.GroupID, err)
+		}
+	}
+
+	groupEight, foundEight := platformManagedSessionForGroup(session, "image", 8)
+	groupNine, foundNine := platformManagedSessionForGroup(session, "image", 9)
+	if !foundEight || !foundNine || groupEight.APIKey != "image-group-8" || groupNine.APIKey != "image-group-9" {
+		t.Fatalf("group-pinned sessions = group8=%#v found=%t group9=%#v found=%t", groupEight, foundEight, groupNine, foundNine)
+	}
+	if got := session.Sessions["image"].APIKey; got != "base-image-key" {
+		t.Fatalf("base purpose session changed = %q", got)
+	}
+	if got := session.GroupSessions["image"]; len(got) != 2 {
+		t.Fatalf("group-pinned cache length = %d, want 2", len(got))
+	}
+}
+
+func TestPlatformManagedGroupSessionRebasePreservesAnotherPurposeReplacement(t *testing.T) {
+	withPlatformSessionTestConfig(t, "https://api.example.test")
+	base := PlatformManagedSession{
+		ExpiresAt: time.Now().UTC().Add(time.Hour),
+		Sessions: map[string]PlatformManagedSessionKey{
+			"chat":  {UserID: 7, APIKey: "chat-key", APIKeyID: 11, Purpose: "chat"},
+			"image": {UserID: 7, APIKey: "base-image-key", APIKeyID: 12, Purpose: "image"},
+			"video": {UserID: 7, APIKey: "base-video-key", APIKeyID: 13, Purpose: "video"},
+		},
+	}
+
+	// This mirrors an image switch winning the database compare-and-swap before
+	// a concurrent video switch retries from the current encrypted payload.
+	imageUser := &model.User{ID: "canvas-user"}
+	imageSession := base
+	imageReplacement := PlatformManagedSessionKey{UserID: 7, APIKey: "image-group-8", APIKeyID: 42, Purpose: "image", GroupID: 8, Binding: platformGroupPinnedSessionBinding}
+	if err := persistPlatformManagedReplacementSession(imageUser, &imageSession, "image", imageReplacement); err != nil {
+		t.Fatalf("persist image replacement: %v", err)
+	}
+
+	rebasedSession, err := readPlatformManagedSession(*imageUser)
+	if err != nil {
+		t.Fatalf("read persisted image session: %v", err)
+	}
+	videoReplacement := PlatformManagedSessionKey{UserID: 7, APIKey: "video-group-23", APIKeyID: 43, Purpose: "video", GroupID: 23, Binding: platformGroupPinnedSessionBinding}
+	if err := persistPlatformManagedReplacementSession(imageUser, &rebasedSession, "video", videoReplacement); err != nil {
+		t.Fatalf("persist rebased video replacement: %v", err)
+	}
+
+	finalSession, err := readPlatformManagedSession(*imageUser)
+	if err != nil {
+		t.Fatalf("read final session: %v", err)
+	}
+	if got, found := platformManagedSessionForGroup(finalSession, "image", 8); !found || got.APIKeyID != 42 {
+		t.Fatalf("image replacement lost after rebase: %#v found=%t", got, found)
+	}
+	if got, found := platformManagedSessionForGroup(finalSession, "video", 23); !found || got.APIKeyID != 43 {
+		t.Fatalf("video replacement missing after rebase: %#v found=%t", got, found)
+	}
+}
+
+func TestPlatformManagedGroupSessionNeverFallsBackToBasePurposeKey(t *testing.T) {
+	session := PlatformManagedSession{
+		Sessions: map[string]PlatformManagedSessionKey{
+			"image": {UserID: 7, APIKey: "base-image-key", APIKeyID: 12, Purpose: "image"},
+		},
+	}
+
+	if _, err := requirePlatformManagedSessionForGroup(session, "image", 8); err == nil {
+		t.Fatal("a selected image group must not fall back to the base image key")
+	}
+	base, err := requirePlatformManagedSessionForGroup(session, "image", 0)
+	if err != nil || base.APIKey != "base-image-key" {
+		t.Fatalf("unscoped image session = %#v, %v", base, err)
+	}
+
+	session.GroupSessions = map[string]map[int64]PlatformManagedSessionKey{
+		"image": {
+			8: {UserID: 7, APIKey: "group-image-key", APIKeyID: 42, Purpose: "image", GroupID: 8, Binding: platformGroupPinnedSessionBinding},
+		},
+	}
+	pinned, err := requirePlatformManagedSessionForGroup(session, "image", 8)
+	if err != nil || pinned.APIKey != "group-image-key" {
+		t.Fatalf("group-pinned image session = %#v, %v", pinned, err)
+	}
+}
+
+func TestParsePlatformManagedChannelIDRejectsPurposeMismatch(t *testing.T) {
+	for _, tc := range []struct {
+		name            string
+		channelID       string
+		fallbackPurpose string
+		wantPurpose     string
+		wantGroup       int64
+		wantErr         bool
+	}{
+		{name: "matching image group", channelID: "platform-managed:image:17", fallbackPurpose: "image", wantPurpose: "image", wantGroup: 17},
+		{name: "matching video group", channelID: "platform-managed:video:23", fallbackPurpose: "video", wantPurpose: "video", wantGroup: 23},
+		{name: "legacy empty channel keeps chat compatibility", fallbackPurpose: "chat", wantPurpose: "chat"},
+		{name: "legacy empty channel cannot bypass image group binding", fallbackPurpose: "image", wantErr: true},
+		{name: "legacy empty channel cannot bypass video group binding", fallbackPurpose: "video", wantErr: true},
+		{name: "image cannot be used for a video request", channelID: "platform-managed:image:17", fallbackPurpose: "video", wantErr: true},
+		{name: "video cannot be used for a chat request", channelID: "platform-managed:video:23", fallbackPurpose: "chat", wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			purpose, groupID, _, err := parsePlatformManagedChannelID(tc.channelID, tc.fallbackPurpose)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatal("expected purpose mismatch to fail")
+				}
+				return
+			}
+			if err != nil || purpose != tc.wantPurpose || groupID != tc.wantGroup {
+				t.Fatalf("parsed channel = purpose=%q group=%d err=%v", purpose, groupID, err)
+			}
+		})
+	}
+}
+
+func TestPlatformGroupSwitchRejectsMissingOrMutableReplacementSession(t *testing.T) {
+	previous := PlatformManagedSessionKey{UserID: 7, APIKey: "old-image-key", APIKeyID: 12, Purpose: "image"}
+	for name, raw := range map[string]string{
+		"missing session":        `{"purpose":"image","session_binding":"group-pinned-v1"}`,
+		"missing top binding":    `{"purpose":"image","session":{"user_id":7,"api_key":"replacement","api_key_id":42,"purpose":"image","group_id":8,"binding":"group-pinned-v1"}}`,
+		"mutable nested binding": `{"purpose":"image","session_binding":"group-pinned-v1","session":{"user_id":7,"api_key":"replacement","api_key_id":42,"purpose":"image","group_id":8}}`,
+		"wrong purpose":          `{"purpose":"video","session_binding":"group-pinned-v1","session":{"user_id":7,"api_key":"replacement","api_key_id":42,"purpose":"video","group_id":8,"binding":"group-pinned-v1"}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := decodePlatformManagedGroupSwitchResponse(json.RawMessage(raw), "image", previous, 8); err == nil {
+				t.Fatal("mutable or incomplete replacement session must be rejected")
+			}
+		})
+	}
+}
+
 func TestPlatformManagedMediaModelRequiresDeclaredGroupOperationAndAdapter(t *testing.T) {
 	workspace := map[string]any{
 		"selected_group_id": float64(12),
@@ -224,5 +422,40 @@ func TestPlatformManagedMediaModelRequiresDeclaredGroupOperationAndAdapter(t *te
 		},
 	}, 0, "sensenova-u1.5-lite", "image", "create"); err == nil {
 		t.Fatal("a model in another group must not be accepted when the requested group is omitted")
+	}
+}
+
+func TestPlatformManagedVideoModelFailsClosedWhenGroupIsExplicitlyUnavailable(t *testing.T) {
+	blocked := map[string]any{
+		"groups": []any{map[string]any{
+			"id":                     float64(23),
+			"video_available":        false,
+			"video_unavailable_code": "no_schedulable_account",
+			"models": []any{map[string]any{
+				"id": "grok-video", "modalities": []any{"video"}, "adapter": "grok_video", "capability_version": "v1",
+				"video_capabilities": map[string]any{"operations": []any{"generate"}},
+			}},
+		}},
+	}
+	if err := validatePlatformManagedMediaModel(blocked, 23, "grok-video", "video", "generate"); err == nil || !strings.Contains(err.Error(), "暂时没有可用账号") || strings.Contains(err.Error(), "no_schedulable_account") {
+		t.Fatalf("explicit unavailable video group must fail closed with a localized reason: %v", err)
+	}
+	blockedGroup := blocked["groups"].([]any)[0].(map[string]any)
+	blockedGroup["video_unavailable_code"] = "future_platform_code"
+	if err := validatePlatformManagedMediaModel(blocked, 23, "grok-video", "video", "generate"); err == nil || !strings.Contains(err.Error(), "视频分组暂不可用") || strings.Contains(err.Error(), "future_platform_code") {
+		t.Fatalf("unknown video unavailability code must remain localized: %v", err)
+	}
+
+	legacy := map[string]any{
+		"groups": []any{map[string]any{
+			"id": float64(23),
+			"models": []any{map[string]any{
+				"id": "grok-video", "modalities": []any{"video"}, "adapter": "grok_video", "capability_version": "v1",
+				"video_capabilities": map[string]any{"operations": []any{"generate"}},
+			}},
+		}},
+	}
+	if err := validatePlatformManagedMediaModel(legacy, 23, "grok-video", "video", "generate"); err != nil {
+		t.Fatalf("legacy video workspace without availability metadata must remain compatible: %v", err)
 	}
 }

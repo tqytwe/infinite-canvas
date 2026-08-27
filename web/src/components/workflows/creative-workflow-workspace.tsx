@@ -16,7 +16,7 @@ import { createCanvasImageTask, requestEdit, requestGeneration, requestImageQues
 import { saveImageGenerationLogs } from "@/services/api/generation-logs";
 import { deleteUserWorkflow, draftUserWorkflow, fetchUserConfig, fetchUserWorkflows, saveUserWorkflow, type CreativeWorkflowRecord } from "@/services/api/user-config";
 import { deleteStoredImages, imageToDataUrl, uploadImage } from "@/services/image-storage";
-import { defaultConfig, localChannelForActiveModel, normalizeLocalChannels, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { defaultConfig, forcePlatformManagedImageAPI, isPlatformManagedImageConfig, localChannelForActiveModel, normalizeLocalChannels, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
@@ -1531,6 +1531,13 @@ function WorkflowEditorModal({
     onSave: (workflow: CreativeWorkflow) => void;
 }) {
     if (!workflow) return null;
+    const editorImageConfig = {
+        ...modelConfig,
+        ...workflow.config,
+        model: workflow.config.model || modelConfig.model || defaultConfig.model,
+        imageModel: workflow.config.imageModel || workflow.config.model || modelConfig.imageModel || defaultConfig.imageModel,
+    };
+    const managedImageChannel = isPlatformManagedImageConfig(editorImageConfig, editorImageConfig.imageModel);
     const patch = (next: Partial<CreativeWorkflow>) => onChange({ ...workflow, ...next });
     const patchConfig = (next: Partial<WorkflowGenerationConfig>) => patch({ config: { ...workflow.config, ...next } });
     const patchSeriesConfig = (next: Partial<WorkflowSeriesConfig>) => patch({ seriesConfig: { ...workflow.seriesConfig, ...next } });
@@ -1652,24 +1659,20 @@ function WorkflowEditorModal({
                             <ToggleRow label="先审核提示词" checked={workflow.seriesConfig.reviewRequired !== false} onChange={(checked) => patchSeriesConfig({ reviewRequired: checked })} />
                         </div>
                     ) : null}
-                    <Select
-                        className="w-full"
-                        value={workflow.config.apiMode}
-                        options={[
-                            { value: "images", label: "Images API" },
-                            { value: "responses", label: "Responses API" },
-                        ]}
-                        onChange={(value) => patchConfig({ apiMode: value })}
-                    />
-                    <ImageSettingsPanel
-                        config={{ ...defaultConfig, ...workflow.config, model: workflow.config.model || defaultConfig.model, imageModel: workflow.config.imageModel || workflow.config.model || defaultConfig.imageModel }}
-                        onConfigChange={(key, value) => patchConfig({ [key]: value } as Partial<WorkflowGenerationConfig>)}
-                        theme={theme}
-                        showTitle={false}
-                        className="space-y-4"
-                        maxCount={10}
-                        quickCount={6}
-                    />
+                    {managedImageChannel ? (
+                        <div className="flex h-8 items-center rounded-md border border-stone-300 px-3 text-sm text-stone-500 dark:border-stone-700 dark:text-stone-400">Images API</div>
+                    ) : (
+                        <Select
+                            className="w-full"
+                            value={workflow.config.apiMode}
+                            options={[
+                                { value: "images", label: "Images API" },
+                                { value: "responses", label: "Responses API" },
+                            ]}
+                            onChange={(value) => patchConfig({ apiMode: value })}
+                        />
+                    )}
+                    <ImageSettingsPanel config={editorImageConfig} onConfigChange={(key, value) => patchConfig({ [key]: value } as Partial<WorkflowGenerationConfig>)} theme={theme} showTitle={false} className="space-y-4" maxCount={10} quickCount={6} />
                     <div className="space-y-2 rounded-md bg-stone-100 p-3 text-sm dark:bg-stone-950">
                         <ToggleRow label="流式传输" checked={Boolean(workflow.config.streamImages)} onChange={(checked) => patchConfig({ streamImages: checked ? "1" : "" })} />
                         <ToggleRow label="返回 Base64" checked={Boolean(workflow.config.responseFormatB64Json)} onChange={(checked) => patchConfig({ responseFormatB64Json: checked ? "1" : "" })} />
@@ -2069,11 +2072,15 @@ function resolveWorkflowRuntime(workflow: CreativeWorkflow, baseConfig: AiConfig
     const workflowModel = workflow.config.imageModel || workflow.config.model;
     const fallbackModel = baseConfig.imageModel || baseConfig.model;
     const fallbackChannelId = resolveWorkflowImageChannelId(baseConfig, fallbackModel, baseConfig.imageChannelId, baseConfig.activeChannelId);
-    if (!workflowModel) return { model: fallbackModel, apiMode: baseConfig.apiMode, channelId: fallbackChannelId };
+    const resolved = (model: string, apiMode: AiConfig["apiMode"], channelId: string) => {
+        const config = forcePlatformManagedImageAPI({ ...baseConfig, model, imageModel: model, imageChannelId: channelId, activeChannelId: channelId, apiMode });
+        return { model, apiMode: config.apiMode, channelId };
+    };
+    if (!workflowModel) return resolved(fallbackModel, baseConfig.apiMode, fallbackChannelId);
     if (baseConfig.channelMode === "remote" && workflowModel !== fallbackModel && (!baseConfig.models.length || !baseConfig.models.includes(workflowModel))) {
-        return { model: fallbackModel, apiMode: baseConfig.apiMode, channelId: fallbackChannelId };
+        return resolved(fallbackModel, baseConfig.apiMode, fallbackChannelId);
     }
-    return { model: workflowModel, apiMode: workflow.config.apiMode || baseConfig.apiMode, channelId: resolveWorkflowImageChannelId(baseConfig, workflowModel, workflow.config.imageChannelId, baseConfig.imageChannelId, baseConfig.activeChannelId) };
+    return resolved(workflowModel, workflow.config.apiMode || baseConfig.apiMode, resolveWorkflowImageChannelId(baseConfig, workflowModel, workflow.config.imageChannelId, baseConfig.imageChannelId, baseConfig.activeChannelId));
 }
 
 function resolveWorkflowImageChannelId(config: AiConfig, model: string, ...preferredIds: Array<string | undefined>) {

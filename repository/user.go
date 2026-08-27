@@ -79,6 +79,25 @@ func SaveUser(user model.User) (model.User, error) {
 	return user, db.Save(&user).Error
 }
 
+// UpdateUserExtraIfUnchanged atomically replaces the opaque user extra payload
+// only when it still has the value the caller read. Callers that store
+// independent server-side session entries in Extra must use this compare and
+// swap instead of SaveUser, otherwise concurrent image/video session switches
+// can overwrite one another's encrypted payload.
+func UpdateUserExtraIfUnchanged(id, expectedExtra, nextExtra, updatedAt string) (bool, error) {
+	db, err := DB()
+	if err != nil {
+		return false, err
+	}
+	tx := db.Model(&model.User{}).
+		Where("id = ? AND extra = ?", id, expectedExtra).
+		Updates(map[string]any{"extra": nextExtra, "updated_at": updatedAt})
+	if tx.Error != nil {
+		return false, tx.Error
+	}
+	return tx.RowsAffected == 1, nil
+}
+
 func ConsumeUserCredits(id string, credits int, now string) (model.User, bool, error) {
 	db, err := DB()
 	if err != nil {

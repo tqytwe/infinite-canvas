@@ -501,7 +501,10 @@ func readCanvasTaskAIRequest(r *http.Request, fallbackEndpoint string) ([]byte, 
 		if err != nil {
 			return nil, "", "", "", "", "", "", "", "", err
 		}
-		endpoint := firstNonEmpty(meta["_canvas_endpoint"], fallbackEndpoint)
+		endpoint, err := canvasTaskEndpoint(meta["_canvas_endpoint"], fallbackEndpoint)
+		if err != nil {
+			return nil, "", "", "", "", "", "", "", "", err
+		}
 		return body, cleanedContentType, endpoint, meta["_canvas_source"], meta["_canvas_node_id"], meta["_canvas_source_id"], meta["_canvas_task_id"], meta["_canvas_prompt"], meta["_canvas_channel_id"], nil
 	}
 	var wrapper struct {
@@ -526,8 +529,35 @@ func readCanvasTaskAIRequest(r *http.Request, fallbackEndpoint string) ([]byte, 
 	if len(body) == 0 {
 		return nil, "", "", "", "", "", "", "", "", errors.New("任务请求体不能为空")
 	}
-	endpoint := firstNonEmpty(wrapper.Endpoint, fallbackEndpoint)
+	endpoint, err := canvasTaskEndpoint(wrapper.Endpoint, fallbackEndpoint)
+	if err != nil {
+		return nil, "", "", "", "", "", "", "", "", err
+	}
 	return body, "application/json", endpoint, wrapper.Source, wrapper.NodeID, wrapper.SourceID, firstNonEmpty(wrapper.ClientTaskID, wrapper.TaskID), wrapper.Prompt, wrapper.ChannelID, nil
+}
+
+// Canvas task routes execute an upstream request after persisting a task. Keep
+// the endpoint set tied to the task type so a client cannot convert an image
+// task into a chat request through its request wrapper or multipart metadata.
+func canvasTaskEndpoint(requested string, fallback string) (string, error) {
+	endpoint := strings.TrimSpace(firstNonEmpty(requested, fallback))
+	switch fallback {
+	case "/images/generations":
+		if endpoint == "/images/generations" || endpoint == "/images/edits" {
+			return endpoint, nil
+		}
+		return "", errors.New("不支持的图片任务接口")
+	case "/audio/speech":
+		if endpoint == "/audio/speech" {
+			return endpoint, nil
+		}
+		return "", errors.New("不支持的音频任务接口")
+	default:
+		if endpoint == fallback {
+			return endpoint, nil
+		}
+		return "", errors.New("不支持的画布任务接口")
+	}
 }
 
 func stripCanvasTaskMultipartFields(raw []byte, contentType string, normalizeImages bool) ([]byte, string, map[string]string, error) {

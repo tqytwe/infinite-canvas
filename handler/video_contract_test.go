@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tigerowo/infinite-canvas/config"
 	"github.com/tigerowo/infinite-canvas/model"
 	"github.com/tigerowo/infinite-canvas/service"
 )
@@ -33,6 +34,35 @@ func TestVideoPayloadUsesVideoIDForDocumentedPolling(t *testing.T) {
 	parsed := parseVideoTaskPayload([]byte(`{"id":"video_abc","task_id":"task_xyz","status":"queued"}`), "seedance2.5")
 	if parsed.UpstreamTaskID != "video_abc" {
 		t.Fatalf("poll id = %q, want video_abc", parsed.UpstreamTaskID)
+	}
+}
+
+func TestVideoTaskPollUsesManagedSessionOnlyForManagedChannel(t *testing.T) {
+	previous := config.Cfg
+	t.Cleanup(func() { config.Cfg = previous })
+
+	tests := []struct {
+		name    string
+		enabled bool
+		task    model.VideoTask
+		want    bool
+	}{
+		{name: "ordinary remote task", enabled: true, task: model.VideoTask{ChannelID: "remote-video"}, want: false},
+		{name: "user local task", enabled: true, task: model.VideoTask{ChannelID: "platform-managed:video:7", UserChannelID: "local-video"}, want: false},
+		{name: "managed video task", enabled: true, task: model.VideoTask{ChannelID: "platform-managed:video:7"}, want: true},
+		{name: "managed channel while platform auth is disabled", enabled: false, task: model.VideoTask{ChannelID: "platform-managed:video:7"}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config.Cfg = config.Config{}
+			if tt.enabled {
+				config.Cfg = config.Config{PlatformAPIBaseURL: "https://api.example.test", PlatformExchangeSecret: "exchange-secret"}
+			}
+			if got := shouldPollVideoTaskFromPlatform(tt.task); got != tt.want {
+				t.Fatalf("should poll from platform = %t, want %t", got, tt.want)
+			}
+		})
 	}
 }
 

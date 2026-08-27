@@ -5,7 +5,15 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
 import { filterModelsByCapability as filterDiscoveredModelsByCapability, modelMatchesCapability as discoveredModelMatchesCapability, type ModelCapabilities, type ModelCapability } from "@/lib/model-capabilities";
-import { platformManagedChannelForCapability, platformManagedChannels, type PlatformManagedBootstrap } from "@/lib/platform-managed-models";
+import {
+    platformManagedChannelForCapability,
+    platformManagedChannels,
+    type PlatformImageMediaCapabilities,
+    type PlatformManagedBootstrap,
+    type PlatformManagedModelMediaCapabilities,
+    type PlatformMediaPurpose,
+    type PlatformVideoMediaCapabilities,
+} from "@/lib/platform-managed-models";
 import { apiGet } from "@/services/api/request";
 import type { AdminPublicSettings } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
@@ -18,6 +26,7 @@ export type LocalModelChannel = {
     apiKey: string;
     models: string[];
     modelCapabilities?: ModelCapabilities;
+    modelMediaCapabilities?: Record<string, PlatformManagedModelMediaCapabilities>;
     declaredModelIds?: string[];
     modelDiscovery?: {
         state: "declared" | "legacy" | "error";
@@ -185,6 +194,7 @@ type ConfigStore = {
     platformBootstrap: PlatformManagedBootstrap | null;
     platformBootstrapError: string;
     isPlatformBootstrapLoading: boolean;
+    platformBootstrapToken: string;
     isConfigOpen: boolean;
     shouldPromptContinue: boolean;
     updateConfig: <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
@@ -269,6 +279,10 @@ function resolvePlatformManagedConfig(config: AiConfig, bootstrap: PlatformManag
         channelMode: "local" as const,
         baseUrl: "/api",
         apiKey: token,
+        // The platform's image sessions accept only the Images API. Normalize
+        // a legacy persisted Responses selection in the effective config so
+        // UI history and retries describe the request that will be sent.
+        apiMode: "images",
         localChannels,
         publicChannels: [],
         models,
@@ -339,6 +353,7 @@ export const useConfigStore = create<ConfigStore>()(
             platformBootstrap: null,
             platformBootstrapError: "",
             isPlatformBootstrapLoading: false,
+            platformBootstrapToken: "",
             isConfigOpen: false,
             shouldPromptContinue: false,
             updateConfig: (key, value) =>
@@ -358,18 +373,18 @@ export const useConfigStore = create<ConfigStore>()(
                 }
             },
             loadPlatformBootstrap: async (token) => {
-                if (!token || get().isPlatformBootstrapLoading) return;
-                set({ isPlatformBootstrapLoading: true, platformBootstrapError: "" });
+                if (!token || (get().isPlatformBootstrapLoading && get().platformBootstrapToken === token)) return;
+                set({ isPlatformBootstrapLoading: true, platformBootstrapError: "", platformBootstrapToken: token, platformBootstrap: null });
                 try {
                     const platformBootstrap = await apiGet<PlatformManagedBootstrap>("/api/v1/platform/bootstrap", undefined, token);
-                    set({ platformBootstrap, platformBootstrapError: "" });
+                    if (get().platformBootstrapToken === token) set({ platformBootstrap, platformBootstrapError: "" });
                 } catch (error) {
-                    set({ platformBootstrap: null, platformBootstrapError: error instanceof Error ? error.message : "创作能力加载失败" });
+                    if (get().platformBootstrapToken === token) set({ platformBootstrap: null, platformBootstrapError: error instanceof Error ? error.message : "创作能力加载失败" });
                 } finally {
-                    set({ isPlatformBootstrapLoading: false });
+                    if (get().platformBootstrapToken === token) set({ isPlatformBootstrapLoading: false });
                 }
             },
-            clearPlatformBootstrap: () => set({ platformBootstrap: null, platformBootstrapError: "", isPlatformBootstrapLoading: false }),
+            clearPlatformBootstrap: () => set({ platformBootstrap: null, platformBootstrapError: "", isPlatformBootstrapLoading: false, platformBootstrapToken: "" }),
             isAiConfigReady: (config, model) => isAiConfigReady(config, model),
             openConfigDialog: (shouldPromptContinue = false) => set({ isConfigOpen: true, shouldPromptContinue }),
             setConfigDialogOpen: (isConfigOpen) => set({ isConfigOpen }),
@@ -495,6 +510,7 @@ export function normalizeLocalChannels(config: Partial<AiConfig>): LocalModelCha
             apiKey: channel.apiKey || "",
             models,
             modelCapabilities,
+            modelMediaCapabilities: channel.managedPlatform === true ? channel.modelMediaCapabilities : undefined,
             declaredModelIds,
             modelDiscovery: channel.modelDiscovery,
             managedPlatform: channel.managedPlatform === true,
@@ -513,7 +529,54 @@ export function localModelsByCapability(channels: LocalModelChannel[], capabilit
     return normalizeModelList(channels.flatMap((channel) => filterModelsByCapability(channel.models, capability, channel)));
 }
 
-export function channelIdForActiveModel(config: AiConfig) {
+// Server-declared media details are runtime-only and are accepted exclusively
+// from a managed channel selected for the exact purpose. A locally persisted
+// channel therefore cannot accidentally turn a text model into a media model.
+function platformManagedChannelForConfig(config: AiConfig, purpose: Exclude<PlatformMediaPurpose, "chat">, model = config.model): LocalModelChannel | undefined {
+    const modelID = model.trim();
+    if (!modelID) return undefined;
+    const preferredID = purpose === "image" ? config.imageChannelId : config.videoChannelId;
+    const channels = normalizeLocalChannels(config);
+    const supportsModel = (channel: LocalModelChannel) => channel.models.some((candidate) => candidate.trim().toLowerCase() === modelID.toLowerCase());
+    const preferred = channels.find((channel) => channel.id === preferredID);
+    if (preferred) {
+        return preferred.managedPlatform === true && preferred.platformPurpose === purpose && supportsModel(preferred) ? preferred : undefined;
+    }
+    return channels.find((channel) => channel.managedPlatform === true && channel.platformPurpose === purpose && supportsModel(channel));
+}
+
+export function isPlatformManagedImageConfig(config: AiConfig, model = config.model): boolean {
+    return Boolean(platformManagedChannelForConfig(config, "image", model));
+}
+
+// A managed image session is purpose-bound on the platform. The Responses API
+// is a chat-purpose route there, so stale persisted settings must not redirect
+// image work to it. Keep the normalization at the request boundary as well as
+// the UI so restored workflow and retry snapshots remain safe.
+export function forcePlatformManagedImageAPI<T extends AiConfig>(config: T): T {
+    if (!isPlatformManagedImageConfig(config) || config.apiMode === "images") return config;
+    return { ...config, apiMode: "images" } as T;
+}
+
+export function platformManagedMediaCapabilitiesForConfig(config: AiConfig, purpose: Exclude<PlatformMediaPurpose, "chat">, model = config.model): PlatformManagedModelMediaCapabilities | undefined {
+    const modelID = model.trim();
+    if (!modelID) return undefined;
+    const channel = platformManagedChannelForConfig(config, purpose, modelID);
+    if (!channel) return undefined;
+    const exact = channel.modelMediaCapabilities?.[modelID];
+    if (exact) return exact;
+    return Object.entries(channel.modelMediaCapabilities || {}).find(([candidate]) => candidate.toLowerCase() === modelID.toLowerCase())?.[1];
+}
+
+export function platformManagedImageCapabilitiesForConfig(config: AiConfig, model = config.model): PlatformImageMediaCapabilities | undefined {
+    return platformManagedMediaCapabilitiesForConfig(config, "image", model)?.image;
+}
+
+export function platformManagedVideoCapabilitiesForConfig(config: AiConfig, model = config.model): PlatformVideoMediaCapabilities | undefined {
+    return platformManagedMediaCapabilitiesForConfig(config, "video", model)?.video;
+}
+
+export function channelIdForActiveModel(config: AiConfig, capability?: ModelCapability) {
     const channels =
         config.channelMode === "remote"
             ? config.publicChannels.map((channel) => ({
@@ -522,16 +585,21 @@ export function channelIdForActiveModel(config: AiConfig) {
                   modelCapabilities: channel.modelCapabilities,
               }))
             : normalizeLocalChannels(config);
-    for (const [capability, preferredChannelID] of [
+    const channelForCapability = (requested: ModelCapability) => {
+        const preferredChannelID = requested === "image" ? config.imageChannelId : requested === "video" ? config.videoChannelId : requested === "audio" ? config.audioChannelId : config.textChannelId;
+        const preferred = channels.find((channel) => channel.id === preferredChannelID && channel.models.includes(config.model) && modelMatchesCapability(config.model, requested, channel));
+        if (preferred?.id) return preferred.id;
+        return channels.find((channel) => channel.models.includes(config.model) && modelMatchesCapability(config.model, requested, channel))?.id || "";
+    };
+    if (capability) return channelForCapability(capability);
+    for (const requested of [
         ["image", config.imageChannelId],
         ["video", config.videoChannelId],
         ["audio", config.audioChannelId],
         ["text", config.textChannelId],
     ] as const) {
-        const preferred = channels.find((channel) => channel.id === preferredChannelID && channel.models.includes(config.model) && modelMatchesCapability(config.model, capability, channel));
-        if (preferred?.id) return preferred.id;
-        const matching = channels.find((channel) => channel.models.includes(config.model) && modelMatchesCapability(config.model, capability, channel));
-        if (matching?.id) return matching.id;
+        const channelID = channelForCapability(requested[0]);
+        if (channelID) return channelID;
     }
     if (config.activeChannelId) return config.activeChannelId;
     if (config.model === config.videoModel) return config.videoChannelId;
@@ -540,18 +608,19 @@ export function channelIdForActiveModel(config: AiConfig) {
     return config.imageChannelId;
 }
 
-export function localChannelForActiveModel(config: AiConfig) {
+export function localChannelForActiveModel(config: AiConfig, capability?: ModelCapability) {
     const channels = normalizeLocalChannels(config);
-    const preferredId = channelIdForActiveModel(config);
-    return channels.find((channel) => channel.id === preferredId && channel.models.includes(config.model)) || channels.find((channel) => channel.models.includes(config.model)) || channels.find((channel) => channel.id === preferredId) || channels[0];
+    const preferredId = channelIdForActiveModel(config, capability);
+    const matching = channels.filter((channel) => channel.models.includes(config.model) && (!capability || modelMatchesCapability(config.model, capability, channel)));
+    return matching.find((channel) => channel.id === preferredId) || matching[0] || (capability ? undefined : channels.find((channel) => channel.id === preferredId) || channels[0]);
 }
 
 export type DirectAIProvider = "kie" | "apimart";
 
 const directAIProviderCache = new Map<string, DirectAIProvider | null>();
 
-export function directAIProviderForConfig(config: AiConfig): DirectAIProvider | null {
-    const channel = localChannelForActiveModel(config);
+export function directAIProviderForConfig(config: AiConfig, capability?: ModelCapability): DirectAIProvider | null {
+    const channel = localChannelForActiveModel(config, capability);
     if (!channel) return null;
     const protocol = channel.protocol.toLowerCase();
     const baseUrl = channel.baseUrl.trim().toLowerCase();

@@ -30,18 +30,15 @@ import { App, Button, Checkbox, Drawer, Empty, Image, Input, Modal, Segmented, T
 import localforage from "localforage";
 import { saveAs } from "file-saver";
 
-import { ImageSettingsPanel, imageFormatLabel, imageQualityLabel, imageSizeLabel, imageSizeOptions } from "@/components/image-settings-panel";
+import { ImageSettingsPanel, imageFormatLabel, imageQualityLabel, imageSizeLabel, imageSizeOptionsForConfig } from "@/components/image-settings-panel";
 import { ModelPicker } from "@/components/model-picker";
 import { PromptSelectDialog } from "@/components/prompts/prompt-select-dialog";
 import { AssetPickerModal, type InsertAssetPayload } from "@/app/(user)/canvas/components/asset-picker-modal";
 import { canvasThemes } from "@/lib/canvas-theme";
-import {
-    CreativeWorkflowWorkspace,
-    type WorkflowExternalTaskFailure,
-    type WorkflowExternalTaskStart,
-    type WorkflowExternalTaskSuccess,
-} from "@/components/workflows/creative-workflow-workspace";
-import { normalizeLocalChannels, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
+import { CreativeWorkflowWorkspace, type WorkflowExternalTaskFailure, type WorkflowExternalTaskStart, type WorkflowExternalTaskSuccess } from "@/components/workflows/creative-workflow-workspace";
+import { PlatformMediaCapabilityNotice } from "@/components/platform-media-capability-notice";
+import { platformManagedCapabilityIssue } from "@/lib/platform-managed-models";
+import { isPlatformManagedImageConfig, normalizeLocalChannels, platformManagedImageCapabilitiesForConfig, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { nanoid } from "nanoid";
 import { formatBytes, formatDuration, getDataUrlByteSize, readImageMeta } from "@/lib/image-utils";
@@ -137,8 +134,14 @@ export default function ImagePage() {
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
+    const publicSettings = useConfigStore((state) => state.publicSettings);
+    const platformBootstrap = useConfigStore((state) => state.platformBootstrap);
+    const platformBootstrapError = useConfigStore((state) => state.platformBootstrapError);
+    const isPlatformBootstrapLoading = useConfigStore((state) => state.isPlatformBootstrapLoading);
+    const loadPlatformBootstrap = useConfigStore((state) => state.loadPlatformBootstrap);
     const addAsset = useAssetStore((state) => state.addAsset);
     const token = useUserStore((state) => state.token);
+    const user = useUserStore((state) => state.user);
     const isUserReady = useUserStore((state) => state.isReady);
     const [prompt, setPrompt] = useState("");
     const [references, setReferences] = useState<ReferenceImage[]>([]);
@@ -167,6 +170,9 @@ export default function ImagePage() {
     const effectiveConfigRef = useRef(effectiveConfig);
 
     const model = effectiveConfig.imageModel || effectiveConfig.model;
+    const managedImageCapabilities = platformManagedImageCapabilitiesForConfig(effectiveConfig, model);
+    const managedCapabilityIssue = isUserReady && Boolean(token) && user?.role !== "admin" && publicSettings?.auth?.platform?.enabled === true ? platformBootstrapError || platformManagedCapabilityIssue(platformBootstrap, "image") : "";
+    const canUseImageReferences = !managedImageCapabilities || (managedImageCapabilities.operations.includes("edit") && managedImageCapabilities.maxReferenceImages !== 0);
     const canGenerate = Boolean(prompt.trim());
     const generationCount = Math.max(1, Math.min(10, Number(config.count) || 1));
     const pendingCount = results.filter((item) => item.status === "pending").length;
@@ -212,7 +218,6 @@ export default function ImagePage() {
     useEffect(() => {
         logsRef.current = logs;
     }, [logs]);
-
 
     useEffect(() => {
         if (token) accountHistorySyncEnabledRef.current = true;
@@ -288,7 +293,7 @@ export default function ImagePage() {
         const dx = event.clientX - drag.startX;
         const dy = event.clientY - drag.startY;
         if (Math.abs(dx) > 4 || Math.abs(dy) > 4) drag.moved = true;
-        
+
         // 直接更新 DOM 样式，免去顶层 React State 的庞大整页重绘 Layout 卡顿！
         const nextPos = clampWorkflowButtonPosition({ x: drag.originX + dx, y: drag.originY + dy });
         if (workflowButtonRef.current) {
@@ -308,6 +313,10 @@ export default function ImagePage() {
     };
 
     const addReferences = async (files?: FileList | null) => {
+        if (!canUseImageReferences) {
+            message.warning("当前模型不支持参考图，请移除已有参考图后再生成");
+            return;
+        }
         const imageFiles = Array.from(files || []).filter((file) => file.type.startsWith("image/"));
         if (!imageFiles.length) return;
         setUploadingCount(imageFiles.length);
@@ -330,6 +339,10 @@ export default function ImagePage() {
     };
 
     const addReferencesFromClipboard = async () => {
+        if (!canUseImageReferences) {
+            message.warning("当前模型不支持参考图，请移除已有参考图后再生成");
+            return;
+        }
         try {
             const items = await navigator.clipboard.read();
             const blobs = await Promise.all(items.flatMap((item) => item.types.filter((type) => type.startsWith("image/")).map((type) => item.getType(type))));
@@ -401,7 +414,12 @@ export default function ImagePage() {
 
     const retryLog = async (log: GenerationLog) => {
         const retryChannelId = imageTaskChannelId(log.task);
-        const snapshot = buildRequestSnapshot({ promptText: log.prompt, referenceItems: log.references, taskCount: Number(log.config.count) || 1, configOverride: { ...log.config, ...(retryChannelId ? { imageChannelId: retryChannelId, activeChannelId: retryChannelId } : {}) } });
+        const snapshot = buildRequestSnapshot({
+            promptText: log.prompt,
+            referenceItems: log.references,
+            taskCount: Number(log.config.count) || 1,
+            configOverride: { ...log.config, ...(retryChannelId ? { imageChannelId: retryChannelId, activeChannelId: retryChannelId } : {}) },
+        });
         if (!snapshot) return;
         await submitGenerationBatch(snapshot);
     };
@@ -442,12 +460,11 @@ export default function ImagePage() {
 
     const createPersistentImageTask = async (pendingLog: GenerationLog, snapshot: RequestSnapshot, index: number, taskCount: number) => {
         try {
-            const task = await createCanvasImageTask(
-                { ...snapshot.requestConfig, seedIndex: index, seedCount: taskCount, count: "1" } as AiConfig & { seedIndex?: number; seedCount?: number },
-                snapshot.text,
-                snapshot.references,
-                { source: "image-workbench", sourceId: pendingLog.id, clientTaskId: imageLogTaskId(pendingLog) },
-            );
+            const task = await createCanvasImageTask({ ...snapshot.requestConfig, seedIndex: index, seedCount: taskCount, count: "1" } as AiConfig & { seedIndex?: number; seedCount?: number }, snapshot.text, snapshot.references, {
+                source: "image-workbench",
+                sourceId: pendingLog.id,
+                clientTaskId: imageLogTaskId(pendingLog),
+            });
             const nextLog = { ...pendingLog, task, lastPolledAt: Date.now() };
             await saveLog(nextLog);
             setResults((value) => updateResultByLogId(value, pendingLog.id, { taskLogId: nextLog.id, task, progress: task.progress, lastPolledAt: nextLog.lastPolledAt }));
@@ -495,10 +512,10 @@ export default function ImagePage() {
                     bytes: 0,
                     mimeType: undefined,
                 });
-                
+
                 // 更新结果状态
                 setResults((value) => updateResult(value, id, { image: durableImage }));
-                
+
                 // 立即保存单张成功日志
                 await saveLog(
                     buildLog({
@@ -520,7 +537,7 @@ export default function ImagePage() {
             } catch (err) {
                 const errMsg = errorMessage(err);
                 const errDetail = errorDetail(err);
-                
+
                 // 立即保存单张失败日志
                 await saveLog(
                     buildLog({
@@ -560,6 +577,10 @@ export default function ImagePage() {
     };
 
     const addResultToReferences = async (image: GeneratedImage, index: number) => {
+        if (!canUseImageReferences) {
+            message.warning("当前模型不支持参考图，请选择支持编辑的图片模型");
+            return;
+        }
         try {
             if (image.storageKey) {
                 const url = await resolveImageUrl(image.storageKey, image.dataUrl);
@@ -629,9 +650,9 @@ export default function ImagePage() {
     const syncLogImage = async (log: GenerationLog, image: GeneratedImage, index: number) => {
         const synced = await syncImage(image, index);
         if (!synced) return;
-        const nextLog = { ...log, images: log.images.map((item) => item.id === image.id ? synced : item) };
+        const nextLog = { ...log, images: log.images.map((item) => (item.id === image.id ? synced : item)) };
         await logStore.setItem(log.id, serializeLog(nextLog));
-        const nextLogs = logs.map((item) => item.id === log.id ? nextLog : item);
+        const nextLogs = logs.map((item) => (item.id === log.id ? nextLog : item));
         setLogs(nextLogs);
         await persistImageHistory(nextLogs, categories);
         if (previewLog?.id === log.id) setPreviewLog(nextLog);
@@ -641,6 +662,11 @@ export default function ImagePage() {
         if (payload.kind === "text") {
             setPrompt(payload.content);
         } else if (payload.kind === "image") {
+            if (!canUseImageReferences) {
+                message.warning("当前模型不支持参考图，请选择支持编辑的图片模型");
+                setAssetPickerOpen(false);
+                return;
+            }
             const resolvedUrl = await resolveImageUrl(payload.storageKey, payload.dataUrl);
             const safeUrl = resolvedUrl || "";
             const reference =
@@ -664,7 +690,10 @@ export default function ImagePage() {
                 setReferences((value) => [...value, reference]);
             } else {
                 const stored = await uploadImage(payload.dataUrl);
-                setReferences((value) => [...value, { id: nanoid(), name: payload.title, type: stored.mimeType, dataUrl: stored.url, storageKey: stored.storageKey, source: payload.source === "library" ? "library" : "upload", temporary: payload.source !== "library" }]);
+                setReferences((value) => [
+                    ...value,
+                    { id: nanoid(), name: payload.title, type: stored.mimeType, dataUrl: stored.url, storageKey: stored.storageKey, source: payload.source === "library" ? "library" : "upload", temporary: payload.source !== "library" },
+                ]);
             }
         } else {
             message.warning("视频素材不能作为生图参考图");
@@ -686,9 +715,7 @@ export default function ImagePage() {
             new Map(
                 items.flatMap((item) => {
                     const taskId = item.task?.parent_task_id || item.task?.id;
-                    return item.task && taskId
-                        ? [[taskId, { ...item.task, id: taskId }] as const]
-                        : [];
+                    return item.task && taskId ? [[taskId, { ...item.task, id: taskId }] as const] : [];
                 }),
             ).values(),
         );
@@ -804,7 +831,10 @@ export default function ImagePage() {
             let mergedLogs = recoverableTasks.length ? mergeBackendImageTasks(currentLogs, recoverableTasks, currentConfig) : currentLogs;
             const repairCandidates = currentLogs.filter((log) => log.status === "成功" && !log.images.length && Boolean(log.task?.id));
             if (repairCandidates.length) {
-                const repairedTasks = await batchCanvasImageTaskStatus(currentConfig, repairCandidates.map((log) => log.task?.id || ""));
+                const repairedTasks = await batchCanvasImageTaskStatus(
+                    currentConfig,
+                    repairCandidates.map((log) => log.task?.id || ""),
+                );
                 const taskById = new Map(repairedTasks.map((task) => [task.id, task]));
                 const repairedLogs = await Promise.all(
                     mergedLogs.map(async (log) => {
@@ -960,7 +990,12 @@ export default function ImagePage() {
         message.success("提示词已复制");
     };
 
-    const buildRequestSnapshot = ({ promptText = prompt, referenceItems = references, taskCount = generationCount, configOverride }: { promptText?: string; referenceItems?: ReferenceImage[]; taskCount?: number; configOverride?: Partial<GenerationLogConfig> } = {}) => {
+    const buildRequestSnapshot = ({
+        promptText = prompt,
+        referenceItems = references,
+        taskCount = generationCount,
+        configOverride,
+    }: { promptText?: string; referenceItems?: ReferenceImage[]; taskCount?: number; configOverride?: Partial<GenerationLogConfig> } = {}) => {
         const text = promptText.trim();
         if (!text) {
             message.error("请输入生图提示词");
@@ -1001,7 +1036,12 @@ export default function ImagePage() {
 
     const retryResult = (result: GenerationResult) => {
         const retryChannelId = imageTaskChannelId(result.task);
-        const snapshot = buildRequestSnapshot({ promptText: result.prompt, referenceItems: result.references, taskCount: 1, configOverride: { ...result.config, ...(retryChannelId ? { imageChannelId: retryChannelId, activeChannelId: retryChannelId } : {}) } });
+        const snapshot = buildRequestSnapshot({
+            promptText: result.prompt,
+            referenceItems: result.references,
+            taskCount: 1,
+            configOverride: { ...result.config, ...(retryChannelId ? { imageChannelId: retryChannelId, activeChannelId: retryChannelId } : {}) },
+        });
         if (!snapshot) return;
         setResults((value) => value.filter((item) => item.id !== result.id));
         void submitGenerationBatch(snapshot);
@@ -1101,6 +1141,7 @@ export default function ImagePage() {
 
     return (
         <div className="flex h-full flex-col overflow-hidden bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100">
+            {managedCapabilityIssue ? <PlatformMediaCapabilityNotice capability="图片" message={managedCapabilityIssue} loading={isPlatformBootstrapLoading} onReload={() => token && void loadPlatformBootstrap(token)} /> : null}
             <main className={`${workbenchLayout === "side" ? "grid grid-cols-1 lg:grid-cols-[420px_minmax(0,1fr)]" : "relative flex flex-col"} min-h-0 flex-1 gap-3 overflow-y-auto p-3 lg:overflow-hidden`}>
                 {workbenchLayout === "side" ? (
                     <>
@@ -1111,6 +1152,7 @@ export default function ImagePage() {
                             references={references}
                             config={effectiveConfig}
                             model={model}
+                            canUseImageReferences={canUseImageReferences}
                             canGenerate={canGenerate}
                             pendingCount={pendingCount}
                             updateConfig={updateConfig}
@@ -1118,7 +1160,13 @@ export default function ImagePage() {
                             onLayoutChange={setWorkbenchLayout}
                             onPromptChange={setPrompt}
                             onOpenPromptLibrary={() => setPromptDialogOpen(true)}
-                            onOpenAssetPicker={() => setAssetPickerOpen(true)}
+                            onOpenAssetPicker={() => {
+                                if (!canUseImageReferences) {
+                                    message.warning("当前模型不支持参考图，请选择支持编辑的图片模型");
+                                    return;
+                                }
+                                setAssetPickerOpen(true);
+                            }}
                             onPastePrompt={() => void pastePromptFromClipboard()}
                             onClearPrompt={clearPrompt}
                             onPasteReferences={() => void addReferencesFromClipboard()}
@@ -1202,6 +1250,7 @@ export default function ImagePage() {
                             references={references}
                             config={effectiveConfig}
                             model={model}
+                            canUseImageReferences={canUseImageReferences}
                             canGenerate={canGenerate}
                             pendingCount={pendingCount}
                             updateConfig={updateConfig}
@@ -1209,7 +1258,13 @@ export default function ImagePage() {
                             onLayoutChange={setWorkbenchLayout}
                             onPromptChange={setPrompt}
                             onOpenPromptLibrary={() => setPromptDialogOpen(true)}
-                            onOpenAssetPicker={() => setAssetPickerOpen(true)}
+                            onOpenAssetPicker={() => {
+                                if (!canUseImageReferences) {
+                                    message.warning("当前模型不支持参考图，请选择支持编辑的图片模型");
+                                    return;
+                                }
+                                setAssetPickerOpen(true);
+                            }}
                             onPastePrompt={() => void pastePromptFromClipboard()}
                             onClearPrompt={clearPrompt}
                             onPasteReferences={() => void addReferencesFromClipboard()}
@@ -1227,7 +1282,7 @@ export default function ImagePage() {
                 className="fixed z-50 inline-flex touch-none select-none items-center gap-2 rounded-full border border-sky-300/70 bg-white/90 px-4 py-3 text-sm font-semibold text-stone-950 shadow-[0_18px_50px_rgba(14,165,233,0.28),0_8px_18px_rgba(0,0,0,0.14)] ring-1 ring-white/70 backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-sky-300 hover:bg-white hover:shadow-[0_22px_64px_rgba(14,165,233,0.36),0_10px_22px_rgba(0,0,0,0.18)] dark:border-sky-400/40 dark:bg-stone-900/88 dark:text-stone-100 dark:ring-white/10 dark:hover:bg-stone-900"
                 style={{
                     left: (typeof window === "undefined" ? defaultWorkflowButtonPosition() : clampWorkflowButtonPosition(workflowButtonPosition.x || workflowButtonPosition.y ? workflowButtonPosition : defaultWorkflowButtonPosition())).x,
-                    top: (typeof window === "undefined" ? defaultWorkflowButtonPosition() : clampWorkflowButtonPosition(workflowButtonPosition.x || workflowButtonPosition.y ? workflowButtonPosition : defaultWorkflowButtonPosition())).y
+                    top: (typeof window === "undefined" ? defaultWorkflowButtonPosition() : clampWorkflowButtonPosition(workflowButtonPosition.x || workflowButtonPosition.y ? workflowButtonPosition : defaultWorkflowButtonPosition())).y,
                 }}
                 onPointerDown={handleWorkflowButtonPointerDown}
                 onPointerMove={handleWorkflowButtonPointerMove}
@@ -1245,7 +1300,7 @@ export default function ImagePage() {
                 <WandSparkles className="size-4 text-sky-500 dark:text-sky-300" />
                 工作流
             </button>
-            <Drawer title="创作工作流" placement="right" size="min(1120px, 92vw)" open={workflowDrawerOpen}  onClose={() => setWorkflowDrawerOpen(false)} styles={{ body: { padding: 0 } }} destroyOnHidden={false}>
+            <Drawer title="创作工作流" placement="right" size="min(1120px, 92vw)" open={workflowDrawerOpen} onClose={() => setWorkflowDrawerOpen(false)} styles={{ body: { padding: 0 } }} destroyOnHidden={false}>
                 <CreativeWorkflowWorkspace
                     embedded
                     hideTaskList
@@ -1297,6 +1352,7 @@ function WorkbenchPanel({
     references,
     config,
     model,
+    canUseImageReferences,
     canGenerate,
     pendingCount,
     updateConfig,
@@ -1319,6 +1375,7 @@ function WorkbenchPanel({
     references: ReferenceImage[];
     config: AiConfig;
     model: string;
+    canUseImageReferences: boolean;
     canGenerate: boolean;
     pendingCount: number;
     updateConfig: UpdateAiConfig;
@@ -1336,6 +1393,7 @@ function WorkbenchPanel({
     uploadingCount: number;
 }) {
     const [bottomSettingsCollapsed, setBottomSettingsCollapsed] = useState(true);
+    const managedImageChannel = isPlatformManagedImageConfig(config, model);
 
     if (layout === "bottom") {
         return (
@@ -1356,7 +1414,7 @@ function WorkbenchPanel({
                             <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                                 <Button title="清空输入" icon={<Trash2 className="size-4" />} onClick={onClearPrompt} />
                                 <Button title="提示词库" icon={<BookOpen className="size-4" />} onClick={onOpenPromptLibrary} />
-                                <Button title="我的素材" icon={<FolderPlus className="size-4" />} onClick={onOpenAssetPicker} />
+                                <Button title={canUseImageReferences ? "我的素材" : "当前模型不支持参考图"} icon={<FolderPlus className="size-4" />} disabled={!canUseImageReferences} onClick={onOpenAssetPicker} />
                                 <Button
                                     title="参数配置"
                                     className={`lg:hidden ${!bottomSettingsCollapsed ? "!bg-sky-500/10 !text-sky-500 !border-sky-500/30" : ""}`}
@@ -1386,25 +1444,11 @@ function WorkbenchPanel({
                                     fullWidth
                                 />
                             </label>
-                            <label className="grid gap-1 text-xs text-stone-500 dark:text-stone-400">
-                                接口模式
-                                <div className="flex h-11 items-center rounded-xl border border-stone-200 bg-background px-2.5 dark:border-stone-800">
-                                    <Segmented
-                                        size="small"
-                                        className="canvas-config-mode !rounded-md !p-0.5 w-full"
-                                        value={config.apiMode}
-                                        onChange={(value) => updateConfig("apiMode", value as "images" | "responses")}
-                                        options={[
-                                            { value: "images", label: "images" },
-                                            { value: "responses", label: "responses" },
-                                        ]}
-                                    />
-                                </div>
-                            </label>
-                            <QuickSelect label="尺寸" value={config.size || "auto"} options={imageSizeOptions} onChange={(value) => updateConfig("size", value)} />
+                            <ImageAPIModeControl config={config} model={model} updateConfig={updateConfig} managedImageChannel={managedImageChannel} />
+                            <QuickSelect label="尺寸" value={config.size || "auto"} options={imageSizeOptionsForConfig(config, model)} onChange={(value) => updateConfig("size", value)} />
                             <QuickSelect label="质量" value={config.quality || "auto"} options={quickQualityOptions} onChange={(value) => updateConfig("quality", value)} />
                             <QuickNumber label="数量" value={config.count || "1"} min={1} max={10} onChange={(value) => updateConfig("count", value)} />
-                            <ReferenceQuickActions references={references} onUploadReferences={onUploadReferences} />
+                            <ReferenceQuickActions references={references} canUseImageReferences={canUseImageReferences} onUploadReferences={onUploadReferences} />
                             <Button type="primary" className="h-11 min-w-28 rounded-xl hidden lg:inline-flex" icon={<Sparkles className="size-4" />} disabled={!canGenerate} onClick={onGenerate}>
                                 {pendingCount ? `${pendingCount} 生成中` : "开始创作"}
                             </Button>
@@ -1428,10 +1472,18 @@ function WorkbenchPanel({
                     </div>
                     <div className="border-t border-stone-200 p-3 dark:border-stone-800 space-y-2">
                         <div className="flex flex-wrap gap-1">
-                            <Button size="small" icon={<ClipboardPaste className="size-3.5" />} onClick={onPastePrompt}>读取剪贴板</Button>
-                            <Button size="small" icon={<Trash2 className="size-3.5" />} onClick={onClearPrompt}>清空</Button>
-                            <Button size="small" icon={<BookOpen className="size-3.5" />} onClick={onOpenPromptLibrary}>提示词库</Button>
-                            <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={onOpenAssetPicker}>我的素材</Button>
+                            <Button size="small" icon={<ClipboardPaste className="size-3.5" />} onClick={onPastePrompt}>
+                                读取剪贴板
+                            </Button>
+                            <Button size="small" icon={<Trash2 className="size-3.5" />} onClick={onClearPrompt}>
+                                清空
+                            </Button>
+                            <Button size="small" icon={<BookOpen className="size-3.5" />} onClick={onOpenPromptLibrary}>
+                                提示词库
+                            </Button>
+                            <Button size="small" title={canUseImageReferences ? "我的素材" : "当前模型不支持参考图"} icon={<FolderPlus className="size-3.5" />} disabled={!canUseImageReferences} onClick={onOpenAssetPicker}>
+                                我的素材
+                            </Button>
                         </div>
                         <Input.TextArea value={prompt} onChange={(event) => onPromptChange(event.target.value)} rows={6} placeholder="描述画面主体、风格、构图、光线和用途" />
                     </div>
@@ -1444,9 +1496,15 @@ function WorkbenchPanel({
                     </div>
                     <div className="border-t border-stone-200 p-3 dark:border-stone-800 space-y-2">
                         <div className="flex flex-wrap gap-1">
-                            <Button size="small" icon={<ClipboardPaste className="size-3.5" />} onClick={onPasteReferences}>剪切板</Button>
-                            <Button size="small" icon={<Upload className="size-3.5" />} onClick={onUploadReferences}>上传</Button>
-                            <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={onOpenAssetPicker}>从素材库选择</Button>
+                            <Button size="small" title={canUseImageReferences ? "从剪切板添加参考图" : "当前模型不支持参考图"} icon={<ClipboardPaste className="size-3.5" />} disabled={!canUseImageReferences} onClick={onPasteReferences}>
+                                剪切板
+                            </Button>
+                            <Button size="small" title={canUseImageReferences ? "上传参考图" : "当前模型不支持参考图"} icon={<Upload className="size-3.5" />} disabled={!canUseImageReferences} onClick={onUploadReferences}>
+                                上传
+                            </Button>
+                            <Button size="small" title={canUseImageReferences ? "从素材库选择参考图" : "当前模型不支持参考图"} icon={<FolderPlus className="size-3.5" />} disabled={!canUseImageReferences} onClick={onOpenAssetPicker}>
+                                从素材库选择
+                            </Button>
                         </div>
                         <ReferenceStrip references={references} onRemoveReference={onRemoveReference} uploadingCount={uploadingCount} />
                     </div>
@@ -1519,12 +1577,12 @@ function ReferenceStrip({ references, compact = false, className = "", onRemoveR
     );
 }
 
-function ReferenceQuickActions({ references, onUploadReferences }: { references: ReferenceImage[]; onUploadReferences: () => void }) {
+function ReferenceQuickActions({ references, canUseImageReferences, onUploadReferences }: { references: ReferenceImage[]; canUseImageReferences: boolean; onUploadReferences: () => void }) {
     return (
         <div className="flex h-11 items-center gap-1 rounded-xl border border-stone-200 bg-background px-2 dark:border-stone-800">
             {references[0] ? <img src={references[0].dataUrl || undefined} alt={references[0].name} className="size-7 rounded object-cover" /> : null}
             {references.length ? <span className="min-w-7 text-xs text-stone-500">{references.length} 张</span> : null}
-            <Button size="small" type="text" icon={<Upload className="size-3.5" />} onClick={onUploadReferences} />
+            <Button size="small" type="text" title={canUseImageReferences ? "上传参考图" : "当前模型不支持参考图"} icon={<Upload className="size-3.5" />} disabled={!canUseImageReferences} onClick={onUploadReferences} />
         </div>
     );
 }
@@ -1562,13 +1620,7 @@ function QuickNumber({ label, value, min, max, disabled, onChange }: { label: st
 }
 
 function settingsSummary(config: AiConfig, model: string) {
-    return [
-        model,
-        imageSizeLabel(config.size || "auto"),
-        imageQualityLabel(config.quality || "auto"),
-        `${config.count || "1"} 张`,
-        config.streamImages ? `流式 ${config.streamPartialImages || "1"}` : "非流式",
-    ].join(" · ");
+    return [model, imageSizeLabel(config.size || "auto"), imageQualityLabel(config.quality || "auto"), `${config.count || "1"} 张`, config.streamImages ? `流式 ${config.streamPartialImages || "1"}` : "非流式"].join(" · ");
 }
 
 function ResultsPanel({
@@ -1710,7 +1762,18 @@ function ResultsPanel({
                 <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                     {results.map((result, index) =>
                         result.status === "success" && result.image ? (
-                            <ResultImageCard key={result.id} result={result} image={result.image} index={index} onCopyPrompt={onCopyPrompt} onEdit={onEdit} onDownload={onDownload} onSaveAsset={onSaveAsset} syncing={syncingImageIds.includes(result.image.id)} onSync={(image) => onSyncResult(result.id, image, index)} />
+                            <ResultImageCard
+                                key={result.id}
+                                result={result}
+                                image={result.image}
+                                index={index}
+                                onCopyPrompt={onCopyPrompt}
+                                onEdit={onEdit}
+                                onDownload={onDownload}
+                                onSaveAsset={onSaveAsset}
+                                syncing={syncingImageIds.includes(result.image.id)}
+                                onSync={(image) => onSyncResult(result.id, image, index)}
+                            />
                         ) : result.status === "failed" ? (
                             <FailedImageCard key={result.id} result={result} error={result.error || "生成失败"} onCopyPrompt={onCopyPrompt} onRetry={() => onRetry(result)} />
                         ) : (
@@ -1841,24 +1904,73 @@ function GenerationSettings({ config, model, updateConfig, openConfigDialog }: {
                     <span className="font-medium text-sm">模型</span>
                 </div>
                 <div className="border-t border-stone-200 p-3 dark:border-stone-800 space-y-2">
-                    <ModelPicker config={config} value={model} capability="image" channelId={config.imageChannelId} onChange={(value, channelId) => { updateConfig("imageModel", value); if (channelId) updateConfig("imageChannelId", channelId); }} fullWidth onMissingConfig={() => openConfigDialog(false)} />
-                    <div className="flex items-center justify-between gap-3 pt-1">
-                        <div className="text-xs opacity-75">接口模式</div>
-                        <Segmented
-                            size="small"
-                            className="canvas-config-mode !rounded-md !p-0.5"
-                            value={config.apiMode}
-                            onChange={(value) => updateConfig("apiMode", value as "images" | "responses")}
-                            options={[
-                                { value: "images", label: "images" },
-                                { value: "responses", label: "responses" },
-                            ]}
-                        />
-                    </div>
+                    <ModelPicker
+                        config={config}
+                        value={model}
+                        capability="image"
+                        channelId={config.imageChannelId}
+                        onChange={(value, channelId) => {
+                            updateConfig("imageModel", value);
+                            if (channelId) updateConfig("imageChannelId", channelId);
+                        }}
+                        fullWidth
+                        onMissingConfig={() => openConfigDialog(false)}
+                    />
+                    <ImageAPIModeControl config={config} model={model} updateConfig={updateConfig} compact />
                 </div>
             </section>
-            <ImageSettingsPanel config={config} onConfigChange={(key, value) => updateConfig(key, value)} theme={theme} showTitle={false} className="space-y-3" maxCount={10} />
+            <ImageSettingsPanel config={config} model={model} onConfigChange={(key, value) => updateConfig(key, value)} theme={theme} showTitle={false} className="space-y-3" maxCount={10} />
         </div>
+    );
+}
+
+function ImageAPIModeControl({
+    config,
+    model,
+    updateConfig,
+    managedImageChannel = isPlatformManagedImageConfig(config, model),
+    compact = false,
+}: {
+    config: AiConfig;
+    model: string;
+    updateConfig: UpdateAiConfig;
+    managedImageChannel?: boolean;
+    compact?: boolean;
+}) {
+    if (managedImageChannel) {
+        return compact ? (
+            <div className="flex items-center justify-between gap-3 pt-1">
+                <div className="text-xs opacity-75">接口模式</div>
+                <span className="text-xs opacity-75">Images API</span>
+            </div>
+        ) : (
+            <label className="grid gap-1 text-xs text-stone-500 dark:text-stone-400">
+                接口模式
+                <span className="flex h-11 items-center rounded-xl border border-stone-200 bg-background px-2.5 dark:border-stone-800">Images API</span>
+            </label>
+        );
+    }
+    const selector = (
+        <Segmented
+            size="small"
+            className="canvas-config-mode !rounded-md !p-0.5 w-full"
+            value={config.apiMode}
+            onChange={(value) => updateConfig("apiMode", value as "images" | "responses")}
+            options={[
+                { value: "images", label: "images" },
+                { value: "responses", label: "responses" },
+            ]}
+        />
+    );
+    return compact ? (
+        <div className="flex items-center justify-between gap-3 pt-1">
+            <div className="text-xs opacity-75">接口模式</div>
+            {selector}
+        </div>
+    ) : (
+        <label className="grid gap-1 text-xs text-stone-500 dark:text-stone-400">
+            接口模式<div className="flex h-11 items-center rounded-xl border border-stone-200 bg-background px-2.5 dark:border-stone-800">{selector}</div>
+        </label>
     );
 }
 
@@ -1887,8 +1999,14 @@ function ResultImageCard({
         <div className="overflow-hidden rounded-lg border border-stone-200 bg-background dark:border-stone-800">
             <div className="relative aspect-[4/3] bg-stone-100 dark:bg-stone-900">
                 <div className="absolute right-1.5 top-1.5 z-10 flex gap-1">
-                    {!image.storageKey?.startsWith("server:") ? <Tag className="m-0 text-[10px]" color="gold">临时URL</Tag> : null}
-                    <Tag className="m-0 text-[10px]" color="blue">新生成</Tag>
+                    {!image.storageKey?.startsWith("server:") ? (
+                        <Tag className="m-0 text-[10px]" color="gold">
+                            临时URL
+                        </Tag>
+                    ) : null}
+                    <Tag className="m-0 text-[10px]" color="blue">
+                        新生成
+                    </Tag>
                 </div>
                 <ReferenceThumbnailOverlay references={result.references} className="left-1.5 top-1.5" />
                 <Image src={image.dataUrl} alt={`生成结果 ${index + 1}`} className="aspect-[4/3] object-cover" />
@@ -2075,7 +2193,11 @@ function HistoryLogCard({
                     {selected ? <Button size="small" danger type="text" icon={<Trash2 className="size-3.5" />} onClick={onDelete} /> : null}
                 </div>
                 <div className="absolute right-1.5 top-1.5 z-10 flex gap-1">
-                    {firstImage && !firstImage.storageKey?.startsWith("server:") ? <Tag className="m-0 text-[10px]" color="gold">临时URL</Tag> : null}
+                    {firstImage && !firstImage.storageKey?.startsWith("server:") ? (
+                        <Tag className="m-0 text-[10px]" color="gold">
+                            临时URL
+                        </Tag>
+                    ) : null}
                     <Tag className="m-0 text-[10px]" color={log.status === "生成中" ? "processing" : log.failCount ? "red" : "blue"}>
                         {log.status === "生成中" ? "生成中" : log.failCount ? `失败 ${log.failCount}` : "成功"}
                     </Tag>
@@ -2278,18 +2400,21 @@ function imageTaskSourceId(task?: CanvasImageTask) {
 }
 
 function imageTaskIdentityKeys(task?: CanvasImageTask) {
-    return uniqueStrings([task?.id, imageTaskSourceId(task), stringRecordValue(task, "task_id"), stringRecordValue(task, "taskId"), stringRecordValue(task, "image_id"), stringRecordValue(task, "imageId"), stringRecordValue(task, "result_id"), stringRecordValue(task, "resultId")]);
+    return uniqueStrings([
+        task?.id,
+        imageTaskSourceId(task),
+        stringRecordValue(task, "task_id"),
+        stringRecordValue(task, "taskId"),
+        stringRecordValue(task, "image_id"),
+        stringRecordValue(task, "imageId"),
+        stringRecordValue(task, "result_id"),
+        stringRecordValue(task, "resultId"),
+    ]);
 }
 
 function imageLogIdentityKeys(log: GenerationLog) {
-    const taskKeys = (log.task?.image_urls?.length || 0) > 1
-        ? []
-        : imageTaskIdentityKeys(log.task);
-    return uniqueStrings([
-        log.id,
-        ...taskKeys,
-        ...log.images.flatMap((image) => [image.id, image.storageKey]),
-    ]);
+    const taskKeys = (log.task?.image_urls?.length || 0) > 1 ? [] : imageTaskIdentityKeys(log.task);
+    return uniqueStrings([log.id, ...taskKeys, ...log.images.flatMap((image) => [image.id, image.storageKey])]);
 }
 
 function imageResultIdentityKeys(result: GenerationResult) {
@@ -2406,7 +2531,7 @@ function isRecoverableImageTask(task: CanvasImageTask) {
 }
 
 function isCompletedImageTask(task: CanvasImageTask) {
-    return Boolean(task.image_url || task.url) && Boolean(task.storageKey) || ["completed", "complete", "done", "succeeded", "success"].includes((task.status || "").toLowerCase());
+    return (Boolean(task.image_url || task.url) && Boolean(task.storageKey)) || ["completed", "complete", "done", "succeeded", "success"].includes((task.status || "").toLowerCase());
 }
 
 function isFailedImageTask(task: CanvasImageTask) {
@@ -2418,7 +2543,9 @@ function mergeBackendImageTasks(logs: GenerationLog[], tasks: CanvasImageTask[],
     const byKey = new Map<string, GenerationLog>();
     nextLogs.forEach((log) => imageLogIdentityKeys(log).forEach((key) => byKey.set(key, log)));
     tasks.forEach((task) => {
-        const existing = imageTaskIdentityKeys(task).map((key) => byKey.get(key)).find(Boolean);
+        const existing = imageTaskIdentityKeys(task)
+            .map((key) => byKey.get(key))
+            .find(Boolean);
         if (existing) {
             const index = nextLogs.findIndex((log) => log.id === existing.id);
             if (index >= 0) {
@@ -2756,9 +2883,7 @@ function imageTaskChannelId(task?: CanvasImageTask | null) {
 }
 
 function resolveImageChannelId(config: AiConfig, model: string, ...preferredIds: Array<string | undefined>) {
-    const channels = config.channelMode === "remote"
-        ? config.publicChannels.map((channel) => ({ id: channel.id || "", models: channel.models || [] }))
-        : normalizeLocalChannels(config).map((channel) => ({ id: channel.id, models: channel.models }));
+    const channels = config.channelMode === "remote" ? config.publicChannels.map((channel) => ({ id: channel.id || "", models: channel.models || [] })) : normalizeLocalChannels(config).map((channel) => ({ id: channel.id, models: channel.models }));
     for (const id of preferredIds) {
         const channelId = (id || "").trim();
         if (channelId && channels.some((channel) => channel.id === channelId && channel.models.includes(model))) return channelId;
@@ -2881,15 +3006,3 @@ function buildLog({
 function formatLogTime(value: number) {
     return new Date(value).toLocaleString("zh-CN", { hour12: false });
 }
-
-
-
-
-
-
-
-
-
-
-
-

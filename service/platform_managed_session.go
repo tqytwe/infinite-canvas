@@ -24,14 +24,16 @@ import (
 
 const platformManagedChannelPrefix = "platform-managed:"
 const platformManagedSessionExtraKey = "platform_managed_session"
+const platformGroupPinnedSessionBinding = "group-pinned-v1"
 
 // PlatformManagedSession is stored encrypted in the Canvas shadow account.
 // API keys must remain in this server-side record and never be sent back to
 // the browser with a bootstrap response.
 type PlatformManagedSession struct {
-	ExpiresAt time.Time                            `json:"expires_at"`
-	Sessions  map[string]PlatformManagedSessionKey `json:"sessions"`
-	Groups    map[string]int64                     `json:"groups,omitempty"`
+	ExpiresAt     time.Time                                      `json:"expires_at"`
+	Sessions      map[string]PlatformManagedSessionKey           `json:"sessions"`
+	Groups        map[string]int64                               `json:"groups,omitempty"`
+	GroupSessions map[string]map[int64]PlatformManagedSessionKey `json:"group_sessions,omitempty"`
 }
 
 type PlatformManagedSessionKey struct {
@@ -39,6 +41,14 @@ type PlatformManagedSessionKey struct {
 	APIKey   string `json:"api_key"`
 	APIKeyID int64  `json:"api_key_id"`
 	Purpose  string `json:"purpose"`
+	GroupID  int64  `json:"group_id,omitempty"`
+	Binding  string `json:"binding,omitempty"`
+}
+
+type platformGroupSwitchResponse struct {
+	Purpose        string                    `json:"purpose"`
+	SessionBinding string                    `json:"session_binding"`
+	Session        PlatformManagedSessionKey `json:"session"`
 }
 
 type platformSessionExchangeResponse struct {
@@ -166,7 +176,7 @@ func platformExchangeManagedSession(ctx context.Context, launchToken string) (Pl
 	if expiresAt.IsZero() || !expiresAt.After(time.Now().UTC()) {
 		return PlatformManagedSession{}, safeMessageError{message: "极速蹬创作会话已过期，请重新进入 AI 创作空间"}
 	}
-	return PlatformManagedSession{ExpiresAt: expiresAt, Sessions: sessions, Groups: map[string]int64{}}, nil
+	return PlatformManagedSession{ExpiresAt: expiresAt, Sessions: sessions, Groups: map[string]int64{}, GroupSessions: map[string]map[int64]PlatformManagedSessionKey{}}, nil
 }
 
 func platformSessionCipher() (cipher.AEAD, error) {
@@ -272,6 +282,23 @@ func readPlatformManagedSession(user model.User) (PlatformManagedSession, error)
 	}
 	if session.Groups == nil {
 		session.Groups = map[string]int64{}
+	}
+	if session.GroupSessions == nil {
+		session.GroupSessions = map[string]map[int64]PlatformManagedSessionKey{}
+	}
+	// Older encrypted sessions may already have a group-pinned key in their
+	// purpose slot. Preserve it as a keyed immutable entry during read so a
+	// request for another group cannot overwrite the only usable key.
+	for purpose, entry := range session.Sessions {
+		if !isPlatformGroupPinnedSession(entry, purpose, entry.GroupID) {
+			continue
+		}
+		if session.GroupSessions[purpose] == nil {
+			session.GroupSessions[purpose] = map[int64]PlatformManagedSessionKey{}
+		}
+		if _, exists := session.GroupSessions[purpose][entry.GroupID]; !exists {
+			session.GroupSessions[purpose][entry.GroupID] = entry
+		}
 	}
 	return session, nil
 }
@@ -402,21 +429,32 @@ func redactPlatformSecrets(value any) any {
 }
 
 func parsePlatformManagedChannelID(value string, fallbackPurpose string) (string, int64, string, error) {
-	purpose, ok := platformSessionPurpose(fallbackPurpose)
+	expectedPurpose, ok := platformSessionPurpose(fallbackPurpose)
 	if !ok {
-		purpose = "chat"
+		expectedPurpose = "chat"
 	}
 	value = strings.TrimSpace(value)
 	if !strings.HasPrefix(value, platformManagedChannelPrefix) {
-		return purpose, 0, platformManagedChannelPrefix + purpose, nil
+		// Chat existed before immutable group-bound managed sessions. Keep its
+		// historical base-session compatibility, but image and video must always
+		// identify the exact declared group. Falling either back to an unscoped
+		// purpose key would bypass the server-owned media contract and billing
+		// group isolation.
+		if expectedPurpose == "image" || expectedPurpose == "video" {
+			return "", 0, "", safeMessageError{message: "极速蹬创作媒体请求缺少固定分组"}
+		}
+		return expectedPurpose, 0, platformManagedChannelPrefix + expectedPurpose, nil
 	}
 	parts := strings.Split(strings.TrimPrefix(value, platformManagedChannelPrefix), ":")
 	if len(parts) != 2 {
 		return "", 0, "", safeMessageError{message: "极速蹬创作分组参数无效"}
 	}
-	purpose, ok = platformSessionPurpose(parts[0])
+	purpose, ok := platformSessionPurpose(parts[0])
 	if !ok {
 		return "", 0, "", safeMessageError{message: "极速蹬创作分组参数无效"}
+	}
+	if purpose != expectedPurpose {
+		return "", 0, "", safeMessageError{message: "极速蹬创作分组与当前媒体类型不匹配"}
 	}
 	groupID, err := strconv.ParseInt(strings.TrimSpace(parts[1]), 10, 64)
 	if err != nil || groupID <= 0 {
@@ -426,23 +464,169 @@ func parsePlatformManagedChannelID(value string, fallbackPurpose string) (string
 }
 
 func setPlatformManagedGroup(ctx context.Context, user *model.User, session *PlatformManagedSession, purpose string, groupID int64) error {
-	if groupID <= 0 || session.Groups[purpose] == groupID {
+	if groupID <= 0 {
 		return nil
 	}
+	if _, found := platformManagedSessionForGroup(*session, purpose, groupID); found {
+		return nil
+	}
+	entry := session.Sessions[purpose]
 	body, err := json.Marshal(map[string]int64{"group_id": groupID})
 	if err != nil {
 		return err
 	}
-	if _, err := platformRequest(ctx, http.MethodPost, "nextchat/sessions/"+purpose+"/group", session.Sessions[purpose], bytes.NewReader(body)); err != nil {
+	raw, err := platformRequest(ctx, http.MethodPost, "nextchat/sessions/"+purpose+"/group", entry, bytes.NewReader(body))
+	if err != nil {
 		return err
 	}
-	session.Groups[purpose] = groupID
+	replacement, err := decodePlatformManagedGroupSwitchResponse(raw, purpose, entry, groupID)
+	if err != nil {
+		return err
+	}
+
+	// The image and video switches can arrive at the same time from different
+	// Canvas tabs. Re-read and merge the encrypted session on every retry, then
+	// compare-and-swap only Extra. A full db.Save(user) would lose the other
+	// purpose's replacement key across tabs or process instances.
+	const maxPersistAttempts = 5
+	for attempt := 0; attempt < maxPersistAttempts; attempt++ {
+		stored, found, readErr := repository.GetUserByID(user.ID)
+		if readErr != nil {
+			return readErr
+		}
+		if !found {
+			return safeMessageError{message: "极速蹬创作会话保存失败，请稍后重试"}
+		}
+		persisted, readErr := readPlatformManagedSession(stored)
+		if readErr != nil {
+			return readErr
+		}
+		if existing, exists := platformManagedSessionForGroup(persisted, purpose, groupID); exists {
+			*user = stored
+			*session = persisted
+			if existing.UserID > 0 && existing.APIKeyID > 0 {
+				return nil
+			}
+			return safeMessageError{message: "极速蹬创作分组会话更新失败，请稍后重试"}
+		}
+
+		expectedExtra := stored.Extra
+		if err := persistPlatformManagedReplacementSession(&stored, &persisted, purpose, replacement); err != nil {
+			return err
+		}
+		stored.UpdatedAt = now()
+		updated, updateErr := repository.UpdateUserExtraIfUnchanged(stored.ID, expectedExtra, stored.Extra, stored.UpdatedAt)
+		if updateErr != nil {
+			return updateErr
+		}
+		if !updated {
+			continue
+		}
+		*user = stored
+		*session = persisted
+		return nil
+	}
+	return safeMessageError{message: "极速蹬创作分组会话更新冲突，请稍后重试"}
+}
+
+func decodePlatformManagedGroupSwitchResponse(raw json.RawMessage, purpose string, current PlatformManagedSessionKey, groupID int64) (PlatformManagedSessionKey, error) {
+	purpose, ok := platformSessionPurpose(purpose)
+	if !ok || groupID <= 0 {
+		return PlatformManagedSessionKey{}, safeMessageError{message: "极速蹬创作分组参数无效"}
+	}
+	var payload platformGroupSwitchResponse
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return PlatformManagedSessionKey{}, safeMessageError{message: "极速蹬创作分组会话返回异常，请稍后重试"}
+	}
+	responsePurpose, ok := platformSessionPurpose(payload.Purpose)
+	if !ok || responsePurpose != purpose || strings.TrimSpace(payload.SessionBinding) != platformGroupPinnedSessionBinding {
+		return PlatformManagedSessionKey{}, safeMessageError{message: "极速蹬创作服务未返回固定分组会话，请稍后重试"}
+	}
+	replacement := payload.Session
+	replacementPurpose, ok := platformSessionPurpose(replacement.Purpose)
+	if !ok || replacementPurpose != purpose || replacement.UserID != current.UserID || replacement.APIKeyID <= 0 || strings.TrimSpace(replacement.APIKey) == "" || replacement.GroupID != groupID || strings.TrimSpace(replacement.Binding) != platformGroupPinnedSessionBinding {
+		return PlatformManagedSessionKey{}, safeMessageError{message: "极速蹬创作服务未返回有效固定分组会话，请稍后重试"}
+	}
+	replacement.Purpose = purpose
+	replacement.APIKey = strings.TrimSpace(replacement.APIKey)
+	replacement.Binding = platformGroupPinnedSessionBinding
+	return replacement, nil
+}
+
+func persistPlatformManagedReplacementSession(user *model.User, session *PlatformManagedSession, purpose string, replacement PlatformManagedSessionKey) error {
+	if user == nil || session == nil {
+		return errors.New("platform managed session is required")
+	}
+	if session.Sessions == nil {
+		session.Sessions = map[string]PlatformManagedSessionKey{}
+	}
+	if session.Groups == nil {
+		session.Groups = map[string]int64{}
+	}
+	if session.GroupSessions == nil {
+		session.GroupSessions = map[string]map[int64]PlatformManagedSessionKey{}
+	}
+	if session.GroupSessions[purpose] == nil {
+		session.GroupSessions[purpose] = map[int64]PlatformManagedSessionKey{}
+	}
+	session.GroupSessions[purpose][replacement.GroupID] = replacement
+	session.Groups[purpose] = replacement.GroupID
 	if err := savePlatformManagedSession(user, *session); err != nil {
 		return err
 	}
-	user.UpdatedAt = now()
-	_, err = repository.SaveUser(*user)
-	return err
+	persisted, err := readPlatformManagedSession(*user)
+	if err != nil {
+		return err
+	}
+	persistedEntry, found := platformManagedSessionForGroup(persisted, purpose, replacement.GroupID)
+	if !found || persistedEntry.APIKeyID != replacement.APIKeyID || persistedEntry.GroupID != replacement.GroupID || strings.TrimSpace(persistedEntry.Binding) != platformGroupPinnedSessionBinding {
+		return safeMessageError{message: "极速蹬创作分组会话更新失败，请稍后重试"}
+	}
+	*session = persisted
+	return nil
+}
+
+func platformManagedSessionForGroup(session PlatformManagedSession, purpose string, groupID int64) (PlatformManagedSessionKey, bool) {
+	purpose, ok := platformSessionPurpose(purpose)
+	if !ok {
+		return PlatformManagedSessionKey{}, false
+	}
+	if groupID <= 0 {
+		entry, found := session.Sessions[purpose]
+		return entry, found
+	}
+	entry, found := session.GroupSessions[purpose][groupID]
+	if found && isPlatformGroupPinnedSession(entry, purpose, groupID) {
+		return entry, true
+	}
+	// Sessions produced before group_sessions was introduced can be migrated at
+	// read time. Do not use a differently scoped purpose session as a fallback.
+	entry, found = session.Sessions[purpose]
+	if found && isPlatformGroupPinnedSession(entry, purpose, groupID) {
+		return entry, true
+	}
+	return PlatformManagedSessionKey{}, false
+}
+
+// requirePlatformManagedSessionForGroup deliberately refuses to fall back from
+// a selected group to the base purpose session. A missing immutable binding is
+// a server-contract failure, not permission to send work through whichever
+// group happened to be selected when the base session was issued.
+func requirePlatformManagedSessionForGroup(session PlatformManagedSession, purpose string, groupID int64) (PlatformManagedSessionKey, error) {
+	entry, found := platformManagedSessionForGroup(session, purpose, groupID)
+	if !found {
+		return PlatformManagedSessionKey{}, safeMessageError{message: "极速蹬创作固定分组会话不可用，请重新进入 AI 创作空间后重试"}
+	}
+	return entry, nil
+}
+
+func isPlatformGroupPinnedSession(entry PlatformManagedSessionKey, purpose string, groupID int64) bool {
+	normalizedPurpose, ok := platformSessionPurpose(purpose)
+	if !ok || groupID <= 0 {
+		return false
+	}
+	entryPurpose, ok := platformSessionPurpose(entry.Purpose)
+	return ok && entryPurpose == normalizedPurpose && entry.UserID > 0 && entry.APIKeyID > 0 && strings.TrimSpace(entry.APIKey) != "" && entry.GroupID == groupID && strings.TrimSpace(entry.Binding) == platformGroupPinnedSessionBinding
 }
 
 // PlatformManagedChannelForUser resolves a Canvas-only channel identifier to
@@ -470,7 +654,10 @@ func PlatformManagedChannelForUser(ctx context.Context, canvasUserID string, cha
 	if err := setPlatformManagedGroup(ctx, &user, &session, purpose, groupID); err != nil {
 		return model.ModelChannel{}, err
 	}
-	entry := session.Sessions[purpose]
+	entry, err := requirePlatformManagedSessionForGroup(session, purpose, groupID)
+	if err != nil {
+		return model.ModelChannel{}, err
+	}
 	return model.ModelChannel{
 		ID:       normalizedID,
 		Protocol: "openai",
@@ -534,6 +721,10 @@ func ValidatePlatformManagedMediaRequest(
 	if err := setPlatformManagedGroup(ctx, &user, &session, purpose, groupID); err != nil {
 		return err
 	}
+	entry, err = requirePlatformManagedSessionForGroup(session, purpose, groupID)
+	if err != nil {
+		return err
+	}
 	bootstrap, err := platformBootstrapForSession(ctx, entry)
 	if err != nil {
 		return err
@@ -570,6 +761,10 @@ func validatePlatformManagedMediaModel(workspace map[string]any, groupID int64, 
 		group, ok := rawGroup.(map[string]any)
 		if !ok || (groupID > 0 && platformWorkspaceID(group["id"]) != groupID) {
 			continue
+		}
+		videoAvailable, videoAvailabilityDeclared := group["video_available"].(bool)
+		if purpose == "video" && videoAvailabilityDeclared && !videoAvailable {
+			return safeMessageError{message: platformWorkspaceVideoUnavailableMessage(group)}
 		}
 		models, ok := group["models"].([]any)
 		if !ok {
@@ -624,6 +819,27 @@ func platformWorkspaceString(value any) string {
 func platformWorkspaceBool(value any) bool {
 	flag, _ := value.(bool)
 	return flag
+}
+
+func platformWorkspaceVideoUnavailableMessage(group map[string]any) string {
+	switch strings.ToLower(platformWorkspaceString(group["video_unavailable_code"])) {
+	case "not_mapped":
+		return "当前视频分组尚未完成模型映射，请稍后重试"
+	case "capability_not_declared":
+		return "当前视频分组尚未声明可执行的视频能力，请稍后重试"
+	case "price_missing":
+		return "当前视频分组暂未完成价格配置，请稍后重试"
+	case "adapter_unsupported":
+		return "当前视频分组暂不支持所选视频能力，请稍后重试"
+	case "no_schedulable_account":
+		return "当前视频分组暂时没有可用账号，请稍后重试"
+	case "group_permission_denied":
+		return "当前账号暂无该视频分组权限，请稍后重试"
+	case "subscription_reservation_unsupported":
+		return "当前视频分组暂不支持此计费方式，请稍后重试"
+	default:
+		return "当前视频分组暂不可用，请稍后重试"
+	}
 }
 
 func platformWorkspaceStringsContain(value any, expected string) bool {
