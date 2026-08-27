@@ -60,8 +60,7 @@ export class VideoRequestError extends Error {
 }
 
 function usesAccountProxy(config: AiConfig) {
-    const token = useUserStore.getState().token;
-    return config.channelMode === "remote" || (config.channelMode === "local" && Boolean(token));
+    return config.channelMode === "remote";
 }
 
 function aiApiUrl(config: AiConfig, path: string) {
@@ -95,7 +94,6 @@ function aiHeaders(config: AiConfig) {
     const channelID = channelIdForActiveModel(config, "video");
     if (config.channelMode === "remote" && !token) throw new Error("请先登录后再使用云端渠道");
     if (config.channelMode === "remote") return { Authorization: `Bearer ${token}`, ...(channelID ? { "X-Model-Channel-ID": channelID } : {}) };
-    if (token) return { Authorization: `Bearer ${token}`, ...(channelID ? { "X-User-Model-Channel-ID": channelID } : {}) };
     return { Authorization: `Bearer ${localChannelForActiveModel(config, "video")?.apiKey || config.apiKey}` };
 }
 

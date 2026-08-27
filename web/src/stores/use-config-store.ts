@@ -16,7 +16,6 @@ import {
 } from "@/lib/platform-managed-models";
 import { apiGet } from "@/services/api/request";
 import type { AdminPublicSettings } from "@/services/api/admin";
-import { useUserStore } from "@/stores/use-user-store";
 
 export type LocalModelChannel = {
     id: string;
@@ -121,11 +120,12 @@ export type AiConfig = {
 };
 
 export const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
+export const JISUDENG_API_BASE_URL = "https://api.jisudeng.com";
 export type { ModelCapability, ModelCapabilities } from "@/lib/model-capabilities";
 
 export const defaultConfig: AiConfig = {
     channelMode: "local",
-    baseUrl: "https://api.openai.com",
+    baseUrl: JISUDENG_API_BASE_URL,
     apiKey: "",
     model: "gpt-image-2",
     imageModel: "gpt-image-2",
@@ -459,15 +459,23 @@ function normalizeModelList(models: string[]) {
 
 export function useEffectiveConfig() {
     const config = useConfigStore((state) => state.config);
-    const modelChannel = useConfigStore((state) => state.publicSettings?.modelChannel || null);
-    const platformAuthEnabled = useConfigStore((state) => state.publicSettings?.auth?.platform?.enabled === true);
-    const platformBootstrap = useConfigStore((state) => state.platformBootstrap);
-    const token = useUserStore((state) => state.token);
-    const user = useUserStore((state) => state.user);
-    const canUseRemoteChannel = !platformAuthEnabled && Boolean(token && user && (user.role === "admin" || modelChannel?.allowUserRemoteChannel === true));
-    const isPlatformManagedUser = platformAuthEnabled && Boolean(user) && user?.role !== "admin";
-    const managedBootstrap = isPlatformManagedUser ? platformBootstrap : null;
-    return useMemo(() => resolveEffectiveConfig(config, modelChannel, canUseRemoteChannel, isPlatformManagedUser, managedBootstrap, token), [canUseRemoteChannel, config, isPlatformManagedUser, managedBootstrap, modelChannel, token]);
+    return useMemo(() => {
+        const localChannels = normalizeLocalChannels(config);
+        const models = normalizeModelList(localChannels.flatMap((channel) => channel.models));
+        return {
+            ...config,
+            channelMode: "local" as const,
+            baseUrl: JISUDENG_API_BASE_URL,
+            apiKey: localChannels[0]?.apiKey || config.apiKey,
+            localChannels,
+            models,
+            imageModels: localModelsByCapability(localChannels, "image"),
+            videoModels: localModelsByCapability(localChannels, "video"),
+            textModels: localModelsByCapability(localChannels, "text"),
+            audioModels: localModelsByCapability(localChannels, "audio"),
+            publicChannels: [],
+        };
+    }, [config]);
 }
 
 export function buildApiUrl(baseUrl: string, path: string) {
@@ -500,32 +508,27 @@ function normalizeVersionedBaseUrl(baseUrl: string) {
 }
 
 export function normalizeLocalChannels(config: Partial<AiConfig>): LocalModelChannel[] {
-    const channels = Array.isArray(config.localChannels) ? config.localChannels : [];
-    const normalized: LocalModelChannel[] = channels.map((channel, index) => {
-        const models = Array.isArray(channel.models) ? channel.models.filter(Boolean) : [];
-        const declaredModelIds = Array.isArray(channel.declaredModelIds) ? channel.declaredModelIds.filter((model): model is string => typeof model === "string" && Boolean(model.trim())) : [];
-        const modelCapabilities = declaredModelIds.length ? Object.fromEntries(models.map((model) => [model, declaredModelIds.includes(model) ? channel.modelCapabilities?.[model] || [] : []])) : channel.modelCapabilities;
-        return {
-            id: channel.id || `local-${index + 1}`,
-            protocol: channel.protocol === "kie" || channel.protocol === "mimo" ? channel.protocol : "openai",
-            name: typeof channel.name === "string" ? channel.name : `本地渠道 ${index + 1}`,
-            baseUrl: channel.baseUrl || "",
-            apiKey: channel.apiKey || "",
+    const source = Array.isArray(config.localChannels) ? config.localChannels[0] : undefined;
+    const models = Array.isArray(source?.models) && source.models.length ? source.models.filter(Boolean) : Array.isArray(config.models) ? config.models.filter(Boolean) : [];
+    const declaredModelIds = Array.isArray(source?.declaredModelIds) ? source.declaredModelIds.filter((model): model is string => typeof model === "string" && Boolean(model.trim())) : [];
+    const modelCapabilities = declaredModelIds.length ? Object.fromEntries(models.map((model) => [model, declaredModelIds.includes(model) ? source?.modelCapabilities?.[model] || [] : []])) : source?.modelCapabilities;
+    return [
+        {
+            id: "jisudeng-api",
+            protocol: "openai",
+            name: "极速蹬 API",
+            baseUrl: JISUDENG_API_BASE_URL,
+            apiKey: source?.apiKey || config.apiKey || "",
             models,
             modelCapabilities,
-            modelMediaCapabilities: channel.managedPlatform === true ? channel.modelMediaCapabilities : undefined,
             declaredModelIds,
-            modelDiscovery: channel.modelDiscovery,
-            managedPlatform: channel.managedPlatform === true,
-            platformPurpose: channel.platformPurpose,
-            platformGroupID: channel.platformGroupID,
-            isCurrent: channel.isCurrent === true,
-        };
-    });
-    if (!normalized.length) {
-        normalized.push({ id: "local-default", protocol: "openai", name: "本地直连", baseUrl: config.baseUrl || defaultConfig.baseUrl, apiKey: config.apiKey || "", models: Array.isArray(config.models) ? config.models.filter(Boolean) : [] });
-    }
-    return normalized;
+            modelDiscovery: source?.modelDiscovery,
+        },
+    ];
+}
+
+export function hasConfiguredJisudengAPIKey() {
+    return Boolean(normalizeLocalChannels(useConfigStore.getState().config)[0]?.apiKey.trim());
 }
 
 export function localModelsByCapability(channels: LocalModelChannel[], capability?: ModelCapability) {

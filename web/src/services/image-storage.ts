@@ -59,46 +59,26 @@ export const USER_WEBDAV_STORAGE_PROVIDER_KEY = "infinite-canvas:user_webdav_sto
 let storageConfigPromise: Promise<StorageConfig> | null = null;
 
 export function canUseGlobalStorage(config: StorageConfig) {
+    if (config.mode === "server_local_disk") return true;
     const user = useUserStore.getState().user;
     if (!user || user.role === "guest") return false;
-    if (config.mode === "server_local_disk") return true;
     return config.mode === "server_sqlite_s3" && (user.role === "admin" || config.allowUserGlobalProvider);
 }
 
 function isLocalNetworkHost(hostname: string) {
     const host = hostname.toLowerCase().replace(/^\[|\]$/g, "");
-    if (
-        host === "localhost" ||
-        host.endsWith(".localhost") ||
-        host.endsWith(".local") ||
-        host === "host.docker.internal" ||
-        host === "::1"
-    ) {
+    if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host === "host.docker.internal" || host === "::1") {
         return true;
     }
-    if (
-        host.includes(":") &&
-        (host.startsWith("fc") ||
-            host.startsWith("fd") ||
-            /^fe[89ab]/.test(host))
-    ) {
+    if (host.includes(":") && (host.startsWith("fc") || host.startsWith("fd") || /^fe[89ab]/.test(host))) {
         return true;
     }
     const parts = host.split(".").map(Number);
-    if (
-        parts.length !== 4 ||
-        parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)
-    ) {
+    if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) {
         return false;
     }
     const [a, b] = parts;
-    return (
-        a === 10 ||
-        a === 127 ||
-        (a === 172 && b >= 16 && b <= 31) ||
-        (a === 192 && b === 168) ||
-        (a === 169 && b === 254)
-    );
+    return a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254);
 }
 
 export function getProxyUrl(url: string): string {
@@ -107,11 +87,7 @@ export function getProxyUrl(url: string): string {
     }
     try {
         const parsed = new URL(url);
-        if (
-            isLocalNetworkHost(parsed.hostname) ||
-            (typeof window !== "undefined" &&
-                parsed.host === window.location.host)
-        ) {
+        if (isLocalNetworkHost(parsed.hostname) || (typeof window !== "undefined" && parsed.host === window.location.host)) {
             return url;
         }
     } catch {
@@ -126,12 +102,12 @@ export async function uploadImage(input: string | Blob, options: UploadImageOpti
     if (typeof url === "string") {
         const response = await fetch(url);
         if (!response.ok) {
-            const payload = await response.json().catch(() => null) as { msg?: string } | null;
+            const payload = (await response.json().catch(() => null)) as { msg?: string } | null;
             throw new Error(payload?.msg || `代理图片拉取失败：${response.status}`);
         }
         const contentType = response.headers.get("content-type") || "";
         if (contentType.includes("application/json")) {
-            const payload = await response.json().catch(() => null) as { msg?: string } | null;
+            const payload = (await response.json().catch(() => null)) as { msg?: string } | null;
             throw new Error(payload?.msg || "代理图片下载失败");
         }
         blob = await response.blob();
@@ -153,19 +129,17 @@ export async function uploadImage(input: string | Blob, options: UploadImageOpti
 export async function uploadRemoteImageToServer(url: string, filename: string): Promise<UploadedImage> {
     const response = await fetch(getProxyUrl(url));
     if (!response.ok) {
-        const payload = await response.json().catch(() => null) as { msg?: string } | null;
+        const payload = (await response.json().catch(() => null)) as { msg?: string } | null;
         throw new Error(payload?.msg || "代理图片拉取失败：" + response.status);
     }
     const blob = await response.blob();
     const config = await loadStorageConfig();
     const userProvider = config.allowUserProvider ? loadUserStorageProvider() : null;
     if (!canUseGlobalStorage(config) && !userProvider) throw new Error("服务端对象存储未启用");
-    const token = useUserStore.getState().token;
-    if (!token) throw new Error("服务端存储需要先登录");
     const formData = new FormData();
     formData.append("file", blob, filename || "image-" + nanoid() + "." + imageExtension(blob.type));
     if (userProvider) formData.append("provider", JSON.stringify(toProviderPayload(userProvider)));
-    const uploadResponse = await fetch("/api/v1/files", { method: "POST", headers: { Authorization: "Bearer " + token }, body: formData });
+    const uploadResponse = await fetch("/api/storage/files", { method: "POST", body: formData });
     const payload = (await uploadResponse.json().catch(() => null)) as { code?: number; msg?: string; data?: UploadedImage } | null;
     if (!uploadResponse.ok || payload?.code !== 0 || !payload.data) throw new Error(payload?.msg || "服务端图片上传失败");
     const meta = await readImageMeta(payload.data.url);
@@ -203,8 +177,7 @@ export async function resolveImageUrl(storageKey?: string, fallback = "") {
         }
         const cachedUrl = serverUrls.get(id);
         if (cachedUrl && cachedUrl.expiresAt > Date.now() + 60_000) return cachedUrl.url;
-        const token = useUserStore.getState().token;
-        const info = await apiGet<{ contentUrl?: string; publicUrl?: string }>(`/api/files/${encodeURIComponent(id)}`, undefined, token).catch(() => null);
+        const info = await apiGet<{ contentUrl?: string; publicUrl?: string }>(`/api/files/${encodeURIComponent(id)}`).catch(() => null);
         if (!info) return fallback;
         const url = info.contentUrl || info.publicUrl || fallback || `/api/files/${encodeURIComponent(id)}/content`;
         cacheServerURL(id, url);
@@ -225,15 +198,10 @@ async function maybeUploadImageToServer(blob: Blob): Promise<UploadedImage | nul
     const canUseGlobalProvider = config ? canUseGlobalStorage(config) : false;
     const useServerStorage = canUseGlobalProvider || Boolean(userProvider);
     if (!config || !useServerStorage) return null;
-    const token = useUserStore.getState().token;
-    if (!token) {
-        if (canUseGlobalProvider) throw new Error("服务端存储需要先登录");
-        return null;
-    }
     const formData = new FormData();
     formData.append("file", blob, `image-${nanoid()}.${imageExtension(blob.type)}`);
     if (userProvider) formData.append("provider", JSON.stringify(toProviderPayload(userProvider)));
-    const response = await fetch("/api/v1/files", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: formData });
+    const response = await fetch("/api/storage/files", { method: "POST", body: formData });
     const payload = (await response.json().catch(() => null)) as { code?: number; msg?: string; data?: UploadedImage } | null;
     if (!response.ok || payload?.code !== 0 || !payload.data) {
         if (!canUseGlobalProvider) return null;
@@ -296,9 +264,10 @@ export async function imageToDataUrl(image: { url?: string; dataUrl?: string; st
 export async function deleteStoredImages(keys: Iterable<string>) {
     const { useAssetStore } = await import("@/stores/use-asset-store");
     const assetKeys = new Set(
-        useAssetStore.getState().assets
-            .map((a) => (a.kind !== "text" ? a.data.storageKey : null))
-            .filter((k): k is string => Boolean(k))
+        useAssetStore
+            .getState()
+            .assets.map((a) => (a.kind !== "text" ? a.data.storageKey : null))
+            .filter((k): k is string => Boolean(k)),
     );
     await Promise.all(
         Array.from(new Set(keys)).map(async (key) => {
@@ -436,13 +405,11 @@ export function toProviderPayload(provider: UserStorageProvider) {
 async function deleteServerImage(storageKey: string) {
     const id = storageKey.slice("server:".length);
     if (!id) return;
-    const token = useUserStore.getState().token;
     serverUrls.delete(id);
-    if (!token) return;
     const provider = loadUserStorageProvider();
-    const response = await fetch(`/api/v1/files/${encodeURIComponent(id)}`, {
+    const response = await fetch(`/api/storage/files/${encodeURIComponent(id)}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(provider ? { provider: toProviderPayload(provider) } : {}),
     });
     const payload = (await response.json().catch(() => null)) as { code?: number; msg?: string } | null;

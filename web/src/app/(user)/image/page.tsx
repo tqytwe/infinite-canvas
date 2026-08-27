@@ -36,8 +36,6 @@ import { PromptSelectDialog } from "@/components/prompts/prompt-select-dialog";
 import { AssetPickerModal, type InsertAssetPayload } from "@/app/(user)/canvas/components/asset-picker-modal";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { CreativeWorkflowWorkspace, type WorkflowExternalTaskFailure, type WorkflowExternalTaskStart, type WorkflowExternalTaskSuccess } from "@/components/workflows/creative-workflow-workspace";
-import { PlatformMediaCapabilityNotice } from "@/components/platform-media-capability-notice";
-import { platformManagedCapabilityIssue } from "@/lib/platform-managed-models";
 import { isPlatformManagedImageConfig, normalizeLocalChannels, platformManagedImageCapabilitiesForConfig, useConfigStore, useEffectiveConfig, type AiConfig } from "@/stores/use-config-store";
 import { useThemeStore } from "@/stores/use-theme-store";
 import { nanoid } from "nanoid";
@@ -134,14 +132,8 @@ export default function ImagePage() {
     const updateConfig = useConfigStore((state) => state.updateConfig);
     const isAiConfigReady = useConfigStore((state) => state.isAiConfigReady);
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
-    const publicSettings = useConfigStore((state) => state.publicSettings);
-    const platformBootstrap = useConfigStore((state) => state.platformBootstrap);
-    const platformBootstrapError = useConfigStore((state) => state.platformBootstrapError);
-    const isPlatformBootstrapLoading = useConfigStore((state) => state.isPlatformBootstrapLoading);
-    const loadPlatformBootstrap = useConfigStore((state) => state.loadPlatformBootstrap);
     const addAsset = useAssetStore((state) => state.addAsset);
     const token = useUserStore((state) => state.token);
-    const user = useUserStore((state) => state.user);
     const isUserReady = useUserStore((state) => state.isReady);
     const [prompt, setPrompt] = useState("");
     const [references, setReferences] = useState<ReferenceImage[]>([]);
@@ -169,15 +161,16 @@ export default function ImagePage() {
     const logsRef = useRef<GenerationLog[]>([]);
     const effectiveConfigRef = useRef(effectiveConfig);
 
+    const storageReady = Boolean(effectiveConfig.apiKey.trim());
+
     const model = effectiveConfig.imageModel || effectiveConfig.model;
     const managedImageCapabilities = platformManagedImageCapabilitiesForConfig(effectiveConfig, model);
-    const managedCapabilityIssue = isUserReady && Boolean(token) && user?.role !== "admin" && publicSettings?.auth?.platform?.enabled === true ? platformBootstrapError || platformManagedCapabilityIssue(platformBootstrap, "image") : "";
     const canUseImageReferences = !managedImageCapabilities || (managedImageCapabilities.operations.includes("edit") && managedImageCapabilities.maxReferenceImages !== 0);
     const canGenerate = Boolean(prompt.trim());
     const generationCount = Math.max(1, Math.min(10, Number(config.count) || 1));
     const pendingCount = results.filter((item) => item.status === "pending").length;
     const pendingLogCount = logs.filter((log) => log.status === "生成中" && log.task && !log.images.length).length;
-    const usesBackendImageTasks = (value: AiConfig) => value.channelMode === "remote" || (value.channelMode === "local" && Boolean(token));
+    const usesBackendImageTasks = (value: AiConfig) => value.channelMode === "remote";
     const imageTaskConfig = () => effectiveConfigRef.current;
 
     const restorePendingLogResults = (sourceLogs: GenerationLog[]) => {
@@ -220,8 +213,8 @@ export default function ImagePage() {
     }, [logs]);
 
     useEffect(() => {
-        if (token) accountHistorySyncEnabledRef.current = true;
-    }, [token]);
+        accountHistorySyncEnabledRef.current = storageReady;
+    }, [storageReady]);
 
     useEffect(() => {
         effectiveConfigRef.current = effectiveConfig;
@@ -233,12 +226,12 @@ export default function ImagePage() {
 
     useEffect(() => {
         if (!isUserReady) return;
-        if (token) {
-            void loadAccountImageHistory(token).then((items) => syncBackendImageTasks(items || logsRef.current));
+        if (storageReady) {
+            void loadAccountImageHistory(token || undefined).then((items) => syncBackendImageTasks(items || logsRef.current));
             return;
         }
         void refreshLogs().then((items) => syncBackendImageTasks(items));
-    }, [isUserReady, token]);
+    }, [isUserReady, storageReady, token]);
 
     useEffect(() => {
         if (!pendingCount && !pendingLogCount) return;
@@ -513,6 +506,10 @@ export default function ImagePage() {
                     mimeType: undefined,
                 });
 
+                if (!durableImage.storageKey?.startsWith("server:")) {
+                    message.warning("图片生成成功但保存失败，可点击“重新保存”重试");
+                }
+
                 // 更新结果状态
                 setResults((value) => updateResult(value, id, { image: durableImage }));
 
@@ -622,10 +619,10 @@ export default function ImagePage() {
     const syncImage = async (image: GeneratedImage, index: number) => {
         if (image.storageKey?.startsWith("server:") || syncingImageIds.includes(image.id)) return null;
         setSyncingImageIds((ids) => Array.from(new Set([...ids, image.id])));
-        const hideLoading = message.loading("正在同步图片到云端存储...", 0);
+        const hideLoading = message.loading("正在保存图片到本站存储...", 0);
         try {
             const uploaded = await uploadRemoteImageToServer(image.dataUrl, "image-" + (index + 1) + "." + imageExtension(image.mimeType || image.dataUrl));
-            message.success("图片已同步到云端存储");
+            message.success("图片已保存到本站存储");
             return { ...image, dataUrl: uploaded.url, storageKey: uploaded.storageKey, width: uploaded.width || image.width, height: uploaded.height || image.height, bytes: uploaded.bytes || image.bytes, mimeType: uploaded.mimeType || image.mimeType };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : "";
@@ -710,7 +707,7 @@ export default function ImagePage() {
     };
 
     const deleteBackendImageTasks = async (items: GenerationLog[]) => {
-        if (!token) return;
+        if (!storageReady) return;
         const tasks = Array.from(
             new Map(
                 items.flatMap((item) => {
@@ -726,7 +723,7 @@ export default function ImagePage() {
         if (!token) return;
         const ids = Array.from(new Set(items.flatMap((item) => [item.id, item.task?.id].filter((id): id is string => Boolean(id)))));
         if (!ids.length) return;
-        await deleteImageGenerationLogs(token, ids).catch(() => undefined);
+        await deleteImageGenerationLogs(token || undefined, ids).catch(() => undefined);
     };
 
     const deleteSelectedLogs = () => {
@@ -796,7 +793,7 @@ export default function ImagePage() {
     };
     const refreshCategories = async () => setCategories(await readStoredCategories());
 
-    const loadAccountImageHistory = async (currentToken: string) => {
+    const loadAccountImageHistory = async (currentToken?: string) => {
         try {
             accountHistorySyncEnabledRef.current = true;
             const localLogs = await readStoredLogs();
@@ -815,15 +812,15 @@ export default function ImagePage() {
     };
 
     const persistImageHistory = async (nextLogs: GenerationLog[], _nextCategories: GenerationCategory[]) => {
-        if (!token || !accountHistorySyncEnabledRef.current) return;
-        await saveImageGenerationLogs(token, nextLogs.map(serializeLog)).catch(() => {
+        if (!storageReady || !accountHistorySyncEnabledRef.current) return;
+        await saveImageGenerationLogs(token || undefined, nextLogs.map(serializeLog)).catch(() => {
             accountHistorySyncEnabledRef.current = false;
         });
     };
 
     const syncBackendImageTasks = async (baseLogs?: GenerationLog[]) => {
         const currentConfig = imageTaskConfig();
-        if (!token) return baseLogs || logsRef.current;
+        if (!usesBackendImageTasks(currentConfig)) return baseLogs || logsRef.current;
         try {
             const tasks = await listCanvasImageTasks(currentConfig, ["image-workbench", "workflow"]);
             const recoverableTasks = tasks.filter(isRecoverableImageTask);
@@ -1141,7 +1138,6 @@ export default function ImagePage() {
 
     return (
         <div className="flex h-full flex-col overflow-hidden bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100">
-            {managedCapabilityIssue ? <PlatformMediaCapabilityNotice capability="图片" message={managedCapabilityIssue} loading={isPlatformBootstrapLoading} onReload={() => token && void loadPlatformBootstrap(token)} /> : null}
             <main className={`${workbenchLayout === "side" ? "grid grid-cols-1 lg:grid-cols-[420px_minmax(0,1fr)]" : "relative flex flex-col"} min-h-0 flex-1 gap-3 overflow-y-auto p-3 lg:overflow-hidden`}>
                 {workbenchLayout === "side" ? (
                     <>
@@ -2021,7 +2017,7 @@ function ResultImageCard({
                     <span>{formatDuration(image.durationMs)}</span>
                 </div>
                 <div className="flex shrink-0 gap-1">
-                    <Button size="small" title="同步到云端存储" icon={<CloudUpload className="size-3.5" />} loading={syncing} disabled={image.storageKey?.startsWith("server:")} onClick={() => onSync(image)} />
+                    <Button size="small" title="重新保存到本站存储" icon={<CloudUpload className="size-3.5" />} loading={syncing} disabled={image.storageKey?.startsWith("server:")} onClick={() => onSync(image)} />
                     <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => void onSaveAsset(image, index)} />
                     <Button size="small" icon={<PenLine className="size-3.5" />} onClick={() => void onEdit(image, index)} />
                     <Button size="small" icon={<Download className="size-3.5" />} onClick={() => onDownload(image, index)} />

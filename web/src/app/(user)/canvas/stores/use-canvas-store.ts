@@ -4,7 +4,7 @@ import { persist, type PersistStorage, type StorageValue } from "zustand/middlew
 import { nanoid } from "nanoid";
 import { localForageStorage } from "@/lib/localforage-storage";
 import { listCanvasProjects, saveCanvasProject, syncCanvasProjects } from "@/services/api/canvas-tasks";
-import { fetchUserConfig } from "@/services/api/user-config";
+import { hasConfiguredJisudengAPIKey } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { CanvasBackgroundMode } from "@/lib/canvas-theme";
 import type { CanvasAgentConfig, CanvasAssistantSession, CanvasConnection, CanvasNodeData, CanvasPendingAgentRequest, ViewportTransform } from "../types";
@@ -44,7 +44,10 @@ type CanvasStore = {
     openProject: (id: string) => CanvasProject | null;
     renameProject: (id: string, title: string) => void;
     deleteProjects: (ids: string[]) => void;
-    updateProject: (id: string, patch: Partial<Pick<CanvasProject, "nodes" | "connections" | "chatSessions" | "activeChatId" | "agentConfig" | "autoTitlePending" | "backgroundMode" | "showImageInfo" | "viewport" | "sidePanel" | "agentPanel" | "pendingAgentRequest">>) => void;
+    updateProject: (
+        id: string,
+        patch: Partial<Pick<CanvasProject, "nodes" | "connections" | "chatSessions" | "activeChatId" | "agentConfig" | "autoTitlePending" | "backgroundMode" | "showImageInfo" | "viewport" | "sidePanel" | "agentPanel" | "pendingAgentRequest">>,
+    ) => void;
     syncWithRemote: (token: string, syncEnabled: boolean) => Promise<void>;
     setSyncEnabled: (enabled: boolean) => void;
 };
@@ -61,7 +64,7 @@ function waitForUserStoreHydration() {
     if (useUserStore.persist.hasHydrated()) return Promise.resolve();
 
     return new Promise<void>((resolve) => {
-        let unsubscribe = () => { };
+        let unsubscribe = () => {};
         unsubscribe = useUserStore.persist.onFinishHydration(() => {
             unsubscribe();
             resolve();
@@ -75,7 +78,7 @@ function waitForUserStoreHydration() {
 
 function queueProjectSave(project: CanvasProject) {
     const token = useUserStore.getState().token;
-    const syncEnabled = accountCanvasSyncEnabled;
+    const syncEnabled = accountCanvasSyncEnabled && hasConfiguredJisudengAPIKey();
     const previous = projectSaveTimers.get(project.id);
     if (previous) clearTimeout(previous);
 
@@ -83,15 +86,10 @@ function queueProjectSave(project: CanvasProject) {
         project.id,
         setTimeout(() => {
             projectSaveTimers.delete(project.id);
-            if (
-                !token ||
-                !syncEnabled ||
-                !accountCanvasSyncEnabled ||
-                useUserStore.getState().token !== token
-            ) {
+            if (!syncEnabled || !accountCanvasSyncEnabled || !hasConfiguredJisudengAPIKey()) {
                 return;
             }
-            void saveCanvasProject(token, project).catch(() => undefined);
+            void saveCanvasProject(token || undefined, project).catch(() => undefined);
         }, 400),
     );
 }
@@ -105,40 +103,19 @@ function cancelProjectSaves(ids: string[]) {
     });
 }
 
-async function reconcileCanvasProjects(
-    token: string,
-    remoteProjects: CanvasProject[],
-    localProjects: CanvasProject[],
-) {
-    const remoteById = new Map(
-        remoteProjects.map((project) => [project.id, project]),
-    );
-    const missingProjects = localProjects.filter(
-        (project) => !remoteById.has(project.id),
-    );
-    const existingLocalProjects = localProjects.filter((project) =>
-        remoteById.has(project.id),
-    );
+async function reconcileCanvasProjects(token: string, remoteProjects: CanvasProject[], localProjects: CanvasProject[]) {
+    const remoteById = new Map(remoteProjects.map((project) => [project.id, project]));
+    const missingProjects = localProjects.filter((project) => !remoteById.has(project.id));
+    const existingLocalProjects = localProjects.filter((project) => remoteById.has(project.id));
     const projects = missingProjects.length
-        ? await syncCanvasProjects(token, missingProjects)
-            .then((syncedProjects) =>
-                mergeCanvasProjects(
-                    syncedProjects,
-                    existingLocalProjects,
-                ),
-            )
-            .catch(() =>
-                mergeCanvasProjects(remoteProjects, localProjects),
-            )
+        ? await syncCanvasProjects(token || undefined, missingProjects)
+              .then((syncedProjects) => mergeCanvasProjects(syncedProjects, existingLocalProjects))
+              .catch(() => mergeCanvasProjects(remoteProjects, localProjects))
         : mergeCanvasProjects(remoteProjects, existingLocalProjects);
 
     localProjects.forEach((project) => {
         const remote = remoteById.get(project.id);
-        if (
-            remote &&
-            Date.parse(project.updatedAt || "") >
-            Date.parse(remote.updatedAt || "")
-        ) {
+        if (remote && Date.parse(project.updatedAt || "") > Date.parse(remote.updatedAt || "")) {
             queueProjectSave(project);
         }
     });
@@ -151,29 +128,17 @@ const canvasStorage: PersistStorage<CanvasStore> = {
         await waitForUserStoreHydration();
         const localValue = await localForageStorage.getItem(name);
         const token = useUserStore.getState().token;
-        const localParsed = localValue
-            ? (JSON.parse(localValue) as StorageValue<CanvasStore>)
-            : null;
-        const localProjects =
-            (localParsed?.state as PersistedCanvasState)?.projects || [];
-        const localHasData =
-            Array.isArray(localProjects) && localProjects.length > 0;
+        const localParsed = localValue ? (JSON.parse(localValue) as StorageValue<CanvasStore>) : null;
+        const localProjects = (localParsed?.state as PersistedCanvasState)?.projects || [];
+        const localHasData = Array.isArray(localProjects) && localProjects.length > 0;
 
-        if (token) {
+        if (hasConfiguredJisudengAPIKey()) {
             try {
-                const [userConfig, remoteProjects] = await Promise.all([
-                    fetchUserConfig(token),
-                    listCanvasProjects(token),
-                ]);
-                accountCanvasSyncEnabled =
-                    userConfig.syncCapabilities?.userData === true;
+                const remoteProjects = await listCanvasProjects(token || undefined);
+                accountCanvasSyncEnabled = true;
 
                 if (accountCanvasSyncEnabled && localHasData) {
-                    const projects = await reconcileCanvasProjects(
-                        token,
-                        remoteProjects,
-                        localProjects,
-                    );
+                    const projects = await reconcileCanvasProjects(token, remoteProjects, localProjects);
 
                     const nextState = { projects };
                     const parsed = {
@@ -181,34 +146,22 @@ const canvasStorage: PersistStorage<CanvasStore> = {
                         version: 0,
                     } as StorageValue<CanvasStore>;
                     queuedPersistState = nextState;
-                    await localForageStorage.setItem(
-                        name,
-                        JSON.stringify(parsed),
-                    );
+                    await localForageStorage.setItem(name, JSON.stringify(parsed));
                     return parsed;
                 }
 
-                if (
-                    remoteProjects.length > 0 &&
-                    (accountCanvasSyncEnabled || !localHasData)
-                ) {
+                if (remoteProjects.length > 0 && (accountCanvasSyncEnabled || !localHasData)) {
                     const nextState = { projects: remoteProjects };
                     const parsed = {
                         state: nextState,
                         version: 0,
                     } as StorageValue<CanvasStore>;
                     queuedPersistState = nextState;
-                    await localForageStorage.setItem(
-                        name,
-                        JSON.stringify(parsed),
-                    );
+                    await localForageStorage.setItem(name, JSON.stringify(parsed));
                     return parsed;
                 }
             } catch (error) {
-                console.error(
-                    "Failed to hydrate canvas projects from remote",
-                    error,
-                );
+                console.error("Failed to hydrate canvas projects from remote", error);
             }
         }
 
@@ -219,10 +172,7 @@ const canvasStorage: PersistStorage<CanvasStore> = {
 
     setItem: (name, value) => {
         const nextState = value.state as PersistedCanvasState;
-        if (
-            queuedPersistState &&
-            queuedPersistState.projects === nextState.projects
-        ) {
+        if (queuedPersistState && queuedPersistState.projects === nextState.projects) {
             return;
         }
         queuedPersistState = nextState;
@@ -292,12 +242,9 @@ export const useCanvasStore = create<CanvasStore>()(
                 queueProjectSave(project);
                 return project.id;
             },
-            openProject: (id) =>
-                get().projects.find((item) => item.id === id) || null,
+            openProject: (id) => get().projects.find((item) => item.id === id) || null,
             renameProject: (id, title) => {
-                const project = get().projects.find(
-                    (item) => item.id === id,
-                );
+                const project = get().projects.find((item) => item.id === id);
                 if (!project) return;
                 const nextProject = {
                     ...project,
@@ -306,24 +253,18 @@ export const useCanvasStore = create<CanvasStore>()(
                     updatedAt: new Date().toISOString(),
                 };
                 set((state) => ({
-                    projects: state.projects.map((item) =>
-                        item.id === id ? nextProject : item,
-                    ),
+                    projects: state.projects.map((item) => (item.id === id ? nextProject : item)),
                 }));
                 queueProjectSave(nextProject);
             },
             deleteProjects: (ids) => {
                 cancelProjectSaves(ids);
                 set((state) => ({
-                    projects: state.projects.filter(
-                        (project) => !ids.includes(project.id),
-                    ),
+                    projects: state.projects.filter((project) => !ids.includes(project.id)),
                 }));
             },
             updateProject: (id, patch) => {
-                const project = get().projects.find(
-                    (item) => item.id === id,
-                );
+                const project = get().projects.find((item) => item.id === id);
                 if (!project) return;
                 const nextProject = {
                     ...project,
@@ -331,25 +272,17 @@ export const useCanvasStore = create<CanvasStore>()(
                     updatedAt: new Date().toISOString(),
                 };
                 set((state) => ({
-                    projects: state.projects.map((item) =>
-                        item.id === id ? nextProject : item,
-                    ),
+                    projects: state.projects.map((item) => (item.id === id ? nextProject : item)),
                 }));
                 queueProjectSave(nextProject);
             },
             syncWithRemote: async (token, syncEnabled) => {
-                accountCanvasSyncEnabled = syncEnabled;
-                if (!syncEnabled) return;
+                accountCanvasSyncEnabled = syncEnabled && hasConfiguredJisudengAPIKey();
+                if (!accountCanvasSyncEnabled) return;
                 const localProjects = get().projects;
-                const remoteProjects = await listCanvasProjects(token).catch(
-                    () => null,
-                );
+                const remoteProjects = await listCanvasProjects(token || undefined).catch(() => null);
                 if (!remoteProjects) return;
-                const projects = await reconcileCanvasProjects(
-                    token,
-                    remoteProjects,
-                    localProjects,
-                );
+                const projects = await reconcileCanvasProjects(token, remoteProjects, localProjects);
                 if (saveTimer) {
                     clearTimeout(saveTimer);
                     saveTimer = null;
@@ -357,10 +290,7 @@ export const useCanvasStore = create<CanvasStore>()(
                 const nextState = { projects };
                 queuedPersistState = nextState;
                 set(nextState);
-                await localForageStorage.setItem(
-                    CANVAS_STORE_KEY,
-                    JSON.stringify({ state: nextState, version: 0 }),
-                );
+                await localForageStorage.setItem(CANVAS_STORE_KEY, JSON.stringify({ state: nextState, version: 0 }));
             },
             setSyncEnabled: (enabled) => {
                 accountCanvasSyncEnabled = enabled;
@@ -380,24 +310,13 @@ export const useCanvasStore = create<CanvasStore>()(
     ),
 );
 
-export function mergeCanvasProjects(
-    remoteProjects: CanvasProject[],
-    localProjects: CanvasProject[],
-): CanvasProject[] {
+export function mergeCanvasProjects(remoteProjects: CanvasProject[], localProjects: CanvasProject[]): CanvasProject[] {
     const projects = new Map<string, CanvasProject>();
     [...localProjects, ...remoteProjects].forEach((project) => {
         const previous = projects.get(project.id);
-        if (
-            !previous ||
-            Date.parse(project.updatedAt || "") >=
-            Date.parse(previous.updatedAt || "")
-        ) {
+        if (!previous || Date.parse(project.updatedAt || "") >= Date.parse(previous.updatedAt || "")) {
             projects.set(project.id, project);
         }
     });
-    return Array.from(projects.values()).sort(
-        (a, b) =>
-            Date.parse(b.updatedAt || "") -
-            Date.parse(a.updatedAt || ""),
-    );
+    return Array.from(projects.values()).sort((a, b) => Date.parse(b.updatedAt || "") - Date.parse(a.updatedAt || ""));
 }

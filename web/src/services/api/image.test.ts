@@ -5,22 +5,22 @@ import { createCanvasImageTask, requestGeneration } from "./image";
 import { defaultConfig, type AiConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
-function managedSenseNovaConfig(): AiConfig {
+function directSenseNovaConfig(): AiConfig {
     return {
         ...defaultConfig,
-        channelMode: "remote",
+        channelMode: "local",
         model: "sensenova-u1-fast",
         imageModel: "sensenova-u1-fast",
-        imageChannelId: "platform-managed:image:17",
-        activeChannelId: "platform-managed:image:17",
-        apiMode: "responses",
+        imageChannelId: "jisudeng-api",
+        activeChannelId: "jisudeng-api",
+        apiMode: "images",
         localChannels: [
             {
-                id: "platform-managed:image:17",
+                id: "jisudeng-api",
                 protocol: "openai",
-                name: "图片",
-                baseUrl: "/api",
-                apiKey: "",
+                name: "极速蹬 API",
+                baseUrl: "https://api.jisudeng.com",
+                apiKey: "user-api-key",
                 models: ["sensenova-u1-fast"],
                 modelCapabilities: { "sensenova-u1-fast": ["image"] },
                 modelMediaCapabilities: {
@@ -32,16 +32,13 @@ function managedSenseNovaConfig(): AiConfig {
                     },
                 },
                 declaredModelIds: ["sensenova-u1-fast"],
-                managedPlatform: true,
-                platformPurpose: "image",
-                platformGroupID: "17",
             },
         ],
     };
 }
 
-function managedSenseNovaU15Config(): AiConfig {
-    const config = managedSenseNovaConfig();
+function directSenseNovaU15Config(): AiConfig {
+    const config = directSenseNovaConfig();
     config.model = "sensenova-u1.5-lite";
     config.imageModel = "sensenova-u1.5-lite";
     config.localChannels[0] = {
@@ -60,13 +57,13 @@ function managedSenseNovaU15Config(): AiConfig {
     return config;
 }
 
-test("managed image requests normalize stale Responses mode at both execution boundaries", async () => {
+test("direct image requests use the fixed API endpoint without Canvas session authorization", async () => {
     const originalFetch = globalThis.fetch;
     const runtime = globalThis as unknown as { window?: Pick<Window, "setTimeout" | "clearTimeout"> };
     const originalWindow = runtime.window;
     const originalState = useUserStore.getState();
-    const requests: Array<{ url: string; body: unknown }> = [];
-    useUserStore.setState({ token: "managed-session", hydrateUser: async () => undefined });
+    const requests: Array<{ url: string; body: unknown; authorization: string | null }> = [];
+    useUserStore.setState({ token: "canvas-admin-session", hydrateUser: async () => undefined });
     runtime.window = {
         setTimeout: ((handler: TimerHandler, timeout?: number) => globalThis.setTimeout(handler, timeout) as unknown as number) as Window["setTimeout"],
         clearTimeout: ((id?: number) => globalThis.clearTimeout(id)) as Window["clearTimeout"],
@@ -74,25 +71,25 @@ test("managed image requests normalize stale Responses mode at both execution bo
     globalThis.fetch = (async (input, init) => {
         const url = String(input);
         const body = typeof init?.body === "string" ? JSON.parse(init.body) : init?.body;
-        requests.push({ url, body });
-        if (url === "/api/v1/canvas/image-tasks") {
-            return new Response(JSON.stringify({ code: 0, data: { id: "image-task-1", status: "queued" } }), { status: 200, headers: { "Content-Type": "application/json" } });
-        }
+        requests.push({ url, body, authorization: new Headers(init?.headers).get("Authorization") });
         return new Response(JSON.stringify({ data: [{ b64_json: "aGVsbG8=" }] }), { status: 200, headers: { "Content-Type": "application/json" } });
     }) as typeof fetch;
 
     try {
-        const config = managedSenseNovaConfig();
+        const config = directSenseNovaConfig();
         await requestGeneration(config, "a lighthouse at dusk");
         await createCanvasImageTask(config, "a lighthouse at dusk", []);
+        const directRequests = requests.filter((request) => request.url.startsWith("https://api.jisudeng.com/"));
 
-        assert.equal(requests[0]?.url, "/api/v1/images/generations");
-        assert.equal((requests[0]?.body as { model?: string }).model, "sensenova-u1-fast");
-        assert.equal(Object.hasOwn(requests[0]?.body as object, "watermark"), false);
-        assert.equal(requests[1]?.url, "/api/v1/canvas/image-tasks");
-        assert.equal((requests[1]?.body as { endpoint?: string }).endpoint, "/images/generations");
+        assert.equal(directRequests.length, 2);
+        assert.equal(directRequests[0]?.url, "https://api.jisudeng.com/v1/images/generations");
+        assert.equal((directRequests[0]?.body as { model?: string }).model, "sensenova-u1-fast");
+        assert.equal(directRequests[0]?.authorization, "Bearer user-api-key");
+        assert.equal(Object.hasOwn(directRequests[0]?.body as object, "watermark"), false);
+        assert.equal(directRequests[1]?.url, "https://api.jisudeng.com/v1/images/generations");
+        assert.equal(directRequests[1]?.authorization, "Bearer user-api-key");
         assert.equal(
-            requests.some((request) => request.url.includes("/responses") || (request.body as { endpoint?: string })?.endpoint === "/responses"),
+            requests.some((request) => request.url.includes("/api/v1/images") || request.url.includes("/api/v1/canvas") || request.url.includes("/responses")),
             false,
         );
     } finally {
@@ -109,7 +106,7 @@ test("SenseNova U1.5 Lite sends the user's explicit watermark choice", async () 
     const originalWindow = runtime.window;
     const originalState = useUserStore.getState();
     const requests: Array<Record<string, unknown>> = [];
-    useUserStore.setState({ token: "managed-session", hydrateUser: async () => undefined });
+    useUserStore.setState({ token: "canvas-admin-session", hydrateUser: async () => undefined });
     runtime.window = {
         setTimeout: ((handler: TimerHandler, timeout?: number) => globalThis.setTimeout(handler, timeout) as unknown as number) as Window["setTimeout"],
         clearTimeout: ((id?: number) => globalThis.clearTimeout(id)) as Window["clearTimeout"],
@@ -120,7 +117,7 @@ test("SenseNova U1.5 Lite sends the user's explicit watermark choice", async () 
     }) as typeof fetch;
 
     try {
-        const config = { ...managedSenseNovaU15Config(), imageWatermark: "false" };
+        const config = { ...directSenseNovaU15Config(), imageWatermark: "false" };
         await requestGeneration(config, "a lighthouse at dusk");
         assert.equal(requests[0]?.watermark as boolean | undefined, false);
     } finally {

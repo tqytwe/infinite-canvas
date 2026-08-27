@@ -1,19 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import axios from "axios";
-
-import {
-    channelIdForActiveModel,
-    defaultConfig,
-    forcePlatformManagedImageAPI,
-    isPlatformManagedImageConfig,
-    modelMatchesCapability,
-    normalizeLocalChannels,
-    platformManagedImageCapabilitiesForConfig,
-    platformManagedVideoCapabilitiesForConfig,
-    useConfigStore,
-    type AiConfig,
-} from "./use-config-store";
+import { channelIdForActiveModel, defaultConfig, modelMatchesCapability, normalizeLocalChannels, type AiConfig } from "./use-config-store";
 
 test("remote model selection does not reuse a matching local channel", () => {
     const config: AiConfig = {
@@ -42,40 +29,31 @@ test("remote model selection does not reuse a matching local channel", () => {
     assert.equal(channelIdForActiveModel(config), "remote-image");
 });
 
-test("explicit video selection does not reuse a multi-modal image channel", () => {
+test("the fixed direct channel keeps image and video capabilities on the same configured API key", () => {
     const config: AiConfig = {
         ...defaultConfig,
+        channelMode: "local",
         model: "multi-modal",
         imageModel: "multi-modal",
         videoModel: "multi-modal",
-        imageChannelId: "platform-managed:image:17",
-        videoChannelId: "platform-managed:video:23",
+        imageChannelId: "jisudeng-api",
+        videoChannelId: "jisudeng-api",
         localChannels: [
             {
-                id: "platform-managed:image:17",
+                id: "obsolete-channel-id",
                 protocol: "openai",
-                name: "图片",
-                baseUrl: "/api",
-                apiKey: "canvas-token",
+                name: "极速蹬 API",
+                baseUrl: "https://api.jisudeng.com",
+                apiKey: "user-api-key",
                 models: ["multi-modal"],
-                modelCapabilities: { "multi-modal": ["image"] },
-                declaredModelIds: ["multi-modal"],
-            },
-            {
-                id: "platform-managed:video:23",
-                protocol: "openai",
-                name: "视频",
-                baseUrl: "/api",
-                apiKey: "canvas-token",
-                models: ["multi-modal"],
-                modelCapabilities: { "multi-modal": ["video"] },
+                modelCapabilities: { "multi-modal": ["image", "video"] },
                 declaredModelIds: ["multi-modal"],
             },
         ],
     };
 
-    assert.equal(channelIdForActiveModel(config, "image"), "platform-managed:image:17");
-    assert.equal(channelIdForActiveModel(config, "video"), "platform-managed:video:23");
+    assert.equal(channelIdForActiveModel(config, "image"), "jisudeng-api");
+    assert.equal(channelIdForActiveModel(config, "video"), "jisudeng-api");
 });
 
 test("persisted mixed declarations do not retain legacy classifications", () => {
@@ -104,14 +82,10 @@ test("persisted mixed declarations do not retain legacy classifications", () => 
     assert.equal(modelMatchesCapability("sensenova-u1.5-lite", "image", channel), false);
 });
 
-test("selected managed purpose returns only that group's per-model media contract", () => {
+test("normalization replaces obsolete managed channels with one fixed direct channel", () => {
     const config: AiConfig = {
         ...defaultConfig,
-        model: "shared",
-        imageModel: "shared",
-        videoModel: "shared",
-        imageChannelId: "platform-managed:image:17",
-        videoChannelId: "platform-managed:video:23",
+        apiKey: "user-api-key",
         localChannels: [
             {
                 id: "platform-managed:image:17",
@@ -169,83 +143,16 @@ test("selected managed purpose returns only that group's per-model media contrac
         ],
     };
 
-    assert.deepEqual(platformManagedImageCapabilitiesForConfig(config, "shared"), {
-        operations: ["create", "edit"],
-        supportedSizes: ["1024x1024"],
-        supportedRatios: ["1:1"],
-        supportedFormats: ["png"],
-        maxReferenceImages: 2,
+    const [channel] = normalizeLocalChannels(config);
+    assert.deepEqual(channel, {
+        id: "jisudeng-api",
+        protocol: "openai",
+        name: "极速蹬 API",
+        baseUrl: "https://api.jisudeng.com",
+        apiKey: "user-api-key",
+        models: ["shared"],
+        modelCapabilities: { shared: ["image"] },
+        declaredModelIds: ["shared"],
+        modelDiscovery: undefined,
     });
-    assert.deepEqual(platformManagedVideoCapabilitiesForConfig(config, "shared"), {
-        operations: ["generate"],
-        supportedResolutions: ["720p"],
-        supportedRatios: ["16:9"],
-        supportedDurations: [5],
-    });
-});
-
-test("a persisted Responses mode is normalized only for the selected managed image channel", () => {
-    const managed: AiConfig = {
-        ...defaultConfig,
-        model: "sensenova-u1-fast",
-        imageModel: "sensenova-u1-fast",
-        imageChannelId: "platform-managed:image:17",
-        apiMode: "responses",
-        localChannels: [
-            {
-                id: "platform-managed:image:17",
-                protocol: "openai",
-                name: "图片",
-                baseUrl: "/api",
-                apiKey: "",
-                models: ["sensenova-u1-fast"],
-                modelCapabilities: { "sensenova-u1-fast": ["image"] },
-                modelMediaCapabilities: {
-                    "sensenova-u1-fast": {
-                        adapter: "sensenova",
-                        capabilityVersion: "v1",
-                        modalities: ["image"],
-                        image: { operations: ["create"], supportedSizes: ["1024x1024"], supportedRatios: ["1:1"], supportedFormats: ["png"] },
-                    },
-                },
-                declaredModelIds: ["sensenova-u1-fast"],
-                managedPlatform: true,
-                platformPurpose: "image",
-                platformGroupID: "17",
-            },
-        ],
-    };
-
-    assert.equal(isPlatformManagedImageConfig(managed), true);
-    assert.equal(forcePlatformManagedImageAPI(managed).apiMode, "images");
-
-    const local = { ...managed, imageChannelId: "local-image", localChannels: [{ ...managed.localChannels[0], id: "local-image", managedPlatform: false, platformPurpose: undefined }] };
-    assert.equal(isPlatformManagedImageConfig(local), false);
-    assert.equal(forcePlatformManagedImageAPI(local).apiMode, "responses");
-});
-
-test("a newer managed bootstrap token cannot retain an older session response", async () => {
-    const originalRequest = axios.request;
-    const pending: Array<{ resolve: (value: unknown) => void }> = [];
-    const request = () => new Promise<unknown>((resolve) => pending.push({ resolve }));
-    (axios as unknown as { request: typeof axios.request }).request = request as unknown as typeof axios.request;
-    useConfigStore.setState({ platformBootstrap: null, platformBootstrapError: "", isPlatformBootstrapLoading: false, platformBootstrapToken: "" });
-
-    try {
-        const older = useConfigStore.getState().loadPlatformBootstrap("old-token");
-        const newer = useConfigStore.getState().loadPlatformBootstrap("new-token");
-        assert.equal(pending.length, 2);
-
-        pending[0].resolve({ status: 200, data: { code: 0, data: { workspaces: { image: { groups: [{ id: 1, models: [{ id: "old-model" }] }] } } }, msg: "" } });
-        await older;
-        assert.equal(useConfigStore.getState().platformBootstrap, null);
-
-        const newerBootstrap = { workspaces: { image: { groups: [{ id: 2, models: [{ id: "new-model" }] }] } } };
-        pending[1].resolve({ status: 200, data: { code: 0, data: newerBootstrap, msg: "" } });
-        await newer;
-        assert.deepEqual(useConfigStore.getState().platformBootstrap, newerBootstrap);
-    } finally {
-        (axios as unknown as { request: typeof axios.request }).request = originalRequest;
-        useConfigStore.setState({ platformBootstrap: null, platformBootstrapError: "", isPlatformBootstrapLoading: false, platformBootstrapToken: "" });
-    }
 });

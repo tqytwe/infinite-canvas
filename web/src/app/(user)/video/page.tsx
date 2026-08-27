@@ -50,8 +50,7 @@ import {
 } from "@/components/video-settings-panel";
 import { canvasThemes } from "@/lib/canvas-theme";
 import { formatBytes, formatDuration } from "@/lib/image-utils";
-import { platformAspectRatio, platformManagedCapabilityIssue } from "@/lib/platform-managed-models";
-import { PlatformMediaCapabilityNotice } from "@/components/platform-media-capability-notice";
+import { platformAspectRatio } from "@/lib/platform-managed-models";
 import { boolConfig, isSeedanceVideoConfig, normalizeSeedanceRatio, seedanceReferenceLabel, seedanceVideoReferenceError, seedanceVideoReferenceHint, SEEDANCE_REFERENCE_LIMITS } from "@/lib/seedance-video";
 import { COGVIDEOX3_DURATIONS, isCogVideoX3Model, modelKey, normalizeCogVideoX3Duration, supportsVideoAudioGeneration, supportsVideoFrameReferences } from "@/lib/video-model-capabilities";
 import { createVideoPosterDataUrl, deleteStoredMedia, downloadRemoteMedia, resolveMediaUrl, uploadMediaFile, uploadRemoteMediaToServer } from "@/services/file-storage";
@@ -163,11 +162,6 @@ export default function VideoPage() {
     const lastFrameInputRef = useRef<HTMLInputElement>(null);
     const effectiveConfig = useEffectiveConfig();
     const updateConfig = useConfigStore((state) => state.updateConfig);
-    const publicSettings = useConfigStore((state) => state.publicSettings);
-    const platformBootstrap = useConfigStore((state) => state.platformBootstrap);
-    const platformBootstrapError = useConfigStore((state) => state.platformBootstrapError);
-    const isPlatformBootstrapLoading = useConfigStore((state) => state.isPlatformBootstrapLoading);
-    const loadPlatformBootstrap = useConfigStore((state) => state.loadPlatformBootstrap);
     const videoConfig = useMemo(() => ({ ...effectiveConfig, size: effectiveConfig.videoSize }), [effectiveConfig]);
     const updateVideoConfig = useCallback<UpdateAiConfig>(
         (key, value) => {
@@ -183,7 +177,6 @@ export default function VideoPage() {
     const openConfigDialog = useConfigStore((state) => state.openConfigDialog);
     const addAsset = useAssetStore((state) => state.addAsset);
     const token = useUserStore((state) => state.token);
-    const user = useUserStore((state) => state.user);
     const isUserReady = useUserStore((state) => state.isReady);
     const [prompt, setPrompt] = useState("");
     const [negativePrompt, setNegativePrompt] = useState("");
@@ -212,9 +205,10 @@ export default function VideoPage() {
     const logsRef = useRef<GenerationLog[]>([]);
     const effectiveConfigRef = useRef(videoConfig);
 
+    const storageReady = Boolean(effectiveConfig.apiKey.trim());
+
     const model = effectiveConfig.videoModel || effectiveConfig.model;
     const managedVideoCapabilities = platformManagedVideoCapabilitiesForConfig(effectiveConfig, model);
-    const managedCapabilityIssue = isUserReady && Boolean(token) && user?.role !== "admin" && publicSettings?.auth?.platform?.enabled === true ? platformBootstrapError || platformManagedCapabilityIssue(platformBootstrap, "video") : "";
     const canGenerate = Boolean(prompt.trim());
     const pendingCount = results.filter((item) => item.status === "pending").length;
     const klingWorkbench = managedVideoCapabilities ? null : resolveKlingWorkbenchConfig(videoConfig, model);
@@ -287,9 +281,9 @@ export default function VideoPage() {
     }, [logs]);
 
     useEffect(() => {
-        if (!isUserReady || !token) return;
-        void loadAccountVideoHistory(token).then((items) => syncBackendVideoTasks(items || logsRef.current));
-    }, [isUserReady, token]);
+        if (!isUserReady || !storageReady) return;
+        void loadAccountVideoHistory(token || undefined).then((items) => syncBackendVideoTasks(items || logsRef.current));
+    }, [isUserReady, storageReady, token]);
 
     const setWorkbenchLayout = (layout: WorkbenchLayout) => {
         setWorkbenchLayoutState(layout);
@@ -912,19 +906,19 @@ export default function VideoPage() {
         }
     };
 
-    const syncVideo = async (video: GeneratedVideo, index = 0) => {
+    const syncVideo = async (video: GeneratedVideo, index = 0, quiet = false) => {
         if (isCloudVideo(video)) return video;
         setSyncingVideoIds((ids) => Array.from(new Set([...ids, video.id])));
-        const hideLoading = message.loading("正在同步视频到云端存储...", 0);
+        const hideLoading = quiet ? undefined : message.loading("正在保存视频到本站存储...", 0);
         try {
             const uploaded = await uploadRemoteMediaToServer(video.url, `video-${index + 1}.mp4`);
-            message.success("视频已同步到云端存储");
+            if (!quiet) message.success("视频已保存到本站存储");
             return { ...video, url: uploaded.url, storageKey: uploaded.storageKey, width: uploaded.width || video.width, height: uploaded.height || video.height, bytes: uploaded.bytes || video.bytes, mimeType: uploaded.mimeType || video.mimeType };
         } catch (error) {
-            message.error(error instanceof Error ? error.message : "视频同步失败");
+            if (!quiet) message.error(error instanceof Error ? error.message : "视频保存失败");
             return null;
         } finally {
-            hideLoading();
+            hideLoading?.();
             setSyncingVideoIds((ids) => ids.filter((id) => id !== video.id));
         }
     };
@@ -1093,10 +1087,10 @@ export default function VideoPage() {
     };
 
     const deleteAccountVideoLogs = async (items: GenerationLog[]) => {
-        if (!token) return;
+        if (!storageReady) return;
         const ids = Array.from(new Set(items.flatMap(videoLogDeleteKeys)));
         if (!ids.length) return;
-        await deleteVideoGenerationLogs(token, ids).catch(() => undefined);
+        await deleteVideoGenerationLogs(token || undefined, ids).catch(() => undefined);
     };
 
     const refreshLogs = async () => {
@@ -1107,7 +1101,7 @@ export default function VideoPage() {
 
     const syncBackendVideoTasks = async (baseLogs?: GenerationLog[]) => {
         const config = effectiveConfigRef.current;
-        if (!token || !usesBackendVideoTasks(config)) return baseLogs || logsRef.current;
+        if (!usesBackendVideoTasks(config)) return baseLogs || logsRef.current;
         try {
             const tasks = await listVideoGenerationTasks(config);
             const recoverableTasks = tasks.filter(isRecoverableBackendVideoTask);
@@ -1130,7 +1124,7 @@ export default function VideoPage() {
         }
     };
 
-    const loadAccountVideoHistory = async (currentToken: string) => {
+    const loadAccountVideoHistory = async (currentToken?: string) => {
         try {
             const localLogs = await readStoredLogs();
             const remoteLogs = await fetchVideoGenerationLogs<GenerationLog>(currentToken);
@@ -1145,8 +1139,8 @@ export default function VideoPage() {
     };
 
     const persistVideoLog = async (log: GenerationLog) => {
-        if (!token || !shouldSyncVideoLog(log)) return;
-        await saveVideoGenerationLogs(token, [serializeLog(log)]).catch(() => undefined);
+        if (!storageReady || !shouldSyncVideoLog(log)) return;
+        await saveVideoGenerationLogs(token || undefined, [serializeLog(log)]).catch(() => undefined);
     };
 
     const saveGenerationLog = async (log: GenerationLog) => {
@@ -1182,7 +1176,11 @@ export default function VideoPage() {
                     return;
                 }
                 const video = videoFromTaskResponse(task, durationMs);
-                const nextLog = { ...baseLog, status: "成功" as const, video, error: undefined, errorDetail: undefined };
+                const durableVideo = resumeConfig.channelMode === "local" ? (await syncVideo(video, 0, true)) || video : video;
+                if (resumeConfig.channelMode === "local" && !durableVideo.storageKey) {
+                    message.warning("视频生成成功但保存失败，可点击“重新保存”重试");
+                }
+                const nextLog = { ...baseLog, status: "成功" as const, video: durableVideo, error: undefined, errorDetail: undefined };
                 await finalizeGenerationLog(nextLog);
                 setResults((value) => value.filter((item) => item.taskLogId !== log.id && item.id !== log.id));
                 return;
@@ -1252,7 +1250,6 @@ export default function VideoPage() {
 
     return (
         <div className="flex h-full flex-col overflow-hidden bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100">
-            {managedCapabilityIssue ? <PlatformMediaCapabilityNotice capability="视频" message={managedCapabilityIssue} loading={isPlatformBootstrapLoading} onReload={() => token && void loadPlatformBootstrap(token)} /> : null}
             <main className={`${workbenchLayout === "side" ? "grid grid-cols-1 lg:grid-cols-[420px_minmax(0,1fr)]" : "relative flex flex-col"} min-h-0 flex-1 gap-3 overflow-y-auto p-3 lg:overflow-hidden`}>
                 {workbenchLayout === "side" ? (
                     <>
@@ -2518,7 +2515,7 @@ function HistoryLogCard({
                 </div>
                 {log.video ? (
                     <div className="flex shrink-0 gap-1">
-                        <Button size="small" title="同步到云端存储" icon={<CloudUpload className="size-3.5" />} loading={syncing} disabled={isCloudVideo(log.video)} onClick={() => onSync(log.video!)} />
+                        <Button size="small" title="重新保存到本站存储" icon={<CloudUpload className="size-3.5" />} loading={syncing} disabled={isCloudVideo(log.video)} onClick={() => onSync(log.video!)} />
                         <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => onSaveAsset(log.video!)} />
                         <Button size="small" icon={<Download className="size-3.5" />} onClick={() => onDownload(log.video!)} />
                     </div>
@@ -2555,7 +2552,7 @@ function VideoMetaBar({
                 <span>{formatDuration(video.durationMs)}</span>
             </div>
             <div className="flex shrink-0 gap-1">
-                <Button size="small" title="同步到云端存储" icon={<CloudUpload className="size-3.5" />} loading={syncing} disabled={isCloudVideo(video)} onClick={() => onSync(video)} />
+                <Button size="small" title="重新保存到本站存储" icon={<CloudUpload className="size-3.5" />} loading={syncing} disabled={isCloudVideo(video)} onClick={() => onSync(video)} />
                 <Button size="small" icon={<FolderPlus className="size-3.5" />} onClick={() => onSaveAsset(video)} />
                 <Button size="small" icon={<Download className="size-3.5" />} onClick={() => onDownload(video)} />
             </div>

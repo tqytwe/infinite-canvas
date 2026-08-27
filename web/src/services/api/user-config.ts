@@ -39,32 +39,36 @@ export type UserStorageProviders = {
 };
 
 export async function syncUserStorageProvider(token: string, provider: UserStorageProviders) {
-    return apiPost<UserConfigPayload>("/api/v1/user-config/storage", {
-        provider: {
-            ...(provider.s3 ? { s3: toProviderPayload(provider.s3) } : {}),
-            ...(provider.webdav ? { webdav: toProviderPayload(provider.webdav) } : {}),
+    return apiPost<UserConfigPayload>(
+        "/api/v1/user-config/storage",
+        {
+            provider: {
+                ...(provider.s3 ? { s3: toProviderPayload(provider.s3) } : {}),
+                ...(provider.webdav ? { webdav: toProviderPayload(provider.webdav) } : {}),
+            },
         },
-    }, token);
+        token,
+    );
 }
 
 export async function measureUserStorageProvider(token: string, provider: UserStorageProvider) {
     return apiPost<StorageCapacityResult>("/api/v1/storage/measure", { provider: toProviderPayload(provider) }, token);
 }
 
-export async function fetchUserImageHistory<T>(token: string) {
-    return apiGet<T>("/api/v1/user-data/image-history", undefined, token);
+export async function fetchUserImageHistory<T>(token?: string) {
+    return apiGet<T>("/api/storage/user-data/image-history", undefined, token);
 }
 
-export async function syncUserImageHistory<T>(token: string, data: T) {
-    return apiPost<T>("/api/v1/user-data/image-history", { data }, token);
+export async function syncUserImageHistory<T>(token: string | undefined, data: T) {
+    return apiPost<T>("/api/storage/user-data/image-history", { data }, token);
 }
 
-export async function fetchUserAssetData<T>(token: string) {
-    return apiGet<T>("/api/v1/user-data/assets", undefined, token);
+export async function fetchUserAssetData<T>(token?: string) {
+    return apiGet<T>("/api/storage/user-data/assets", undefined, token);
 }
 
-export async function syncUserAssetData<T>(token: string, data: T) {
-    return apiPost<T>("/api/v1/user-data/assets", { data }, token);
+export async function syncUserAssetData<T>(token: string | undefined, data: T) {
+    return apiPost<T>("/api/storage/user-data/assets", { data }, token);
 }
 
 export type UserAssetPage<T> = {
@@ -74,8 +78,8 @@ export type UserAssetPage<T> = {
     total: number;
 };
 
-export async function fetchUserAssets<T>(token: string, params: { kind?: string; q?: string; cursor?: string; limit?: number }) {
-    return apiGet<UserAssetPage<T>>("/api/v1/user-assets", params, token);
+export async function fetchUserAssets<T>(token: string | undefined, params: { kind?: string; q?: string; cursor?: string; limit?: number }) {
+    return apiGet<UserAssetPage<T>>("/api/storage/user-assets", params, token);
 }
 
 export type CreativeWorkflowRecord<T = unknown> = {

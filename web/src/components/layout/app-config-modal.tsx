@@ -1,13 +1,13 @@
 "use client";
 
-import { App, Button, Form, Input, Modal, Segmented, Select, Switch } from "antd";
+import { App, Button, Form, Input, Modal, Select, Switch } from "antd";
 import { useEffect, useState } from "react";
 
 import { ModelPicker } from "@/components/model-picker";
 import { applyModelDiscovery, modelDiscoveryFailure } from "@/lib/model-capabilities";
-import { platformManagedCapabilityIssue } from "@/lib/platform-managed-models";
 import { fetchImageModels } from "@/services/api/image";
-import { fetchUserConfig, measureUserStorageProvider, syncUserModelConfig, syncUserStorageProvider } from "@/services/api/user-config";
+import { createStorageSession } from "@/services/api/storage-session";
+import { measureUserStorageProvider, syncUserStorageProvider } from "@/services/api/user-config";
 import { clearStorageConfigCache as clearFileStorageCache } from "@/services/file-storage";
 import {
     clearStorageConfigCache as clearImageStorageCache,
@@ -22,7 +22,7 @@ import {
 } from "@/services/image-storage";
 import { audioFormatOptions, audioVoiceOptions, glmTtsFormatOptions, glmTtsVoiceOptions, isGlmTtsModel, normalizeAudioSpeedValue, normalizeGlmTtsFormat, normalizeGlmTtsSpeed, normalizeGlmTtsVoice } from "@/lib/audio-generation";
 import { isMimoPresetTtsModel, isMimoTtsModel, isMimoVoiceCloneModel, isMimoVoiceDesignModel, mimoTtsFormatOptions, mimoTtsVoiceOptions } from "@/lib/mimo-tts";
-import { localModelsByCapability, modelMatchesCapability, normalizeLocalChannels, useConfigStore, useEffectiveConfig, type AiConfig, type LocalModelChannel, type ModelCapability } from "@/stores/use-config-store";
+import { JISUDENG_API_BASE_URL, localModelsByCapability, modelMatchesCapability, normalizeLocalChannels, useConfigStore, useEffectiveConfig, type AiConfig, type LocalModelChannel, type ModelCapability } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 
 type ModelGroup = {
@@ -59,61 +59,16 @@ export function AppConfigModal() {
     const shouldPromptContinue = useConfigStore((state) => state.shouldPromptContinue);
     const setConfigDialogOpen = useConfigStore((state) => state.setConfigDialogOpen);
     const clearPromptContinue = useConfigStore((state) => state.clearPromptContinue);
-    const publicSettings = useConfigStore((state) => state.publicSettings);
-    const platformBootstrap = useConfigStore((state) => state.platformBootstrap);
-    const platformBootstrapError = useConfigStore((state) => state.platformBootstrapError);
-    const isPlatformBootstrapLoading = useConfigStore((state) => state.isPlatformBootstrapLoading);
-    const loadPlatformBootstrap = useConfigStore((state) => state.loadPlatformBootstrap);
     const token = useUserStore((state) => state.token);
-    const user = useUserStore((state) => state.user);
     const effectiveConfig = useEffectiveConfig();
-    const modelChannel = publicSettings?.modelChannel;
-    const platformAuthEnabled = publicSettings?.auth?.platform?.enabled === true;
-    const isLoggedIn = Boolean(token && user);
-    const canUseRemoteChannel = !platformAuthEnabled && isLoggedIn && (user?.role === "admin" || modelChannel?.allowUserRemoteChannel === true);
-    const allowCustomChannel = isLoggedIn && modelChannel?.allowCustomChannel === true;
-    const isPlatformManagedUser = platformAuthEnabled && isLoggedIn && user?.role !== "admin";
-    const effectiveMode = isPlatformManagedUser ? "managed" : canUseRemoteChannel ? (allowCustomChannel ? config.channelMode : "remote") : "local";
-    const localModelConfig: AiConfig = effectiveMode === "local" && config.channelMode !== "local" ? { ...config, channelMode: "local" } : config;
-    const modelConfig = isPlatformManagedUser || effectiveMode === "remote" ? effectiveConfig : localModelConfig;
-    const canUseUserStorageProvider = isLoggedIn && allowUserStorageProvider;
+    const modelConfig = effectiveConfig;
+    const canUseUserStorageProvider = Boolean(token) && allowUserStorageProvider;
     const glmTts = isGlmTtsModel(config.audioModel);
-    const platformCapabilityIssues = isPlatformManagedUser ? (["image", "video"] as const).map((capability) => ({ capability, message: platformManagedCapabilityIssue(platformBootstrap, capability) })).filter((issue) => issue.message) : [];
 
     useEffect(() => {
         setUserStorage(loadUserS3StorageProvider() || defaultUserStorageProvider());
         setUserWebDAVStorage(loadUserWebDAVStorageProvider() || defaultUserWebDAVStorageProvider());
-        if (!isConfigOpen || !token) return;
-        let canceled = false;
-        void fetchUserConfig(token)
-            .then((payload) => {
-                if (canceled) return;
-                const remoteConfig = payload.modelConfig;
-                const syncS3 = remoteConfig?.syncStorageConfig === true;
-                const syncWebDAV = remoteConfig?.syncWebDAVStorageConfig === true;
-                setRemoteStorageSyncEnabled(syncS3);
-                setRemoteWebDAVStorageSyncEnabled(syncWebDAV);
-                if (remoteConfig) {
-                    Object.entries(remoteConfig).forEach(([key, value]) => updateConfig(key as keyof AiConfig, value as never));
-                }
-                updateConfig("syncStorageConfig", syncS3);
-                updateConfig("syncWebDAVStorageConfig", syncWebDAV);
-                if (syncS3 && payload.storageProvider?.s3) {
-                    const next = { ...defaultUserStorageProvider(), ...payload.storageProvider.s3, type: "s3" as const };
-                    setUserStorage(next);
-                    saveUserStorageProvider(next);
-                }
-                if (syncWebDAV && payload.storageProvider?.webdav) {
-                    const next = { ...defaultUserWebDAVStorageProvider(), ...payload.storageProvider.webdav, type: "webdav" as const };
-                    setUserWebDAVStorage(next);
-                    saveUserWebDAVStorageProvider(next);
-                }
-            })
-            .catch(() => {});
-        return () => {
-            canceled = true;
-        };
-    }, [isConfigOpen, token, updateConfig]);
+    }, [isConfigOpen]);
 
     useEffect(() => {
         if (!isConfigOpen) return;
@@ -131,24 +86,23 @@ export function AppConfigModal() {
     }, [isConfigOpen]);
 
     const finishConfig = async () => {
-        const localIncomplete = effectiveMode === "local" && normalizeLocalChannels(config).some((channel) => !channel.baseUrl.trim() || !channel.apiKey.trim());
+        const localIncomplete = normalizeLocalChannels(config).some((channel) => !channel.baseUrl.trim() || !channel.apiKey.trim());
         const modelIncomplete = !modelConfig.imageModel.trim() || !modelConfig.videoModel.trim() || !modelConfig.textModel.trim();
         if (userStorage.enabled && userWebDAVStorage.enabled) {
             message.error("S3/R2 与 WebDAV 不能同时启用");
             return;
         }
-        if (!isPlatformManagedUser && !canUseRemoteChannel && config.channelMode !== "local") updateConfig("channelMode", "local");
-        else if (canUseRemoteChannel && !allowCustomChannel && config.channelMode !== "remote") updateConfig("channelMode", "remote");
+        if (config.channelMode !== "local") updateConfig("channelMode", "local");
         if (canUseUserStorageProvider) {
             saveUserStorageProvider(userStorage);
             saveUserWebDAVStorageProvider(userWebDAVStorage);
         }
         setSavingConfig(true);
         try {
-            if (token) {
-                const configToSave = effectiveMode === "local" && config.channelMode !== "local" ? { ...config, channelMode: "local" as const } : config;
-                await syncUserModelConfig(token, configToSave);
-            }
+            const directChannel = normalizeLocalChannels(config)[0];
+            await createStorageSession(JISUDENG_API_BASE_URL, directChannel?.apiKey || "");
+            const { useCanvasStore } = await import("@/app/(user)/canvas/stores/use-canvas-store");
+            void useCanvasStore.getState().syncWithRemote("", true);
             const providers = {
                 ...(config.syncStorageConfig || remoteStorageSyncEnabled ? { s3: config.syncStorageConfig ? userStorage : { ...userStorage, enabled: false, endpoint: "", bucket: "", accessKeyId: "", secretAccessKey: "" } } : {}),
                 ...(config.syncWebDAVStorageConfig || remoteWebDAVStorageSyncEnabled ? { webdav: config.syncWebDAVStorageConfig ? userWebDAVStorage : { ...userWebDAVStorage, enabled: false, endpoint: "", username: "", password: "" } } : {}),
@@ -173,7 +127,6 @@ export function AppConfigModal() {
     };
 
     const refreshModels = async () => {
-        if (effectiveMode === "remote") return;
         const channels = normalizeLocalChannels(config);
         setLoadingModels(true);
         try {
@@ -219,14 +172,6 @@ export function AppConfigModal() {
 
     const patchLocalChannel = (id: string, patch: Partial<LocalModelChannel>) => {
         updateLocalChannels(normalizeLocalChannels(config).map((channel) => (channel.id === id ? { ...channel, ...patch } : channel)));
-    };
-
-    const addLocalChannel = () => {
-        updateLocalChannels([...normalizeLocalChannels(config), { id: "local-" + Date.now(), protocol: "openai", name: "新渠道", baseUrl: "", apiKey: "", models: [] }]);
-    };
-
-    const removeLocalChannel = (id: string) => {
-        updateLocalChannels(normalizeLocalChannels(config).filter((channel) => channel.id !== id));
     };
 
     const refreshLocalChannelModels = async (channel: LocalModelChannel) => {
@@ -294,108 +239,53 @@ export function AppConfigModal() {
         >
             <div className="pt-1">
                 <Form layout="vertical" requiredMark={false}>
-                    {allowCustomChannel && canUseRemoteChannel ? (
-                        <Form.Item label="渠道模式" className="mb-5">
-                            <Segmented
-                                block
-                                size="middle"
-                                value={effectiveMode}
-                                onChange={(value) => updateConfig("channelMode", value as AiConfig["channelMode"])}
-                                options={[
-                                    { label: "本地直连", value: "local" },
-                                    { label: "云端渠道", value: "remote" },
-                                ]}
-                            />
-                        </Form.Item>
-                    ) : null}
-                    {isPlatformManagedUser ? (
-                        <div className="mb-5 rounded-lg border border-stone-200 p-3 text-sm dark:border-stone-800">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
+                    <>
+                        <div className="mb-5 space-y-3 rounded-lg border border-stone-200 p-3 dark:border-stone-800">
+                            <div className="flex items-center justify-between gap-3">
                                 <div>
-                                    <div className="font-medium">极速蹬受管创作能力</div>
-                                    <div className="mt-1 text-xs text-stone-500">模型、分组和能力均由平台服务端提供，Canvas 不会根据模型名称猜测图片或视频能力。</div>
+                                    <div className="text-sm font-medium">极速蹬 API</div>
+                                    <div className="mt-1 text-xs text-stone-500">API Key 仅保存在此浏览器，用于直接加载和调用你的模型。</div>
                                 </div>
-                                <Button size="small" loading={isPlatformBootstrapLoading} disabled={!token} onClick={() => token && void loadPlatformBootstrap(token)}>
-                                    重新加载
-                                </Button>
                             </div>
-                            {platformBootstrapError ? <div className="mt-3 text-sm text-red-600 dark:text-red-400">创作能力加载失败：{platformBootstrapError}</div> : null}
-                            {platformCapabilityIssues.map((issue) => (
-                                <div key={issue.capability} className="mt-2 text-sm text-amber-700 dark:text-amber-300">
-                                    {issue.message}
+                            {normalizeLocalChannels(config).map((channel) => (
+                                <div key={channel.id} className="space-y-2 rounded-md bg-stone-50 p-2 dark:bg-stone-900">
+                                    <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                                        <Input value={JISUDENG_API_BASE_URL} aria-label="极速蹬 API 地址" disabled />
+                                        <Input.Password value={channel.apiKey} placeholder="API Key" onChange={(event) => patchLocalChannel(channel.id, { apiKey: event.target.value })} />
+                                        <div className="flex gap-2">
+                                            <Button size="small" loading={loadingModels} onClick={() => void refreshLocalChannelModels(channel)}>
+                                                拉取
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-x-2 text-xs text-stone-500">
+                                        <span>已保存 {channel.models.length} 个模型</span>
+                                        {channel.modelDiscovery?.state === "declared" ? <span>已按接口声明识别图片、视频等能力</span> : null}
+                                        {channel.modelDiscovery?.state === "legacy" ? <span>接口未声明模型能力，正在使用兼容识别</span> : null}
+                                        {channel.modelDiscovery?.state === "error" ? (
+                                            <>
+                                                <span className="text-red-600 dark:text-red-400">读取失败：{channel.modelDiscovery.message || "请检查接口、分组和图片权限"}</span>
+                                                <Button type="link" size="small" className="h-auto p-0" onClick={() => void refreshLocalChannelModels(channel)}>
+                                                    重试
+                                                </Button>
+                                            </>
+                                        ) : null}
+                                    </div>
                                 </div>
                             ))}
                         </div>
-                    ) : effectiveMode === "local" ? (
-                        <>
-                            <div className="mb-5 space-y-3 rounded-lg border border-stone-200 p-3 dark:border-stone-800">
-                                <div className="flex items-center justify-between gap-3">
-                                    <div>
-                                        <div className="text-sm font-medium">本地模型渠道</div>
-                                        <div className="mt-1 text-xs text-stone-500">可为生图、视频、文本、音频分别选择不同渠道的模型。</div>
-                                    </div>
-                                    <Button size="small" onClick={addLocalChannel}>
-                                        新增渠道
-                                    </Button>
-                                </div>
-                                {normalizeLocalChannels(config).map((channel, index) => (
-                                    <div key={channel.id} className="space-y-2 rounded-md bg-stone-50 p-2 dark:bg-stone-900">
-                                        <div className="grid gap-2 md:grid-cols-[130px_150px_minmax(0,1fr)_minmax(0,1fr)_auto]">
-                                            <Input value={channel.name} placeholder="渠道名称" onChange={(event) => patchLocalChannel(channel.id, { name: event.target.value })} />
-                                            <Select
-                                                value={channel.protocol}
-                                                options={[
-                                                    { label: "OpenAI", value: "openai" },
-                                                    { label: "KIE", value: "kie" },
-                                                    { label: "MiMo", value: "mimo" },
-                                                ]}
-                                                onChange={(protocol) => patchLocalChannel(channel.id, { protocol: protocol as LocalModelChannel["protocol"] })}
-                                            />
-                                            <Input value={channel.baseUrl} placeholder="Base URL" onChange={(event) => patchLocalChannel(channel.id, { baseUrl: event.target.value })} />
-                                            <Input.Password value={channel.apiKey} placeholder="API Key" onChange={(event) => patchLocalChannel(channel.id, { apiKey: event.target.value })} />
-                                            <div className="flex gap-2">
-                                                <Button size="small" loading={loadingModels} onClick={() => void refreshLocalChannelModels(channel)}>
-                                                    拉取
-                                                </Button>
-                                                <Button size="small" danger disabled={index === 0 && normalizeLocalChannels(config).length === 1} onClick={() => removeLocalChannel(channel.id)}>
-                                                    删除
-                                                </Button>
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-wrap items-center gap-x-2 text-xs text-stone-500">
-                                            <span>已保存 {channel.models.length} 个模型</span>
-                                            {channel.modelDiscovery?.state === "declared" ? <span>已按接口声明识别图片、视频等能力</span> : null}
-                                            {channel.modelDiscovery?.state === "legacy" ? <span>接口未声明模型能力，正在使用兼容识别</span> : null}
-                                            {channel.modelDiscovery?.state === "error" ? (
-                                                <>
-                                                    <span className="text-red-600 dark:text-red-400">读取失败：{channel.modelDiscovery.message || "请检查接口、分组和图片权限"}</span>
-                                                    <Button type="link" size="small" className="h-auto p-0" onClick={() => void refreshLocalChannelModels(channel)}>
-                                                        重试
-                                                    </Button>
-                                                </>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                ))}
+                        <div className="mb-5 flex items-center justify-between gap-3 rounded-lg border border-stone-200 px-3 py-2 dark:border-stone-800">
+                            <div className="min-w-0">
+                                <div className="text-sm font-medium">模型列表</div>
+                                <div className="mt-1 text-xs text-stone-500">当前已保存 {config.models.length} 个模型</div>
                             </div>
-                            <div className="mb-5 flex items-center justify-between gap-3 rounded-lg border border-stone-200 px-3 py-2 dark:border-stone-800">
-                                <div className="min-w-0">
-                                    <div className="text-sm font-medium">模型列表</div>
-                                    <div className="mt-1 text-xs text-stone-500">当前已保存 {config.models.length} 个模型</div>
-                                </div>
-                                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
-                                    <Button size="small" loading={loadingModels} onClick={() => void refreshModels()}>
-                                        拉取全部渠道
-                                    </Button>
-                                </div>
+                            <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                                <Button size="small" loading={loadingModels} onClick={() => void refreshModels()}>
+                                    拉取模型
+                                </Button>
                             </div>
-                        </>
-                    ) : (
-                        <div className="mb-5 rounded-lg border border-stone-200 p-3 text-sm text-stone-500 dark:border-stone-800">
-                            <div className="font-medium text-stone-900 dark:text-stone-100">云端渠道</div>
-                            <div className="mt-1">由系统后台渠道转发请求，当前可用 {modelChannel?.availableModels.length || 0} 个模型。</div>
                         </div>
-                    )}
+                    </>
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                         {modelGroups.map((group) => (
                             <Form.Item key={group.modelKey} label={group.defaultLabel} className="mb-4">
@@ -540,11 +430,9 @@ export function AppConfigModal() {
                             <Input.TextArea rows={2} value={config.audioInstructions} placeholder="例如：自然、温暖、适合旁白。" onChange={(event) => updateConfig("audioInstructions", event.target.value)} />
                         </Form.Item>
                     ) : null}
-                    {effectiveMode === "local" ? (
-                        <Form.Item label="系统提示词" className="mb-0">
-                            <Input.TextArea rows={3} value={config.systemPrompt} placeholder="例如：你是一位擅长电影感写实摄影的视觉导演。" onChange={(event) => updateConfig("systemPrompt", event.target.value)} />
-                        </Form.Item>
-                    ) : null}
+                    <Form.Item label="系统提示词" className="mb-0">
+                        <Input.TextArea rows={3} value={config.systemPrompt} placeholder="例如：你是一位擅长电影感写实摄影的视觉导演。" onChange={(event) => updateConfig("systemPrompt", event.target.value)} />
+                    </Form.Item>
                 </Form>
             </div>
         </Modal>
