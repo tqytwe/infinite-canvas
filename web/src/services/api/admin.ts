@@ -1,4 +1,5 @@
 import { apiDelete, apiGet, apiPost, compactApiParams } from "@/services/api/request";
+import type { ModelCapabilities } from "@/lib/model-capabilities";
 import type { Prompt, PromptListResponse } from "@/services/api/prompts";
 
 export type AdminPromptCategory = {
@@ -168,6 +169,7 @@ export type AdminModelChannel = {
     baseUrl: string;
     apiKey: string;
     models: string[];
+    modelCapabilities?: ModelCapabilities;
     weight: number;
     timeout: number;
     enabled: boolean;
@@ -176,6 +178,7 @@ export type AdminModelChannel = {
 
 export type AdminPublicModelChannelSettings = {
     availableModels: string[];
+    modelCapabilities?: ModelCapabilities;
     modelCosts: AdminModelCost[];
     channels: AdminPublicModelChannelInfo[];
     defaultModel: string;
@@ -204,6 +207,7 @@ export type AdminPublicModelChannelInfo = {
     name: string;
     baseUrl: string;
     models: string[];
+    modelCapabilities?: ModelCapabilities;
     weight: number;
     timeout: number;
     enabled: boolean;
@@ -220,7 +224,6 @@ export type AdminPublicSettings = {
         platform: {
             enabled: boolean;
             loginUrl: string;
-            entryUrl: string;
             entryUrl: string;
         };
     };

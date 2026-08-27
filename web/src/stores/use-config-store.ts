@@ -4,6 +4,16 @@ import { useMemo } from "react";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { filterModelsByCapability as filterDiscoveredModelsByCapability, modelMatchesCapability as discoveredModelMatchesCapability, type ModelCapabilities, type ModelCapability } from "@/lib/model-capabilities";
+import {
+    platformManagedChannelForCapability,
+    platformManagedChannels,
+    type PlatformImageMediaCapabilities,
+    type PlatformManagedBootstrap,
+    type PlatformManagedModelMediaCapabilities,
+    type PlatformMediaPurpose,
+    type PlatformVideoMediaCapabilities,
+} from "@/lib/platform-managed-models";
 import { apiGet } from "@/services/api/request";
 import type { AdminPublicSettings } from "@/services/api/admin";
 import { useUserStore } from "@/stores/use-user-store";
@@ -15,6 +25,29 @@ export type LocalModelChannel = {
     baseUrl: string;
     apiKey: string;
     models: string[];
+    modelCapabilities?: ModelCapabilities;
+    modelMediaCapabilities?: Record<string, PlatformManagedModelMediaCapabilities>;
+    declaredModelIds?: string[];
+    modelDiscovery?: {
+        state: "declared" | "legacy" | "error";
+        message?: string;
+    };
+    managedPlatform?: boolean;
+    platformPurpose?: "chat" | "image" | "video";
+    platformGroupID?: string;
+    isCurrent?: boolean;
+};
+
+export type PublicModelChannel = {
+    id?: string;
+    name?: string;
+    baseUrl?: string;
+    models?: string[];
+    modelCapabilities?: ModelCapabilities;
+    weight?: number;
+    timeout?: number;
+    enabled?: boolean;
+    remark?: string;
 };
 
 export type VideoMultiPromptItem = { prompt: string; duration: string };
@@ -76,7 +109,7 @@ export type AiConfig = {
         workflowAgent: string;
     };
     localChannels: LocalModelChannel[];
-    publicChannels: Array<{ id?: string; name?: string; baseUrl?: string; models?: string[]; weight?: number; timeout?: number; enabled?: boolean; remark?: string }>;
+    publicChannels: PublicModelChannel[];
     syncStorageConfig: boolean;
     syncWebDAVStorageConfig: boolean;
     activeChannelId: string;
@@ -87,7 +120,7 @@ export type AiConfig = {
 };
 
 export const CONFIG_STORE_KEY = "infinite-canvas:ai_config_store";
-export type ModelCapability = "image" | "video" | "text" | "audio";
+export type { ModelCapability, ModelCapabilities } from "@/lib/model-capabilities";
 
 export const defaultConfig: AiConfig = {
     channelMode: "local",
@@ -158,33 +191,46 @@ type ConfigStore = {
     config: AiConfig;
     publicSettings: AdminPublicSettings | null;
     isPublicSettingsLoading: boolean;
+    platformBootstrap: PlatformManagedBootstrap | null;
+    platformBootstrapError: string;
+    isPlatformBootstrapLoading: boolean;
+    platformBootstrapToken: string;
     isConfigOpen: boolean;
     shouldPromptContinue: boolean;
     updateConfig: <K extends keyof AiConfig>(key: K, value: AiConfig[K]) => void;
     loadPublicSettings: () => Promise<void>;
+    loadPlatformBootstrap: (token: string) => Promise<void>;
+    clearPlatformBootstrap: () => void;
     isAiConfigReady: (config: AiConfig, model: string) => boolean;
     openConfigDialog: (shouldPromptContinue?: boolean) => void;
     setConfigDialogOpen: (isOpen: boolean) => void;
     clearPromptContinue: () => void;
 };
 
-function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSettings["modelChannel"] | null, canUseRemoteChannel: boolean) {
+function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSettings["modelChannel"] | null, canUseRemoteChannel: boolean, isPlatformManagedUser: boolean, platformBootstrap: PlatformManagedBootstrap | null, platformToken: string) {
+    if (isPlatformManagedUser) return resolvePlatformManagedConfig(config, platformBootstrap, platformToken);
     const channelMode = canUseRemoteChannel ? (modelChannel?.allowCustomChannel ? config.channelMode : "remote") : "local";
     if (channelMode === "local" || !modelChannel) {
         const localChannels = normalizeLocalChannels(config);
+        const models = normalizeModelList(localChannels.flatMap((channel) => channel.models));
         return {
             ...config,
             channelMode,
             localChannels,
-            models: normalizeModelList(localChannels.flatMap((channel) => channel.models)),
+            models,
+            imageModels: localModelsByCapability(localChannels, "image"),
+            videoModels: localModelsByCapability(localChannels, "video"),
+            textModels: localModelsByCapability(localChannels, "text"),
+            audioModels: localModelsByCapability(localChannels, "audio"),
             publicChannels: modelChannel?.channels || [],
         };
     }
     const models = modelChannel.availableModels;
-    const textModels = filterModelsByCapability(models, "text");
-    const imageModels = filterModelsByCapability(models, "image");
-    const videoModels = filterModelsByCapability(models, "video");
-    const audioModels = filterModelsByCapability(models, "audio");
+    const capabilitySource = { modelCapabilities: modelChannel.modelCapabilities };
+    const textModels = filterModelsByCapability(models, "text", capabilitySource);
+    const imageModels = filterModelsByCapability(models, "image", capabilitySource);
+    const videoModels = filterModelsByCapability(models, "video", capabilitySource);
+    const audioModels = filterModelsByCapability(models, "audio", capabilitySource);
     const fallbackTextModel = validDefault(modelChannel.defaultTextModel, textModels) || preferredModel(textModels, isTextModelName);
     const fallbackModel = validDefault(modelChannel.defaultModel, textModels) || fallbackTextModel;
     const fallbackImageModel = validDefault(modelChannel.defaultImageModel, imageModels) || preferredModel(imageModels, isImageModelName);
@@ -208,6 +254,55 @@ function resolveEffectiveConfig(config: AiConfig, modelChannel: AdminPublicSetti
     };
 }
 
+function resolvePlatformManagedConfig(config: AiConfig, bootstrap: PlatformManagedBootstrap | null, token: string) {
+    // The Canvas JWT is injected only into this calculated runtime config. It
+    // is never copied into the persisted AI configuration, and the platform
+    // API keys are never available to the browser.
+    const managedChannels = platformManagedChannels(bootstrap);
+    const localChannels = managedChannels.map((channel) => ({ ...channel, apiKey: token }));
+    const models = normalizeModelList(localChannels.flatMap((channel) => channel.models));
+    const imageModels = localModelsByCapability(localChannels, "image");
+    const videoModels = localModelsByCapability(localChannels, "video");
+    const textModels = localModelsByCapability(localChannels, "text");
+    const audioModels = localModelsByCapability(localChannels, "audio");
+    const imageChannel = platformManagedChannelForCapability(managedChannels, "image", config.imageChannelId);
+    const videoChannel = platformManagedChannelForCapability(managedChannels, "video", config.videoChannelId);
+    const textChannel = platformManagedChannelForCapability(managedChannels, "text", config.textChannelId);
+    const audioChannel = platformManagedChannelForCapability(managedChannels, "audio", config.audioChannelId);
+    const selectModel = (current: string, options: string[]) => (options.includes(current) ? current : options[0] || "");
+    const imageModel = selectModel(config.imageModel, imageModels);
+    const videoModel = selectModel(config.videoModel, videoModels);
+    const textModel = selectModel(config.textModel, textModels);
+    const audioModel = selectModel(config.audioModel, audioModels);
+    return {
+        ...config,
+        channelMode: "local" as const,
+        baseUrl: "/api",
+        apiKey: token,
+        // The platform's image sessions accept only the Images API. Normalize
+        // a legacy persisted Responses selection in the effective config so
+        // UI history and retries describe the request that will be sent.
+        apiMode: "images",
+        localChannels,
+        publicChannels: [],
+        models,
+        imageModels,
+        videoModels,
+        textModels,
+        audioModels,
+        imageModel,
+        videoModel,
+        textModel,
+        audioModel,
+        model: textModel || imageModel || videoModel || audioModel,
+        imageChannelId: imageChannel?.id || "",
+        videoChannelId: videoChannel?.id || "",
+        textChannelId: textChannel?.id || "",
+        audioChannelId: audioChannel?.id || "",
+        activeChannelId: textChannel?.id || imageChannel?.id || videoChannel?.id || "",
+    };
+}
+
 function validDefault(model: string, models: string[]) {
     return models.includes(model) ? model : "";
 }
@@ -216,110 +311,28 @@ function preferredModel(models: string[], predicate: (model: string) => boolean)
     return models.find(predicate) || "";
 }
 
-function isVideoModelName(model: string) {
-    const value = model.toLowerCase().trim();
-    const normalized = value.replace(/[._/]+/g, "-");
-    return (
-        value.includes("video") ||
-        value.includes("seedance") ||
-        normalized === "sd2-5" ||
-        normalized === "sd-2-5" ||
-        value.includes("sora") ||
-        value.includes("veo") ||
-        value.includes("kling") ||
-        value.includes("hailuo") ||
-        normalized === "minimax-h3" ||
-        (value.includes("minimax") && (value.includes("video") || value.includes("text-to-video") || value.includes("image-to-video"))) ||
-        normalized === "manxue2-5" ||
-        normalized === "manxue-2-5" ||
-        value.includes("skyreels") ||
-        value.includes("happyhorse") ||
-        value.includes("runway") ||
-        value.includes("aleph") ||
-        value.includes("vidu") ||
-        value.includes("pixverse") ||
-        value.includes("omni-flash") ||
-        value.includes("gemini-omni-video") ||
-        value.includes("veo3.1") ||
-        value.includes("veo-3.1") ||
-        value.includes("infinitalk") ||
-        value.includes("wan2-5") ||
-        value.includes("wan2.5") ||
-        value.includes("wan2-6") ||
-        value.includes("wan2.6") ||
-        value.includes("wan2-7") ||
-        value.includes("wan2.7") ||
-        value.includes("wan2-7-r2v") ||
-        value.includes("wan2.7-r2v") ||
-        value.includes("wan2-7-videoedit") ||
-        value.includes("wan2.7-videoedit") ||
-        value.includes("wan/2-5") ||
-        value.includes("wan/2-6") ||
-        value.includes("wan/2-7-text-to-video") ||
-        value.includes("wan/2-7-image-to-video") ||
-        value.includes("wan/2-7-videoedit") ||
-        value.includes("wan/2-7-r2v") ||
-        (value.includes("grok-imagine") && (value.includes("/upscale") || value.includes("/extend")))
-    );
+function isImageModelName(model: string) {
+    return discoveredModelMatchesCapability(model, "image");
 }
 
-function isImageModelName(model: string) {
-    const value = model.toLowerCase();
-    return !isVideoModelName(model) && !isAudioModelName(model) && (
-        value.includes("image") ||
-        value.includes("nano-banana") ||
-        value.includes("seedream") ||
-        value.includes("gpt-image") ||
-        value.includes("cogview") ||
-        value.includes("dall-e") ||
-        value.includes("dalle") ||
-        value.includes("imagen") ||
-        value.includes("gemini-2.5-flash") ||
-        value.includes("gemini-3-pro") ||
-        value.includes("gemini-3.1-flash") ||
-        value.includes("flux") ||
-        value.includes("kontext") ||
-        value.includes("4o-image") ||
-        value.includes("4o image") ||
-        value.includes("gpt-4o-image") ||
-        value.includes("z-image") ||
-        value.includes("qwen/image") ||
-        value.includes("qwen2/image") ||
-        value.includes("qwen/text-to-image") ||
-        value.includes("qwen2/text-to-image") ||
-        value.includes("ideogram") ||
-        value.includes("recraft") ||
-        value.includes("sdxl") ||
-        value.includes("stable-diffusion") ||
-        value.includes("midjourney") ||
-        value.includes("wan2-7-image") ||
-        value.includes("wan2.7-image") ||
-        value.includes("wan/2-7-image") ||
-        value.includes("topaz/image") ||
-        value.includes("gemini-omni-character") ||
-        (value.includes("grok-imagine") && !value.includes("video"))
-    );
+function isVideoModelName(model: string) {
+    return discoveredModelMatchesCapability(model, "video");
 }
 
 function isAudioModelName(model: string) {
-    const value = model.toLowerCase();
-    return value.includes("audio") || value.includes("tts") || value.includes("speech") || value.includes("voice") || value.includes("music") || value.includes("sound") || value.includes("elevenlabs") || value.includes("suno") || value.includes("lyrics") || value.includes("vocal") || value.includes("midi") || value.includes("wav");
+    return discoveredModelMatchesCapability(model, "audio");
 }
 
 function isTextModelName(model: string) {
-    return !isImageModelName(model) && !isVideoModelName(model) && !isAudioModelName(model);
+    return discoveredModelMatchesCapability(model, "text");
 }
 
-export function modelMatchesCapability(model: string, capability?: ModelCapability) {
-    if (!capability) return true;
-    if (capability === "image") return isImageModelName(model);
-    if (capability === "video") return isVideoModelName(model);
-    if (capability === "audio") return isAudioModelName(model);
-    return isTextModelName(model);
+export function modelMatchesCapability(model: string, capability?: ModelCapability, source?: { modelCapabilities?: ModelCapabilities; declaredModelIds?: string[] }) {
+    return discoveredModelMatchesCapability(model, capability, source);
 }
 
-export function filterModelsByCapability(models: string[], capability?: ModelCapability) {
-    return capability ? models.filter((model) => modelMatchesCapability(model, capability)) : models;
+export function filterModelsByCapability(models: string[], capability?: ModelCapability, source?: { modelCapabilities?: ModelCapabilities; declaredModelIds?: string[] }) {
+    return filterDiscoveredModelsByCapability(models, capability, source);
 }
 
 export function selectableModelsByCapability(config: AiConfig, capability?: ModelCapability) {
@@ -337,6 +350,10 @@ export const useConfigStore = create<ConfigStore>()(
             config: defaultConfig,
             publicSettings: null,
             isPublicSettingsLoading: false,
+            platformBootstrap: null,
+            platformBootstrapError: "",
+            isPlatformBootstrapLoading: false,
+            platformBootstrapToken: "",
             isConfigOpen: false,
             shouldPromptContinue: false,
             updateConfig: (key, value) =>
@@ -355,6 +372,19 @@ export const useConfigStore = create<ConfigStore>()(
                     set({ isPublicSettingsLoading: false });
                 }
             },
+            loadPlatformBootstrap: async (token) => {
+                if (!token || (get().isPlatformBootstrapLoading && get().platformBootstrapToken === token)) return;
+                set({ isPlatformBootstrapLoading: true, platformBootstrapError: "", platformBootstrapToken: token, platformBootstrap: null });
+                try {
+                    const platformBootstrap = await apiGet<PlatformManagedBootstrap>("/api/v1/platform/bootstrap", undefined, token);
+                    if (get().platformBootstrapToken === token) set({ platformBootstrap, platformBootstrapError: "" });
+                } catch (error) {
+                    if (get().platformBootstrapToken === token) set({ platformBootstrap: null, platformBootstrapError: error instanceof Error ? error.message : "创作能力加载失败" });
+                } finally {
+                    if (get().platformBootstrapToken === token) set({ isPlatformBootstrapLoading: false });
+                }
+            },
+            clearPlatformBootstrap: () => set({ platformBootstrap: null, platformBootstrapError: "", isPlatformBootstrapLoading: false, platformBootstrapToken: "" }),
             isAiConfigReady: (config, model) => isAiConfigReady(config, model),
             openConfigDialog: (shouldPromptContinue = false) => set({ isConfigOpen: true, shouldPromptContinue }),
             setConfigDialogOpen: (isConfigOpen) => set({ isConfigOpen }),
@@ -409,10 +439,10 @@ export const useConfigStore = create<ConfigStore>()(
                         videoWatermark: config.videoWatermark || "false",
                         videoCharacterOrientation: config.videoCharacterOrientation === "image" ? "image" : "video",
                         canvasImageCount: config.canvasImageCount || "1",
-                        imageModels: filterModelsByCapability(localModels, "image"),
-                        videoModels: filterModelsByCapability(localModels, "video"),
-                        textModels: filterModelsByCapability(localModels, "text"),
-                        audioModels: filterModelsByCapability(localModels, "audio"),
+                        imageModels: localModelsByCapability(localChannels, "image"),
+                        videoModels: localModelsByCapability(localChannels, "video"),
+                        textModels: localModelsByCapability(localChannels, "text"),
+                        audioModels: localModelsByCapability(localChannels, "audio"),
                     },
                 };
             },
@@ -428,10 +458,13 @@ export function useEffectiveConfig() {
     const config = useConfigStore((state) => state.config);
     const modelChannel = useConfigStore((state) => state.publicSettings?.modelChannel || null);
     const platformAuthEnabled = useConfigStore((state) => state.publicSettings?.auth?.platform?.enabled === true);
+    const platformBootstrap = useConfigStore((state) => state.platformBootstrap);
     const token = useUserStore((state) => state.token);
     const user = useUserStore((state) => state.user);
     const canUseRemoteChannel = !platformAuthEnabled && Boolean(token && user && (user.role === "admin" || modelChannel?.allowUserRemoteChannel === true));
-    return useMemo(() => resolveEffectiveConfig(config, modelChannel, canUseRemoteChannel), [canUseRemoteChannel, config, modelChannel]);
+    const isPlatformManagedUser = platformAuthEnabled && Boolean(user) && user?.role !== "admin";
+    const managedBootstrap = isPlatformManagedUser ? platformBootstrap : null;
+    return useMemo(() => resolveEffectiveConfig(config, modelChannel, canUseRemoteChannel, isPlatformManagedUser, managedBootstrap, token), [canUseRemoteChannel, config, isPlatformManagedUser, managedBootstrap, modelChannel, token]);
 }
 
 export function buildApiUrl(baseUrl: string, path: string) {
@@ -465,25 +498,109 @@ function normalizeVersionedBaseUrl(baseUrl: string) {
 
 export function normalizeLocalChannels(config: Partial<AiConfig>): LocalModelChannel[] {
     const channels = Array.isArray(config.localChannels) ? config.localChannels : [];
-    const normalized: LocalModelChannel[] = channels.map((channel, index) => ({
-        id: channel.id || `local-${index + 1}`,
-        protocol: channel.protocol === "kie" || channel.protocol === "mimo" ? channel.protocol : "openai",
-        name: typeof channel.name === "string" ? channel.name : `本地渠道 ${index + 1}`,
-        baseUrl: channel.baseUrl || "",
-        apiKey: channel.apiKey || "",
-        models: Array.isArray(channel.models) ? channel.models.filter(Boolean) : [],
-    }));
+    const normalized: LocalModelChannel[] = channels.map((channel, index) => {
+        const models = Array.isArray(channel.models) ? channel.models.filter(Boolean) : [];
+        const declaredModelIds = Array.isArray(channel.declaredModelIds) ? channel.declaredModelIds.filter((model): model is string => typeof model === "string" && Boolean(model.trim())) : [];
+        const modelCapabilities = declaredModelIds.length ? Object.fromEntries(models.map((model) => [model, declaredModelIds.includes(model) ? channel.modelCapabilities?.[model] || [] : []])) : channel.modelCapabilities;
+        return {
+            id: channel.id || `local-${index + 1}`,
+            protocol: channel.protocol === "kie" || channel.protocol === "mimo" ? channel.protocol : "openai",
+            name: typeof channel.name === "string" ? channel.name : `本地渠道 ${index + 1}`,
+            baseUrl: channel.baseUrl || "",
+            apiKey: channel.apiKey || "",
+            models,
+            modelCapabilities,
+            modelMediaCapabilities: channel.managedPlatform === true ? channel.modelMediaCapabilities : undefined,
+            declaredModelIds,
+            modelDiscovery: channel.modelDiscovery,
+            managedPlatform: channel.managedPlatform === true,
+            platformPurpose: channel.platformPurpose,
+            platformGroupID: channel.platformGroupID,
+            isCurrent: channel.isCurrent === true,
+        };
+    });
     if (!normalized.length) {
         normalized.push({ id: "local-default", protocol: "openai", name: "本地直连", baseUrl: config.baseUrl || defaultConfig.baseUrl, apiKey: config.apiKey || "", models: Array.isArray(config.models) ? config.models.filter(Boolean) : [] });
     }
     return normalized;
 }
 
-export function channelIdForActiveModel(config: AiConfig) {
-    if (modelMatchesCapability(config.model, "image") && config.imageChannelId) return config.imageChannelId;
-    if (modelMatchesCapability(config.model, "video") && config.videoChannelId) return config.videoChannelId;
-    if (modelMatchesCapability(config.model, "audio") && config.audioChannelId) return config.audioChannelId;
-    if (modelMatchesCapability(config.model, "text") && config.textChannelId) return config.textChannelId;
+export function localModelsByCapability(channels: LocalModelChannel[], capability?: ModelCapability) {
+    return normalizeModelList(channels.flatMap((channel) => filterModelsByCapability(channel.models, capability, channel)));
+}
+
+// Server-declared media details are runtime-only and are accepted exclusively
+// from a managed channel selected for the exact purpose. A locally persisted
+// channel therefore cannot accidentally turn a text model into a media model.
+function platformManagedChannelForConfig(config: AiConfig, purpose: Exclude<PlatformMediaPurpose, "chat">, model = config.model): LocalModelChannel | undefined {
+    const modelID = model.trim();
+    if (!modelID) return undefined;
+    const preferredID = purpose === "image" ? config.imageChannelId : config.videoChannelId;
+    const channels = normalizeLocalChannels(config);
+    const supportsModel = (channel: LocalModelChannel) => channel.models.some((candidate) => candidate.trim().toLowerCase() === modelID.toLowerCase());
+    const preferred = channels.find((channel) => channel.id === preferredID);
+    if (preferred) {
+        return preferred.managedPlatform === true && preferred.platformPurpose === purpose && supportsModel(preferred) ? preferred : undefined;
+    }
+    return channels.find((channel) => channel.managedPlatform === true && channel.platformPurpose === purpose && supportsModel(channel));
+}
+
+export function isPlatformManagedImageConfig(config: AiConfig, model = config.model): boolean {
+    return Boolean(platformManagedChannelForConfig(config, "image", model));
+}
+
+// A managed image session is purpose-bound on the platform. The Responses API
+// is a chat-purpose route there, so stale persisted settings must not redirect
+// image work to it. Keep the normalization at the request boundary as well as
+// the UI so restored workflow and retry snapshots remain safe.
+export function forcePlatformManagedImageAPI<T extends AiConfig>(config: T): T {
+    if (!isPlatformManagedImageConfig(config) || config.apiMode === "images") return config;
+    return { ...config, apiMode: "images" } as T;
+}
+
+export function platformManagedMediaCapabilitiesForConfig(config: AiConfig, purpose: Exclude<PlatformMediaPurpose, "chat">, model = config.model): PlatformManagedModelMediaCapabilities | undefined {
+    const modelID = model.trim();
+    if (!modelID) return undefined;
+    const channel = platformManagedChannelForConfig(config, purpose, modelID);
+    if (!channel) return undefined;
+    const exact = channel.modelMediaCapabilities?.[modelID];
+    if (exact) return exact;
+    return Object.entries(channel.modelMediaCapabilities || {}).find(([candidate]) => candidate.toLowerCase() === modelID.toLowerCase())?.[1];
+}
+
+export function platformManagedImageCapabilitiesForConfig(config: AiConfig, model = config.model): PlatformImageMediaCapabilities | undefined {
+    return platformManagedMediaCapabilitiesForConfig(config, "image", model)?.image;
+}
+
+export function platformManagedVideoCapabilitiesForConfig(config: AiConfig, model = config.model): PlatformVideoMediaCapabilities | undefined {
+    return platformManagedMediaCapabilitiesForConfig(config, "video", model)?.video;
+}
+
+export function channelIdForActiveModel(config: AiConfig, capability?: ModelCapability) {
+    const channels =
+        config.channelMode === "remote"
+            ? config.publicChannels.map((channel) => ({
+                  id: channel.id || "",
+                  models: channel.models || [],
+                  modelCapabilities: channel.modelCapabilities,
+              }))
+            : normalizeLocalChannels(config);
+    const channelForCapability = (requested: ModelCapability) => {
+        const preferredChannelID = requested === "image" ? config.imageChannelId : requested === "video" ? config.videoChannelId : requested === "audio" ? config.audioChannelId : config.textChannelId;
+        const preferred = channels.find((channel) => channel.id === preferredChannelID && channel.models.includes(config.model) && modelMatchesCapability(config.model, requested, channel));
+        if (preferred?.id) return preferred.id;
+        return channels.find((channel) => channel.models.includes(config.model) && modelMatchesCapability(config.model, requested, channel))?.id || "";
+    };
+    if (capability) return channelForCapability(capability);
+    for (const requested of [
+        ["image", config.imageChannelId],
+        ["video", config.videoChannelId],
+        ["audio", config.audioChannelId],
+        ["text", config.textChannelId],
+    ] as const) {
+        const channelID = channelForCapability(requested[0]);
+        if (channelID) return channelID;
+    }
     if (config.activeChannelId) return config.activeChannelId;
     if (config.model === config.videoModel) return config.videoChannelId;
     if (config.model === config.textModel) return config.textChannelId;
@@ -491,29 +608,26 @@ export function channelIdForActiveModel(config: AiConfig) {
     return config.imageChannelId;
 }
 
-export function localChannelForActiveModel(config: AiConfig) {
+export function localChannelForActiveModel(config: AiConfig, capability?: ModelCapability) {
     const channels = normalizeLocalChannels(config);
-    const preferredId = channelIdForActiveModel(config);
-    return channels.find((channel) => channel.id === preferredId && channel.models.includes(config.model)) || channels.find((channel) => channel.models.includes(config.model)) || channels.find((channel) => channel.id === preferredId) || channels[0];
+    const preferredId = channelIdForActiveModel(config, capability);
+    const matching = channels.filter((channel) => channel.models.includes(config.model) && (!capability || modelMatchesCapability(config.model, capability, channel)));
+    return matching.find((channel) => channel.id === preferredId) || matching[0] || (capability ? undefined : channels.find((channel) => channel.id === preferredId) || channels[0]);
 }
 
 export type DirectAIProvider = "kie" | "apimart";
 
 const directAIProviderCache = new Map<string, DirectAIProvider | null>();
 
-export function directAIProviderForConfig(config: AiConfig): DirectAIProvider | null {
-    const channel = localChannelForActiveModel(config);
+export function directAIProviderForConfig(config: AiConfig, capability?: ModelCapability): DirectAIProvider | null {
+    const channel = localChannelForActiveModel(config, capability);
     if (!channel) return null;
     const protocol = channel.protocol.toLowerCase();
     const baseUrl = channel.baseUrl.trim().toLowerCase();
     const model = (config.model || "").trim().toLowerCase();
     const key = `${protocol}\n${baseUrl}\n${model}`;
     if (directAIProviderCache.has(key)) return directAIProviderCache.get(key) || null;
-    const provider = protocol === "kie" || baseUrl.includes("kie.ai") || model.includes("kie/")
-        ? "kie"
-        : baseUrl.includes("apimart.ai") || model.includes("apimart")
-            ? "apimart"
-            : null;
+    const provider = protocol === "kie" || baseUrl.includes("kie.ai") || model.includes("kie/") ? "kie" : baseUrl.includes("apimart.ai") || model.includes("apimart") ? "apimart" : null;
     directAIProviderCache.set(key, provider);
     return provider;
 }

@@ -2,9 +2,11 @@ package handler
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"mime"
 	"mime/multipart"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -92,4 +94,56 @@ func canvasTaskMultipartBody(t *testing.T, filename string, data []byte) ([]byte
 		t.Fatal(err)
 	}
 	return body.Bytes(), writer.FormDataContentType()
+}
+
+func TestReadCanvasImageTaskOnlyAllowsImageEndpoints(t *testing.T) {
+	tests := []struct {
+		name     string
+		endpoint string
+		want     string
+		wantErr  string
+	}{
+		{name: "default generation", want: "/images/generations"},
+		{name: "image edit", endpoint: "/images/edits", want: "/images/edits"},
+		{name: "responses is rejected", endpoint: "/responses", wantErr: "不支持的图片任务接口"},
+		{name: "video is rejected", endpoint: "/videos", wantErr: "不支持的图片任务接口"},
+		{name: "query string is rejected", endpoint: "/images/generations?mode=chat", wantErr: "不支持的图片任务接口"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			payload, err := json.Marshal(map[string]any{
+				"endpoint": test.endpoint,
+				"request":  map[string]any{"model": "sensenova-u1.5-lite", "prompt": "test"},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := httptest.NewRequest("POST", "/api/v1/canvas/image-tasks", bytes.NewReader(payload))
+			request.Header.Set("Content-Type", "application/json")
+			_, _, endpoint, _, _, _, _, _, _, err := readCanvasTaskAIRequest(request, "/images/generations")
+			if test.wantErr != "" {
+				if err == nil || err.Error() != test.wantErr {
+					t.Fatalf("error = %v, want %q", err, test.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if endpoint != test.want {
+				t.Fatalf("endpoint = %q, want %q", endpoint, test.want)
+			}
+		})
+	}
+}
+
+func TestReadCanvasAudioTaskOnlyAllowsSpeechEndpoint(t *testing.T) {
+	payload := []byte(`{"endpoint":"/responses","request":{"model":"tts-model","input":"test"}}`)
+	request := httptest.NewRequest("POST", "/api/v1/canvas/audio-tasks", bytes.NewReader(payload))
+	request.Header.Set("Content-Type", "application/json")
+	_, _, _, _, _, _, _, _, _, err := readCanvasTaskAIRequest(request, "/audio/speech")
+	if err == nil || err.Error() != "不支持的音频任务接口" {
+		t.Fatalf("error = %v, want unsupported audio endpoint", err)
+	}
 }

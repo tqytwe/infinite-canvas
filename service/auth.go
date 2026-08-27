@@ -212,46 +212,24 @@ func platformIdentityExchangeURL() (string, error) {
 	return parsed.String(), nil
 }
 
-// LoginWithPlatformLaunchToken exchanges a single-use platform launch token
-// for a local Canvas session. It deliberately consumes only identity data;
-// model keys and platform billing sessions never cross this boundary.
+// LoginWithPlatformLaunchToken consumes a one-time launch token on the Canvas
+// server. The managed platform keys are encrypted in the shadow account and
+// are never included in the Canvas auth response.
 func LoginWithPlatformLaunchToken(ctx context.Context, launchToken string) (model.AuthSession, error) {
-	launchToken = strings.TrimSpace(launchToken)
-	if launchToken == "" {
-		return model.AuthSession{}, safeMessageError{message: "极速蹬登录令牌缺失"}
-	}
-	if !PlatformAuthEnabled() {
-		return model.AuthSession{}, safeMessageError{message: "极速蹬统一登录未配置"}
-	}
-	endpoint, err := platformIdentityExchangeURL()
+	managedSession, err := platformExchangeManagedSession(ctx, launchToken)
 	if err != nil {
 		return model.AuthSession{}, err
 	}
-	body, err := json.Marshal(map[string]string{"launch_token": launchToken})
+	bootstrap, err := platformBootstrapForSession(ctx, managedSession.Sessions["chat"])
 	if err != nil {
 		return model.AuthSession{}, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
+	identity, err := platformIdentityFromBootstrap(bootstrap)
 	if err != nil {
 		return model.AuthSession{}, err
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-NextChat-Secret", strings.TrimSpace(config.Cfg.PlatformExchangeSecret))
-	resp, err := platformAuthHTTPClient.Do(req)
-	if err != nil {
-		return model.AuthSession{}, safeMessageError{message: "极速蹬登录服务暂时不可用"}
-	}
-	defer resp.Body.Close()
-	var payload platformIdentityExchangeResponse
-	if resp.StatusCode == http.StatusServiceUnavailable || resp.StatusCode == http.StatusGatewayTimeout || resp.StatusCode == http.StatusBadGateway {
-		return model.AuthSession{}, safeMessageError{message: "极速蹬登录服务暂时不可用"}
-	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, 256*1024)).Decode(&payload); err != nil || resp.StatusCode < 200 || resp.StatusCode >= 300 || payload.Code != 0 || payload.Data.UserID <= 0 {
-		return model.AuthSession{}, safeMessageError{message: "极速蹬登录令牌无效或已过期"}
 	}
 
-	platformUserID := strconv.FormatInt(payload.Data.UserID, 10)
+	platformUserID := strconv.FormatInt(identity.User.ID, 10)
 	user, ok, err := repository.GetUserByPlatformUserID(platformUserID)
 	if err != nil {
 		return model.AuthSession{}, err
@@ -268,24 +246,27 @@ func LoginWithPlatformLaunchToken(ctx context.Context, launchToken string) (mode
 			Status:         model.UserStatusActive,
 			CreatedAt:      now(),
 		}
-		user.Email = strings.TrimSpace(payload.Data.Email)
-		user.DisplayName = firstNonEmpty(payload.Data.DisplayName, payload.Data.Name, user.DisplayName)
-		user.AvatarURL = strings.TrimSpace(payload.Data.AvatarURL)
+		user.Email = strings.TrimSpace(identity.User.Email)
+		user.DisplayName = firstNonEmpty(identity.User.Username, user.DisplayName)
+		user.AvatarURL = strings.TrimSpace(identity.User.AvatarURL)
 	} else if user.Status == model.UserStatusBan {
 		return model.AuthSession{}, safeMessageError{message: "Canvas 账号已被禁用"}
 	}
 	if strings.TrimSpace(user.Email) == "" {
-		user.Email = strings.TrimSpace(payload.Data.Email)
+		user.Email = strings.TrimSpace(identity.User.Email)
 	}
 	if strings.TrimSpace(user.DisplayName) == "" || user.DisplayName == "极速蹬用户" {
-		user.DisplayName = firstNonEmpty(payload.Data.DisplayName, payload.Data.Name, user.DisplayName)
+		user.DisplayName = firstNonEmpty(identity.User.Username, user.DisplayName)
 	}
 	if strings.TrimSpace(user.AvatarURL) == "" {
-		user.AvatarURL = strings.TrimSpace(payload.Data.AvatarURL)
+		user.AvatarURL = strings.TrimSpace(identity.User.AvatarURL)
 	}
 	normalizeUserDefaults(&user)
 	user.LastLoginAt = now()
 	user.UpdatedAt = now()
+	if err := savePlatformManagedSession(&user, managedSession); err != nil {
+		return model.AuthSession{}, err
+	}
 	user, err = repository.SaveUser(user)
 	if err != nil {
 		if !ok {

@@ -5,7 +5,7 @@ import { Cpu } from "lucide-react";
 
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { filterModelsByCapability, normalizeLocalChannels, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
+import { modelMatchesCapability, normalizeLocalChannels, type AiConfig, type ModelCapability } from "@/stores/use-config-store";
 
 type ModelPickerProps = {
     config: AiConfig;
@@ -25,11 +25,20 @@ export function ModelPicker({ config, value, channelId, capability, onChange, cl
     const channelOptions = useMemo(() => {
         const channels =
             config.channelMode === "remote"
-                ? config.publicChannels.map((channel) => ({ id: channel.id, name: channel.name || "云端渠道", baseUrl: channel.baseUrl, models: channel.models }))
-                : normalizeLocalChannels(config).map((channel) => ({ id: channel.id, name: channel.name || "本地渠道", baseUrl: channel.baseUrl, models: channel.models }));
-        const models = channels.flatMap((channel) => (channel.models ?? []).map((model) => ({ key: `${channel.id}::${model}`, channelId: channel.id, channelName: channel.name, model })));
+                ? config.publicChannels.map((channel) => ({ id: channel.id, name: channel.name || "云端渠道", baseUrl: channel.baseUrl, models: channel.models, modelCapabilities: channel.modelCapabilities, declaredModelIds: undefined }))
+                : normalizeLocalChannels(config).map((channel) => ({
+                      id: channel.id,
+                      name: channel.name || "本地渠道",
+                      baseUrl: channel.baseUrl,
+                      models: channel.models,
+                      modelCapabilities: channel.modelCapabilities,
+                      declaredModelIds: channel.declaredModelIds,
+                  }));
+        const models = channels.flatMap((channel) =>
+            (channel.models ?? []).map((model) => ({ key: `${channel.id}::${model}`, channelId: channel.id, channelName: channel.name, model, modelCapabilities: channel.modelCapabilities, declaredModelIds: channel.declaredModelIds })),
+        );
         if (!capability) return models;
-        return models.filter((item) => filterModelsByCapability([item.model], capability).length > 0);
+        return models.filter((item) => modelMatchesCapability(item.model, capability, item));
     }, [capability, config]);
     const currentOption = useMemo(() => {
         if (!value) return undefined;

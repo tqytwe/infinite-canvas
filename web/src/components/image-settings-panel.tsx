@@ -4,7 +4,8 @@ import { type ReactNode, useState } from "react";
 import { ConfigProvider, Switch } from "antd";
 
 import { type CanvasTheme } from "@/lib/canvas-theme";
-import type { AiConfig } from "@/stores/use-config-store";
+import { platformAspectRatio, platformImageSupportsSize, type PlatformImageMediaCapabilities } from "@/lib/platform-managed-models";
+import { platformManagedImageCapabilitiesForConfig, type AiConfig } from "@/stores/use-config-store";
 
 const qualityOptions = [
     { value: "auto", label: "自动" },
@@ -14,7 +15,9 @@ const qualityOptions = [
 ];
 const DIMENSION_STEP = 16;
 
-const aspectOptions = [
+type ImageAspectOption = { value: string; label: string; size?: string; width: number; height: number; icon: "square" | "landscape" | "portrait" | "auto" };
+
+const aspectOptions: ImageAspectOption[] = [
     { value: "1:1", label: "1:1", width: 1024, height: 1024, icon: "square" },
     { value: "3:2", label: "3:2", width: 1536, height: 1024, icon: "landscape" },
     { value: "2:3", label: "2:3", width: 1024, height: 1536, icon: "portrait" },
@@ -38,8 +41,13 @@ export const imageSizeOptions = aspectOptions.map((item) => ({
     label: item.label,
 }));
 
+export function imageSizeOptionsForConfig(config: AiConfig, model = config.imageModel || config.model) {
+    return availableAspectOptions(platformManagedImageCapabilitiesForConfig(config, model)).map((item) => ({ value: item.size || item.value, label: item.label }));
+}
+
 type ImageSettingsPanelProps = {
     config: AiConfig;
+    model?: string;
     onConfigChange: (key: "quality" | "size" | "count", value: string) => void;
     theme: CanvasTheme;
     showTitle?: boolean;
@@ -50,22 +58,38 @@ type ImageSettingsPanelProps = {
     quickCount?: number;
 };
 
-export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = true, showSize = true, showCount = true, className = "w-[320px] space-y-4 rounded-2xl px-1 py-0.5", maxCount = 15, quickCount = 10 }: ImageSettingsPanelProps) {
+export function ImageSettingsPanel({
+    config,
+    model = config.imageModel || config.model,
+    onConfigChange,
+    theme,
+    showTitle = true,
+    showSize = true,
+    showCount = true,
+    className = "w-[320px] space-y-4 rounded-2xl px-1 py-0.5",
+    maxCount = 15,
+    quickCount = 10,
+}: ImageSettingsPanelProps) {
     const [snapDimensionToStep, setSnapDimensionToStep] = useState(true);
+    const managedCapabilities = platformManagedImageCapabilitiesForConfig(config, model);
+    const visibleAspectOptions = availableAspectOptions(managedCapabilities);
+    const dimensionStep = managedCapabilities?.dimensionStep || DIMENSION_STEP;
+    const dimensionsEditable = !managedCapabilities?.supportedSizes.length;
     const quality = config.quality || "auto";
     const count = Math.max(1, Math.min(maxCount, Math.floor(Math.abs(Number(config.count)) || 1)));
     const activeSize = config.size || "auto";
-    const selectedAspect = aspectOptions.find((item) => (item.size || item.value) === activeSize || item.value === activeSize);
+    const selectedAspect = visibleAspectOptions.find((item) => (item.size || item.value) === activeSize || item.value === activeSize);
     const dimensions = readSizeDimensions(activeSize, selectedAspect || aspectOptions[0]);
     const selectAspect = (value: string) => {
-        const option = aspectOptions.find((item) => item.value === value);
+        const option = visibleAspectOptions.find((item) => item.value === value);
         onConfigChange("size", option?.size || option?.value || "auto");
     };
     const updateDimension = (key: "width" | "height", value: number | null) => {
         const next = Math.max(1, Math.floor(value || dimensions[key] || 1024));
         const width = key === "width" ? next : dimensions.width;
         const height = key === "height" ? next : dimensions.height;
-        onConfigChange("size", `${alignDimension(width, snapDimensionToStep)}x${alignDimension(height, snapDimensionToStep)}`);
+        const size = `${alignDimension(width, snapDimensionToStep, dimensionStep)}x${alignDimension(height, snapDimensionToStep, dimensionStep)}`;
+        if (!managedCapabilities || platformImageSupportsSize(managedCapabilities, size)) onConfigChange("size", size);
     };
 
     return (
@@ -97,23 +121,43 @@ export function ImageSettingsPanel({ config, onConfigChange, theme, showTitle = 
                                 <SettingTitle color={theme.node.muted}>尺寸</SettingTitle>
                                 <div className="flex items-center gap-2">
                                     <span className="text-xs font-medium" style={{ color: theme.node.muted }}>
-                                        16倍数对齐
+                                        {dimensionStep}倍数对齐
                                     </span>
-                                    <span title="输入完成后自动向上补成 16 的倍数" onMouseDown={(event) => event.stopPropagation()}>
-                                        <Switch size="small" checked={snapDimensionToStep} onChange={setSnapDimensionToStep} />
+                                    <span title={`输入完成后自动向上补成 ${dimensionStep} 的倍数`} onMouseDown={(event) => event.stopPropagation()}>
+                                        <Switch size="small" checked={snapDimensionToStep} onChange={setSnapDimensionToStep} disabled={!dimensionsEditable} />
                                     </span>
                                 </div>
                             </div>
                             <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2.5">
-                                <DimensionInput prefix="W" value={dimensions.width} disabled={activeSize === "auto"} theme={theme} alignToStep={snapDimensionToStep} onChange={(value) => updateDimension("width", value)} />
+                                <DimensionInput
+                                    prefix="W"
+                                    value={dimensions.width}
+                                    disabled={activeSize === "auto" || !dimensionsEditable}
+                                    theme={theme}
+                                    alignToStep={snapDimensionToStep}
+                                    step={dimensionStep}
+                                    min={managedCapabilities?.minDimension}
+                                    max={managedCapabilities?.maxDimension}
+                                    onChange={(value) => updateDimension("width", value)}
+                                />
                                 <span className="text-lg opacity-45">↔</span>
-                                <DimensionInput prefix="H" value={dimensions.height} disabled={activeSize === "auto"} theme={theme} alignToStep={snapDimensionToStep} onChange={(value) => updateDimension("height", value)} />
+                                <DimensionInput
+                                    prefix="H"
+                                    value={dimensions.height}
+                                    disabled={activeSize === "auto" || !dimensionsEditable}
+                                    theme={theme}
+                                    alignToStep={snapDimensionToStep}
+                                    step={dimensionStep}
+                                    min={managedCapabilities?.minDimension}
+                                    max={managedCapabilities?.maxDimension}
+                                    onChange={(value) => updateDimension("height", value)}
+                                />
                             </div>
                         </div>
                         <div className="space-y-2.5">
                             <SettingTitle color={theme.node.muted}>宽高比</SettingTitle>
                             <div className="grid grid-cols-4 gap-2.5">
-                                {aspectOptions.map((item) => (
+                                {visibleAspectOptions.map((item) => (
                                     <button
                                         key={item.value}
                                         type="button"
@@ -183,9 +227,31 @@ function OptionPill({ selected, theme, onClick, children }: { selected: boolean;
     );
 }
 
-function DimensionInput({ prefix, value, disabled, theme, alignToStep, onChange }: { prefix: string; value: number; disabled: boolean; theme: CanvasTheme; alignToStep: boolean; onChange: (value: number | null) => void }) {
+function DimensionInput({
+    prefix,
+    value,
+    disabled,
+    theme,
+    alignToStep,
+    step,
+    min,
+    max,
+    onChange,
+}: {
+    prefix: string;
+    value: number;
+    disabled: boolean;
+    theme: CanvasTheme;
+    alignToStep: boolean;
+    step: number;
+    min?: number;
+    max?: number;
+    onChange: (value: number | null) => void;
+}) {
     const commit = (input: HTMLInputElement) => {
-        const next = alignDimension(Math.max(1, Math.floor(Number(input.value) || value || 1024)), alignToStep);
+        const lowerBound = min || 1;
+        const upperBound = max || Number.MAX_SAFE_INTEGER;
+        const next = alignDimension(Math.max(lowerBound, Math.min(upperBound, Math.floor(Number(input.value) || value || 1024))), alignToStep, step);
         input.value = String(next);
         onChange(next);
     };
@@ -197,7 +263,9 @@ function DimensionInput({ prefix, value, disabled, theme, alignToStep, onChange 
             </span>
             <input
                 type="number"
-                min={1}
+                min={min || 1}
+                max={max}
+                step={step}
                 disabled={disabled}
                 className="min-w-0 flex-1 bg-transparent px-2 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 defaultValue={value || ""}
@@ -257,8 +325,34 @@ function readSizeDimensions(size: string, fallback: { width: number; height: num
     };
 }
 
-function alignDimension(value: number, enabled: boolean) {
-    return enabled ? Math.ceil(value / DIMENSION_STEP) * DIMENSION_STEP : value;
+function alignDimension(value: number, enabled: boolean, step = DIMENSION_STEP) {
+    return enabled ? Math.ceil(value / step) * step : value;
+}
+
+function availableAspectOptions(capabilities: PlatformImageMediaCapabilities | undefined): ImageAspectOption[] {
+    if (!capabilities) return aspectOptions;
+    if (capabilities.supportedSizes.length) {
+        return capabilities.supportedSizes.map((size) => toImageAspectOption(size)).filter((item): item is ImageAspectOption => Boolean(item));
+    }
+    return aspectOptions.filter((item) => {
+        if (item.value === "auto") return platformImageSupportsSize(capabilities, item.value);
+        const concreteSize = item.size || (item.width && item.height ? `${item.width}x${item.height}` : item.value);
+        return platformImageSupportsSize(capabilities, concreteSize);
+    });
+}
+
+function toImageAspectOption(size: string): ImageAspectOption | undefined {
+    const value = size.trim();
+    const dimensions = value.match(/^(\d+)x(\d+)$/i);
+    if (dimensions) {
+        const width = Number(dimensions[1]);
+        const height = Number(dimensions[2]);
+        return { value, label: value, size: value, width, height, icon: width === height ? "square" : width > height ? "landscape" : "portrait" };
+    }
+    const ratio = platformAspectRatio(value);
+    const [width = 0, height = 0] = ratio.split(":").map(Number);
+    if (!width || !height) return undefined;
+    return { value, label: ratio, size: value, width: width * 512, height: height * 512, icon: width === height ? "square" : width > height ? "landscape" : "portrait" };
 }
 
 export function imageFormatLabel(format: string) {

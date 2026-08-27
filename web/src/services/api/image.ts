@@ -2,9 +2,11 @@ import axios from "axios";
 
 import { dataUrlToFile } from "@/lib/image-utils";
 import { isKIESeedreamLayerDecompositionModel } from "@/lib/kie-models";
+import { legacyModelDiscovery, parseModelDiscovery, type ModelDiscoveryResult } from "@/lib/model-capabilities";
 import { isMimoChannel, mimoModels } from "@/lib/mimo-tts";
+import { platformImageRequestIssue } from "@/lib/platform-managed-models";
 import { imageToDataUrl, resolveImageUrl } from "@/services/image-storage";
-import { buildApiUrl, channelIdForActiveModel, directAIProviderForConfig, localChannelForActiveModel, type AiConfig } from "@/stores/use-config-store";
+import { buildApiUrl, channelIdForActiveModel, directAIProviderForConfig, forcePlatformManagedImageAPI, localChannelForActiveModel, platformManagedImageCapabilitiesForConfig, type AiConfig } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
 import { nanoid } from "nanoid";
@@ -99,6 +101,8 @@ const QUALITY_ALIASES: Record<string, string> = {
 const IMAGE_MIME = "image/png";
 const IMAGE_REQUEST_TIMEOUT_SECONDS = 600;
 const PROMPT_REWRITE_GUARD_PREFIX = "Use the following text as the complete prompt. Do not rewrite it:";
+const SENSENOVA_U15_LITE_MODEL = "sensenova-u1.5-lite";
+const SENSENOVA_U1_FAST_MODEL = "sensenova-u1-fast";
 
 function normalizeQuality(quality: string) {
     const value = quality.trim().toLowerCase();
@@ -170,6 +174,19 @@ function isZhipuImageModel(model: string) {
     return value === "glm-image" || value.startsWith("cogview-");
 }
 
+function isSenseNovaImageModel(model: string) {
+    const value = model.trim().toLowerCase();
+    return value === SENSENOVA_U15_LITE_MODEL || value === SENSENOVA_U1_FAST_MODEL;
+}
+
+function isSenseNovaU1FastModel(model: string) {
+    return model.trim().toLowerCase() === SENSENOVA_U1_FAST_MODEL;
+}
+
+function isSenseNovaU15LiteModel(model: string) {
+    return model.trim().toLowerCase() === SENSENOVA_U15_LITE_MODEL;
+}
+
 function normalizeZhipuImageQuality(model: string, quality: string) {
     if (model.trim().toLowerCase() === "glm-image") return "hd";
     if (quality === "auto") return quality;
@@ -212,15 +229,30 @@ function applyImageGenerationParams(body: Record<string, unknown>, config: AiCon
 function applyImageGenerationOptions(body: Record<string, unknown>, config: AiConfig, params: ImageRequestParams) {
     if (isZhipuImageModel(config.model)) return;
     if (params.n > 1) body.n = params.n;
+    if (isSenseNovaU1FastModel(config.model)) return;
     if (config.responseFormatB64Json) body.response_format = "b64_json";
+    if (isSenseNovaImageModel(config.model)) return;
     if (config.streamImages) {
         body.stream = true;
         body.partial_images = params.streamPartialImages;
     }
 }
 
-function assertImageReferencesSupported(model: string, references: ReferenceImage[]) {
+function assertImageRequestSupported(config: AiConfig, references: ReferenceImage[], params: ImageRequestParams) {
+    const managedCapabilities = platformManagedImageCapabilitiesForConfig(config, config.model);
+    if (managedCapabilities) {
+        const issue = platformImageRequestIssue(managedCapabilities, {
+            operation: references.length ? "edit" : "create",
+            size: params.size || config.size,
+            referenceImages: references.length,
+        });
+        if (issue) throw new ImageRequestError(issue);
+        return;
+    }
+
+    const model = config.model;
     if (references.length && isZhipuImageModel(model)) throw new ImageRequestError("智谱 GLM-Image 和 CogView 仅支持文生图");
+    if (references.length && isSenseNovaU1FastModel(model)) throw new ImageRequestError("SenseNova U1 Fast 仅支持文生图，不支持参考图或编辑");
 }
 
 function normalizeBase64Image(value: string, fallbackMime: string) {
@@ -436,8 +468,7 @@ async function parseImagesStreamResponse(response: Response, mime: string): Prom
             resultPayload = event as ImageApiResponse;
         }
         if (resolveImageDataUrl(event, mime)) {
-            const imageIndex =
-                typeof event.image_index === "number" || typeof event.image_index === "string" ? String(event.image_index) : `event-${imageItems.size}`;
+            const imageIndex = typeof event.image_index === "number" || typeof event.image_index === "string" ? String(event.image_index) : `event-${imageItems.size}`;
             imageItems.set(imageIndex, event);
         }
     });
@@ -510,25 +541,25 @@ function usesAccountProxy(config: AiConfig) {
 
 export function aiApiUrl(config: AiConfig, path: string) {
     if (usesAccountProxy(config)) return `/api/v1${path}`;
-    const channel = localChannelForActiveModel(config);
+    const channel = localChannelForActiveModel(config, "image");
     return buildApiUrl(channel?.baseUrl || config.baseUrl, path);
 }
 
 export function aiHeaders(config: AiConfig, contentType?: string) {
     const token = useUserStore.getState().token;
+    const channelID = channelIdForActiveModel(config, "image");
     if (config.channelMode === "remote" && !token) throw new Error("请先登录后再使用云端渠道");
     if (config.channelMode === "remote") {
         return {
             Authorization: `Bearer ${token}`,
-            ...(channelIdForActiveModel(config) ? { "X-Model-Channel-ID": channelIdForActiveModel(config) } : {}),
+            ...(channelID ? { "X-Model-Channel-ID": channelID } : {}),
             ...(contentType ? { "Content-Type": contentType } : {}),
         };
     }
     if (token) {
-        const userChannelId = channelIdForActiveModel(config);
         return {
             Authorization: `Bearer ${token}`,
-            ...(userChannelId ? { "X-User-Model-Channel-ID": userChannelId } : {}),
+            ...(channelID ? { "X-User-Model-Channel-ID": channelID } : {}),
             ...(contentType ? { "Content-Type": contentType } : {}),
         };
     }
@@ -546,7 +577,7 @@ async function writeLocalAICallLog(config: AiConfig, endpoint: string, startedAt
     if (config.channelMode !== "local" || usesAccountProxy(config)) return;
     const token = useUserStore.getState().token;
     if (!token) return;
-    const channel = localChannelForActiveModel(config);
+    const channel = localChannelForActiveModel(config, "image");
     await fetch("/api/v1/ai-logs", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -563,7 +594,7 @@ async function writeLocalAICallLog(config: AiConfig, endpoint: string, startedAt
             responseBody,
             error,
         }),
-    }).catch(() => { });
+    }).catch(() => {});
 }
 
 function stringifyLogPayload(value: unknown) {
@@ -586,7 +617,7 @@ function redactLogImages(value: unknown) {
     const record = value as Record<string, unknown>;
     for (const key of Object.keys(record)) {
         const item = record[key];
-        if (typeof item === "string" && (item.startsWith("data:image/") || item.length > 2048 && looksLikeBase64(item))) {
+        if (typeof item === "string" && (item.startsWith("data:image/") || (item.length > 2048 && looksLikeBase64(item)))) {
             record[key] = `[redacted image/string len=${item.length}]`;
             continue;
         }
@@ -670,7 +701,7 @@ async function requestImageGenerationSingle(config: AiConfig & { seedIndex?: num
     applyImageGenerationParams(body, config, params);
     applyImageGenerationOptions(body, config, params);
 
-    const directProvider = !usesAccountProxy(config) ? directAIProviderForConfig(config) : null;
+    const directProvider = !usesAccountProxy(config) ? directAIProviderForConfig(config, "image") : null;
     if (directProvider) {
         const { requestDirectImages } = await import("@/services/api/direct-ai");
         return parseImagePayload(await requestDirectImages(config, directProvider, "/images/generations", body, params.timeoutSeconds), mime);
@@ -767,7 +798,7 @@ async function requestImageEditSingle(config: AiConfig, prompt: string, referenc
     const files = await Promise.all(references.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
     files.forEach((file) => formData.append("image", file));
 
-    const directProvider = !usesAccountProxy(config) ? directAIProviderForConfig(config) : null;
+    const directProvider = !usesAccountProxy(config) ? directAIProviderForConfig(config, "image") : null;
     if (directProvider) {
         const { requestDirectImages } = await import("@/services/api/direct-ai");
         return parseImagePayload(await requestDirectImages(config, directProvider, "/images/edits", formData, params.timeoutSeconds), mime);
@@ -889,8 +920,12 @@ async function requestAndParseImages(config: AiConfig, endpoint: string, request
 }
 
 async function requestImages(config: AiConfig & { seedIndex?: number; seedCount?: number }, prompt: string, references: ReferenceImage[]): Promise<GeneratedImage[]> {
-    assertImageReferencesSupported(config.model, references);
+    config = forcePlatformManagedImageAPI(config);
     const params = createImageRequestParams(config);
+    assertImageRequestSupported(config, references, params);
+    if (isSenseNovaU15LiteModel(config.model) && params.n !== 1) {
+        throw new ImageRequestError("SenseNova U1.5 Lite 每次请求仅支持生成 1 张图片");
+    }
     const inputImageDataUrls = references.length ? await Promise.all(references.map((image) => imageToDataUrl(image))) : [];
     const useConcurrentSingleRequests = config.apiMode === "responses" || config.codexCli || config.streamImages || isZhipuImageModel(config.model);
     if (params.n > 1 && useConcurrentSingleRequests) {
@@ -930,6 +965,7 @@ export async function requestEdit(config: AiConfig & { seedIndex?: number; seedC
 }
 
 export async function createCanvasImageTask(config: AiConfig & { seedIndex?: number; seedCount?: number }, prompt: string, references: ReferenceImage[], options: CanvasImageTaskOptions = {}): Promise<CanvasImageTask> {
+    config = forcePlatformManagedImageAPI(config);
     if (!usesAccountProxy(config)) {
         const images = await requestImages({ ...config, count: "1" }, prompt, references);
         const [image] = images;
@@ -976,8 +1012,9 @@ export async function pollCanvasImageTaskStatus(taskId: string): Promise<CanvasI
 }
 
 async function createCanvasImageTaskRequest(config: AiConfig & { seedIndex?: number; seedCount?: number }, prompt: string, references: ReferenceImage[], params: ImageRequestParams, options: CanvasImageTaskOptions): Promise<RequestInit> {
-    assertImageReferencesSupported(config.model, references);
-    const taskChannelId = channelIdForActiveModel(config);
+    config = forcePlatformManagedImageAPI(config);
+    assertImageRequestSupported(config, references, params);
+    const taskChannelId = channelIdForActiveModel(config, "image");
     const taskChannelHeader: Record<string, string> = config.channelMode === "remote" && taskChannelId ? { "X-Model-Channel-ID": taskChannelId } : {};
     const tokenHeaders = { ...aiHeaders(config), ...taskChannelHeader };
     const jsonHeaders = { ...aiHeaders(config, "application/json"), ...taskChannelHeader };
@@ -1139,21 +1176,18 @@ export async function requestImageQuestion(config: AiConfig, messages: ChatCompl
     return answer || "没有返回内容";
 }
 
-export async function fetchImageModels(config: AiConfig) {
-    if (config.channelMode === "remote") return config.models;
+export async function fetchImageModels(config: AiConfig): Promise<ModelDiscoveryResult> {
+    if (config.channelMode === "remote") return legacyModelDiscovery(config.models);
     const channel = localChannelForActiveModel(config);
-    if (isMimoChannel(channel || { baseUrl: config.baseUrl })) return [...mimoModels];
+    if (isMimoChannel(channel || { baseUrl: config.baseUrl })) return legacyModelDiscovery([...mimoModels]);
     try {
-        const response = await axios.get<{ data?: Array<{ id?: string }>; error?: { message?: string } }>(buildApiUrl(config.baseUrl, "/models"), {
+        const response = await axios.get<unknown>(buildApiUrl(config.baseUrl, "/models"), {
             headers: {
                 Authorization: `Bearer ${config.apiKey}`,
             },
             timeout: IMAGE_REQUEST_TIMEOUT_SECONDS * 1000,
         });
-        return (response.data.data || [])
-            .map((model) => model.id)
-            .filter((id): id is string => Boolean(id))
-            .sort((a, b) => a.localeCompare(b));
+        return parseModelDiscovery(response.data);
     } catch (error) {
         throw new Error(readAxiosError(error, "读取模型失败"));
     }
@@ -1179,21 +1213,20 @@ function normalizeAgnesImage21Ratio(value: string) {
     return "1:1";
 }
 
-function applyAgnesImageSize(
-    body: Record<string, unknown>,
-    config: AiConfig,
-    params: ImageRequestParams,
-) {
+function applyAgnesImageSize(body: Record<string, unknown>, config: AiConfig, params: ImageRequestParams) {
     if (!isAgnesImage21Model(config.model)) {
         if (params.size) body.size = params.size;
         return;
     }
-    body.size = ({
-        auto: "1K",
-        low: "2K",
-        medium: "3K",
-        high: "4K",
-    } as Record<string, string>)[params.quality] || "1K";
+    body.size =
+        (
+            {
+                auto: "1K",
+                low: "2K",
+                medium: "3K",
+                high: "4K",
+            } as Record<string, string>
+        )[params.quality] || "1K";
     body.ratio = normalizeAgnesImage21Ratio(config.size);
 }
 
@@ -1221,7 +1254,7 @@ async function requestAgnesImageEdit(config: AiConfig & { seedIndex?: number; se
                 if (publicUrl) return publicUrl;
             }
             return imageToDataUrl(ref);
-        })
+        }),
     );
 
     const body: Record<string, unknown> = {

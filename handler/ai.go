@@ -2,7 +2,9 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -19,7 +21,17 @@ import (
 
 const userModelChannelHeader = "X-User-Model-Channel-ID"
 
-func selectAIRequestChannel(user model.AuthUser, modelName string, channelID string, userChannelID string) (model.ModelChannel, string, error) {
+func selectAIRequestChannel(ctx context.Context, user model.AuthUser, modelName string, channelID string, userChannelID string, purpose string, operation string) (model.ModelChannel, string, error) {
+	managedChannelID := firstNonEmpty(strings.TrimSpace(userChannelID), strings.TrimSpace(channelID))
+	if service.PlatformAuthEnabled() && (service.IsPlatformManagedCanvasUser(ctx, user.ID) || strings.HasPrefix(managedChannelID, "platform-managed:")) {
+		if (purpose == "image" || purpose == "video") && strings.TrimSpace(operation) != "" {
+			if err := service.ValidatePlatformManagedMediaRequest(ctx, user.ID, managedChannelID, purpose, modelName, operation); err != nil {
+				return model.ModelChannel{}, "", err
+			}
+		}
+		channel, err := service.PlatformManagedChannelForUser(ctx, user.ID, managedChannelID, purpose)
+		return channel, "", err
+	}
 	userChannelID = strings.TrimSpace(userChannelID)
 	if userChannelID != "" {
 		channel, err := service.SelectUserLocalModelChannelForModel(user.ID, modelName, userChannelID)
@@ -33,6 +45,16 @@ func selectAIRequestChannel(user model.AuthUser, modelName string, channelID str
 }
 
 func failAIChannelSelect(w http.ResponseWriter, err error, fallback string) {
+	// Platform-managed capability validation creates only curated messages. Keep
+	// those actionable errors for the Canvas UI without passing through arbitrary
+	// scheduler or upstream error details.
+	var safe interface{ SafeMessage() string }
+	if errors.As(err, &safe) {
+		if message := strings.TrimSpace(safe.SafeMessage()); message != "" {
+			Fail(w, message)
+			return
+		}
+	}
 	message := strings.TrimSpace(err.Error())
 	switch message {
 	case "当前账号未开放云端渠道", "请先登录", "缺少模型名称", "缺少模型渠道", "本地渠道不存在", "本地渠道配置不完整", "本地渠道不支持该模型", "指定模型渠道不可用":
@@ -92,7 +114,7 @@ func proxyAIGetRequest(w http.ResponseWriter, r *http.Request, path string) {
 	if strings.TrimSpace(modelName) == "" {
 		modelName = "Agnes-Video-V2.0"
 	}
-	channel, _, err := selectAIRequestChannel(user, modelName, r.Header.Get("X-Model-Channel-ID"), r.Header.Get(userModelChannelHeader))
+	channel, _, err := selectAIRequestChannel(r.Context(), user, modelName, r.Header.Get("X-Model-Channel-ID"), r.Header.Get(userModelChannelHeader), "video", "")
 	if err != nil {
 		log.Printf("AI proxy select channel failed: model=%s err=%v", modelName, err)
 		failAIChannelSelect(w, err, "AI 接口请求失败")
@@ -121,14 +143,14 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 		Fail(w, "未登录或权限不足")
 		return
 	}
-	channel, userChannelID, err := selectAIRequestChannel(user, modelName, r.Header.Get("X-Model-Channel-ID"), r.Header.Get(userModelChannelHeader))
+	channel, userChannelID, err := selectAIRequestChannel(r.Context(), user, modelName, r.Header.Get("X-Model-Channel-ID"), r.Header.Get(userModelChannelHeader), aiRequestPurpose(path), aiRequestOperation(path))
 	if err != nil {
 		log.Printf("AI proxy select channel failed: model=%s err=%v", modelName, err)
 		failAIChannelSelect(w, err, "AI 接口请求失败")
 		return
 	}
 	credits := 0
-	if userChannelID == "" {
+	if userChannelID == "" && !service.IsPlatformManagedChannel(channel) {
 		credits, err = service.ModelCost(modelName)
 		if err != nil {
 			log.Printf("AI proxy read model cost failed: model=%s err=%v", modelName, err)
@@ -200,6 +222,30 @@ func proxyAIRequest(w http.ResponseWriter, r *http.Request, path string) {
 			}
 		}
 	})
+}
+
+func aiRequestPurpose(path string) string {
+	switch {
+	case strings.HasPrefix(path, "/images/"):
+		return "image"
+	case strings.HasPrefix(path, "/videos"):
+		return "video"
+	default:
+		return "chat"
+	}
+}
+
+func aiRequestOperation(path string) string {
+	switch {
+	case path == "/images/generations":
+		return "create"
+	case path == "/images/edits":
+		return "edit"
+	case strings.HasPrefix(path, "/videos"):
+		return "generate"
+	default:
+		return ""
+	}
 }
 
 type aiLogContext struct {

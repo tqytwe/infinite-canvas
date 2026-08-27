@@ -1,10 +1,31 @@
 package handler
 
 import (
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
 )
+
+type safeChannelSelectionErrorForTest struct{}
+
+func (safeChannelSelectionErrorForTest) Error() string { return "internal detail" }
+func (safeChannelSelectionErrorForTest) SafeMessage() string {
+	return "当前模型不支持该媒体操作"
+}
+
+func TestFailAIChannelSelectPreservesCuratedPlatformCapabilityError(t *testing.T) {
+	recorder := httptest.NewRecorder()
+
+	failAIChannelSelect(recorder, safeChannelSelectionErrorForTest{}, "AI 接口请求失败")
+
+	if !strings.Contains(recorder.Body.String(), "当前模型不支持该媒体操作") {
+		t.Fatalf("expected curated capability error, got %s", recorder.Body.String())
+	}
+	if strings.Contains(recorder.Body.String(), "internal detail") {
+		t.Fatalf("must not expose internal error details: %s", recorder.Body.String())
+	}
+}
 
 func TestPrepareDirectAIRequestKIEReferences(t *testing.T) {
 	markers := map[string]string{

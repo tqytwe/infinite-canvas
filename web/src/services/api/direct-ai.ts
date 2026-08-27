@@ -15,7 +15,7 @@ const DIRECT_IMAGE_POLL_INTERVAL_MS = 2000;
 
 export async function requestDirectImages(config: AiConfig, provider: DirectAIProvider, endpoint: "/images/generations" | "/images/edits", body: DirectRequestBody, timeoutSeconds: number): Promise<DirectImageResponse> {
     const startedAt = Date.now();
-    const { plan, requestBody, apiKey } = await prepareDirectRequest(config, provider, endpoint, body);
+    const { plan, requestBody, apiKey } = await prepareDirectRequest(config, provider, endpoint, body, "image");
     const created = await requestDirectJSON(plan.url, apiKey, plan.contentType, requestBody, remainingTimeoutMs(startedAt, timeoutSeconds));
     const directUrls = readDirectImageURLs(provider, created);
     if (directUrls.length) return directImageResponse(directUrls);
@@ -25,7 +25,7 @@ export async function requestDirectImages(config: AiConfig, provider: DirectAIPr
     for (;;) {
         const waitMs = Math.min(DIRECT_IMAGE_POLL_INTERVAL_MS, remainingTimeoutMs(startedAt, timeoutSeconds));
         await delay(waitMs);
-        const payload = await requestDirectJSON(directPollURL(config, provider, taskId), apiKey, "", undefined, remainingTimeoutMs(startedAt, timeoutSeconds));
+        const payload = await requestDirectJSON(directPollURL(config, provider, taskId, "image"), apiKey, "", undefined, remainingTimeoutMs(startedAt, timeoutSeconds));
         const result = readDirectImagePoll(provider, payload);
         if (result.error) throw new Error(result.error);
         if (result.urls.length) return directImageResponse(result.urls);
@@ -34,7 +34,7 @@ export async function requestDirectImages(config: AiConfig, provider: DirectAIPr
 }
 
 export async function createDirectVideoTask(config: AiConfig, provider: DirectAIProvider, body: DirectRequestBody): Promise<DirectVideoResponse> {
-    const { plan, requestBody, apiKey } = await prepareDirectRequest(config, provider, "/videos", body);
+    const { plan, requestBody, apiKey } = await prepareDirectRequest(config, provider, "/videos", body, "video");
     const payload = await requestDirectJSON(plan.url, apiKey, plan.contentType, requestBody);
     const taskId = readDirectTaskId(provider, payload);
     if (!taskId) throw new Error(readDirectError(payload) || "视频接口没有返回任务 ID");
@@ -47,8 +47,8 @@ export async function createDirectVideoTask(config: AiConfig, provider: DirectAI
 }
 
 export async function pollDirectVideoTask(config: AiConfig, provider: DirectAIProvider, pollId: string): Promise<DirectVideoResponse> {
-    const channel = requireDirectChannel(config);
-    const payload = await requestDirectJSON(directPollURL(config, provider, pollId), channel.apiKey, "", undefined);
+    const channel = requireDirectChannel(config, "video");
+    const payload = await requestDirectJSON(directPollURL(config, provider, pollId, "video"), channel.apiKey, "", undefined);
     if (provider === "kie") {
         const data = asRecord(readPath(payload, "data"));
         const error = firstString(data.failMsg, data.failCode, readDirectError(payload));
@@ -80,8 +80,8 @@ export async function pollDirectVideoTask(config: AiConfig, provider: DirectAIPr
     };
 }
 
-async function prepareDirectRequest(config: AiConfig, provider: DirectAIProvider, endpoint: "/images/generations" | "/images/edits" | "/videos", body: DirectRequestBody) {
-    const channel = requireDirectChannel(config);
+async function prepareDirectRequest(config: AiConfig, provider: DirectAIProvider, endpoint: "/images/generations" | "/images/edits" | "/videos", body: DirectRequestBody, capability: "image" | "video") {
+    const channel = requireDirectChannel(config, capability);
     const serialized = await serializeDirectBody(body);
     assertSafeDirectBody(serialized.body);
     const plan = await apiPost<DirectRequestPlan>("/api/ai/direct-request", {
@@ -95,8 +95,8 @@ async function prepareDirectRequest(config: AiConfig, provider: DirectAIProvider
     return { plan, requestBody, apiKey: channel.apiKey };
 }
 
-function requireDirectChannel(config: AiConfig) {
-    const channel = localChannelForActiveModel(config);
+function requireDirectChannel(config: AiConfig, capability: "image" | "video") {
+    const channel = localChannelForActiveModel(config, capability);
     if (!channel?.baseUrl.trim() || !channel.apiKey.trim()) throw new Error("本地渠道地址或 API Key 不能为空");
     return channel;
 }
@@ -223,11 +223,13 @@ function assertSafeDirectBody(value: unknown) {
 async function uploadAndReplaceReferences(plan: DirectRequestPlan, references: DirectReference[], apiKey: string) {
     const retained = references.filter((reference) => containsDirectMarker(plan.body, reference.marker));
     const uploaded = new Map<string, string>();
-    await Promise.all(retained.map(async (reference) => {
-        const spec = plan.uploads?.[reference.kind];
-        if (!spec) throw new Error(`${plan.provider} 不支持上传本地${directReferenceKindName(reference.kind)}`);
-        uploaded.set(reference.marker, await uploadDirectReference(spec, reference.file, apiKey));
-    }));
+    await Promise.all(
+        retained.map(async (reference) => {
+            const spec = plan.uploads?.[reference.kind];
+            if (!spec) throw new Error(`${plan.provider} 不支持上传本地${directReferenceKindName(reference.kind)}`);
+            uploaded.set(reference.marker, await uploadDirectReference(spec, reference.file, apiKey));
+        }),
+    );
     const replaced = replaceDirectMarkers(plan.body, uploaded);
     if (containsAnyDirectMarker(replaced)) throw new Error("参考素材地址替换失败");
     return replaced;
@@ -310,17 +312,13 @@ async function readDirectResponse(response: Response): Promise<unknown> {
     }
 }
 
-function directPollURL(config: AiConfig, provider: DirectAIProvider, taskId: string) {
-    const channel = requireDirectChannel(config);
-    return provider === "kie"
-        ? buildApiUrl(channel.baseUrl, `/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`)
-        : buildApiUrl(channel.baseUrl, `/tasks/${encodeURIComponent(taskId)}?language=zh`);
+function directPollURL(config: AiConfig, provider: DirectAIProvider, taskId: string, capability: "image" | "video") {
+    const channel = requireDirectChannel(config, capability);
+    return provider === "kie" ? buildApiUrl(channel.baseUrl, `/jobs/recordInfo?taskId=${encodeURIComponent(taskId)}`) : buildApiUrl(channel.baseUrl, `/tasks/${encodeURIComponent(taskId)}?language=zh`);
 }
 
 function readDirectTaskId(provider: DirectAIProvider, payload: unknown) {
-    return provider === "kie"
-        ? readString(readPath(payload, "data.taskId"))
-        : firstString(readPath(payload, "data.0.task_id"), readPath(payload, "data.task_id"), readPath(payload, "data.id"));
+    return provider === "kie" ? readString(readPath(payload, "data.taskId")) : firstString(readPath(payload, "data.0.task_id"), readPath(payload, "data.task_id"), readPath(payload, "data.id"));
 }
 
 function readDirectImageURLs(provider: DirectAIProvider, payload: unknown) {
@@ -366,16 +364,16 @@ function normalizeDirectStatus(value: string) {
         case "failed":
         case "cancelled":
         case "canceled":
-		case "timeout":
-		case "timed_out":
-		case "timed-out":
-		case "timedout":
-		case "expired":
-		case "rejected":
-		case "blocked":
-		case "moderated":
-		case "incomplete":
-		case "aborted":
+        case "timeout":
+        case "timed_out":
+        case "timed-out":
+        case "timedout":
+        case "expired":
+        case "rejected":
+        case "blocked":
+        case "moderated":
+        case "incomplete":
+        case "aborted":
             return "failed";
         default:
             return "processing";

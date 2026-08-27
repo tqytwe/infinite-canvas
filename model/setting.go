@@ -12,18 +12,36 @@ const (
 	StorageProviderTypeWebDAV = "webdav"
 )
 
+// ModelCapability describes a model operation that a channel has declared.
+// Values are deliberately small and stable because they are persisted in
+// settings and consumed by both the Canvas UI and the public settings API.
+type ModelCapability string
+
+const (
+	ModelCapabilityImage ModelCapability = "image"
+	ModelCapabilityVideo ModelCapability = "video"
+	ModelCapabilityText  ModelCapability = "text"
+	ModelCapabilityAudio ModelCapability = "audio"
+)
+
+// ModelCapabilities maps an exact model ID to its declared capabilities.
+// An empty slice is meaningful: it says the model was declared but does not
+// support any Canvas generation mode.
+type ModelCapabilities map[string][]ModelCapability
+
 // ModelChannel 模型渠道配置。
 type ModelChannel struct {
-	ID       string   `json:"id"`
-	Protocol string   `json:"protocol"`
-	Name     string   `json:"name"`
-	BaseURL  string   `json:"baseUrl"`
-	APIKey   string   `json:"apiKey"`
-	Models   []string `json:"models"`
-	Weight   int      `json:"weight"`
-	Timeout  int      `json:"timeout"`
-	Enabled  bool     `json:"enabled"`
-	Remark   string   `json:"remark"`
+	ID                string            `json:"id"`
+	Protocol          string            `json:"protocol"`
+	Name              string            `json:"name"`
+	BaseURL           string            `json:"baseUrl"`
+	APIKey            string            `json:"apiKey"`
+	Models            []string          `json:"models"`
+	ModelCapabilities ModelCapabilities `json:"modelCapabilities,omitempty"`
+	Weight            int               `json:"weight"`
+	Timeout           int               `json:"timeout"`
+	Enabled           bool              `json:"enabled"`
+	Remark            string            `json:"remark"`
 }
 
 // ModelCost 模型算力点配置。
@@ -35,6 +53,7 @@ type ModelCost struct {
 // PublicModelChannelSetting 公开模型渠道配置。
 type PublicModelChannelSetting struct {
 	AvailableModels        []string                 `json:"availableModels"`
+	ModelCapabilities      ModelCapabilities        `json:"modelCapabilities,omitempty"`
 	ModelCosts             []ModelCost              `json:"modelCosts"`
 	Channels               []PublicModelChannelInfo `json:"channels"`
 	DefaultModel           string                   `json:"defaultModel"`
@@ -56,14 +75,15 @@ type SystemPromptSetting struct {
 }
 
 type PublicModelChannelInfo struct {
-	ID      string   `json:"id"`
-	Name    string   `json:"name"`
-	BaseURL string   `json:"baseUrl"`
-	Models  []string `json:"models"`
-	Weight  int      `json:"weight"`
-	Timeout int      `json:"timeout"`
-	Enabled bool     `json:"enabled"`
-	Remark  string   `json:"remark"`
+	ID                string            `json:"id"`
+	Name              string            `json:"name"`
+	BaseURL           string            `json:"baseUrl"`
+	Models            []string          `json:"models"`
+	ModelCapabilities ModelCapabilities `json:"modelCapabilities,omitempty"`
+	Weight            int               `json:"weight"`
+	Timeout           int               `json:"timeout"`
+	Enabled           bool              `json:"enabled"`
+	Remark            string            `json:"remark"`
 }
 
 // PublicSetting 公开配置。
