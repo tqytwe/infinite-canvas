@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { channelIdForActiveModel, defaultConfig, modelMatchesCapability, normalizeLocalChannels, type AiConfig } from "./use-config-store";
+import { channelIdForActiveModel, defaultConfig, localChannelForActiveModel, modelMatchesCapability, normalizeLocalChannels, type AiConfig } from "./use-config-store";
 
 test("remote model selection does not reuse a matching local channel", () => {
     const config: AiConfig = {
@@ -29,31 +29,43 @@ test("remote model selection does not reuse a matching local channel", () => {
     assert.equal(channelIdForActiveModel(config), "remote-image");
 });
 
-test("the fixed direct channel keeps image and video capabilities on the same configured API key", () => {
+test("multiple direct channels retain their IDs and model capabilities", () => {
     const config: AiConfig = {
         ...defaultConfig,
         channelMode: "local",
         model: "multi-modal",
         imageModel: "multi-modal",
         videoModel: "multi-modal",
-        imageChannelId: "jisudeng-api",
-        videoChannelId: "jisudeng-api",
+        imageChannelId: "image-channel",
+        videoChannelId: "video-channel",
         localChannels: [
             {
-                id: "obsolete-channel-id",
+                id: "image-channel",
                 protocol: "openai",
-                name: "极速蹬 API",
-                baseUrl: "https://api.jisudeng.com",
-                apiKey: "user-api-key",
+                name: "Image API",
+                baseUrl: "https://image.example.test",
+                apiKey: "image-key",
                 models: ["multi-modal"],
-                modelCapabilities: { "multi-modal": ["image", "video"] },
+                modelCapabilities: { "multi-modal": ["image"] },
+                declaredModelIds: ["multi-modal"],
+            },
+            {
+                id: "video-channel",
+                protocol: "openai",
+                name: "Video API",
+                baseUrl: "https://video.example.test",
+                apiKey: "video-key",
+                models: ["multi-modal"],
+                modelCapabilities: { "multi-modal": ["video"] },
                 declaredModelIds: ["multi-modal"],
             },
         ],
     };
 
-    assert.equal(channelIdForActiveModel(config, "image"), "jisudeng-api");
-    assert.equal(channelIdForActiveModel(config, "video"), "jisudeng-api");
+    assert.equal(channelIdForActiveModel(config, "image"), "image-channel");
+    assert.equal(channelIdForActiveModel(config, "video"), "video-channel");
+    assert.equal(localChannelForActiveModel(config, "image")?.apiKey, "image-key");
+    assert.equal(localChannelForActiveModel(config, "video")?.apiKey, "video-key");
 });
 
 test("persisted mixed declarations do not retain legacy classifications", () => {
@@ -82,11 +94,21 @@ test("persisted mixed declarations do not retain legacy classifications", () => 
     assert.equal(modelMatchesCapability("sensenova-u1.5-lite", "image", channel), false);
 });
 
-test("normalization replaces obsolete managed channels with one fixed direct channel", () => {
+test("normalization keeps user channels and removes only old managed channels", () => {
     const config: AiConfig = {
         ...defaultConfig,
         apiKey: "user-api-key",
         localChannels: [
+            {
+                id: "kept-channel",
+                protocol: "openai",
+                name: "保留的渠道",
+                baseUrl: "https://custom.example.test/v1",
+                apiKey: "custom-key",
+                models: ["custom-image"],
+                modelCapabilities: { "custom-image": ["image"] },
+                declaredModelIds: ["custom-image"],
+            },
             {
                 id: "platform-managed:image:17",
                 protocol: "openai",
@@ -143,16 +165,17 @@ test("normalization replaces obsolete managed channels with one fixed direct cha
         ],
     };
 
-    const [channel] = normalizeLocalChannels(config);
-    assert.deepEqual(channel, {
-        id: "jisudeng-api",
+    const channels = normalizeLocalChannels(config);
+    assert.equal(channels.length, 1);
+    assert.deepEqual(channels[0], {
+        id: "kept-channel",
         protocol: "openai",
-        name: "极速蹬 API",
-        baseUrl: "https://api.jisudeng.com",
-        apiKey: "user-api-key",
-        models: ["shared"],
-        modelCapabilities: { shared: ["image"] },
-        declaredModelIds: ["shared"],
+        name: "保留的渠道",
+        baseUrl: "https://custom.example.test/v1",
+        apiKey: "custom-key",
+        models: ["custom-image"],
+        modelCapabilities: { "custom-image": ["image"] },
+        declaredModelIds: ["custom-image"],
         modelDiscovery: undefined,
     });
 });

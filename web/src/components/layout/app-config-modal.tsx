@@ -2,6 +2,7 @@
 
 import { App, Button, Form, Input, Modal, Select, Switch } from "antd";
 import { useEffect, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 
 import { ModelPicker } from "@/components/model-picker";
 import { applyModelDiscovery, modelDiscoveryFailure } from "@/lib/model-capabilities";
@@ -22,8 +23,9 @@ import {
 } from "@/services/image-storage";
 import { audioFormatOptions, audioVoiceOptions, glmTtsFormatOptions, glmTtsVoiceOptions, isGlmTtsModel, normalizeAudioSpeedValue, normalizeGlmTtsFormat, normalizeGlmTtsSpeed, normalizeGlmTtsVoice } from "@/lib/audio-generation";
 import { isMimoPresetTtsModel, isMimoTtsModel, isMimoVoiceCloneModel, isMimoVoiceDesignModel, mimoTtsFormatOptions, mimoTtsVoiceOptions } from "@/lib/mimo-tts";
-import { JISUDENG_API_BASE_URL, localModelsByCapability, modelMatchesCapability, normalizeLocalChannels, useConfigStore, useEffectiveConfig, type AiConfig, type LocalModelChannel, type ModelCapability } from "@/stores/use-config-store";
+import { localModelsByCapability, modelMatchesCapability, normalizeLocalChannels, useConfigStore, useEffectiveConfig, type AiConfig, type LocalModelChannel, type ModelCapability } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
+import { nanoid } from "nanoid";
 
 type ModelGroup = {
     capability: ModelCapability;
@@ -99,10 +101,12 @@ export function AppConfigModal() {
         }
         setSavingConfig(true);
         try {
-            const directChannel = normalizeLocalChannels(config)[0];
-            await createStorageSession(JISUDENG_API_BASE_URL, directChannel?.apiKey || "");
-            const { useCanvasStore } = await import("@/app/(user)/canvas/stores/use-canvas-store");
-            void useCanvasStore.getState().syncWithRemote("", true);
+            const storageChannel = normalizeLocalChannels(config).find((channel) => Boolean(channel.baseUrl.trim() && channel.apiKey.trim()));
+            if (storageChannel) {
+                await createStorageSession(storageChannel.baseUrl, storageChannel.apiKey);
+                const { useCanvasStore } = await import("@/app/(user)/canvas/stores/use-canvas-store");
+                void useCanvasStore.getState().syncWithRemote("", true);
+            }
             const providers = {
                 ...(config.syncStorageConfig || remoteStorageSyncEnabled ? { s3: config.syncStorageConfig ? userStorage : { ...userStorage, enabled: false, endpoint: "", bucket: "", accessKeyId: "", secretAccessKey: "" } } : {}),
                 ...(config.syncWebDAVStorageConfig || remoteWebDAVStorageSyncEnabled ? { webdav: config.syncWebDAVStorageConfig ? userWebDAVStorage : { ...userWebDAVStorage, enabled: false, endpoint: "", username: "", password: "" } } : {}),
@@ -142,7 +146,7 @@ export function AppConfigModal() {
     };
 
     const updateLocalChannels = (channels: LocalModelChannel[]) => {
-        const normalized = channels.length ? channels : normalizeLocalChannels({ baseUrl: config.baseUrl, apiKey: config.apiKey, models: config.models });
+        const normalized = channels.length ? channels : [emptyLocalChannel()];
         const models = uniqueModels(normalized.flatMap((channel) => channel.models));
         const nextImageModels = localModelsByCapability(normalized, "image");
         const nextVideoModels = localModelsByCapability(normalized, "video");
@@ -172,6 +176,15 @@ export function AppConfigModal() {
 
     const patchLocalChannel = (id: string, patch: Partial<LocalModelChannel>) => {
         updateLocalChannels(normalizeLocalChannels(config).map((channel) => (channel.id === id ? { ...channel, ...patch } : channel)));
+    };
+
+    const addLocalChannel = () => {
+        updateLocalChannels([...normalizeLocalChannels(config), { ...emptyLocalChannel(), id: `local-channel-${nanoid(8)}`, name: "新渠道" }]);
+    };
+
+    const removeLocalChannel = (id: string) => {
+        const channels = normalizeLocalChannels(config).filter((channel) => channel.id !== id);
+        updateLocalChannels(channels);
     };
 
     const refreshLocalChannelModels = async (channel: LocalModelChannel) => {
@@ -243,19 +256,24 @@ export function AppConfigModal() {
                         <div className="mb-5 space-y-3 rounded-lg border border-stone-200 p-3 dark:border-stone-800">
                             <div className="flex items-center justify-between gap-3">
                                 <div>
-                                    <div className="text-sm font-medium">极速蹬 API</div>
-                                    <div className="mt-1 text-xs text-stone-500">API Key 仅保存在此浏览器，用于直接加载和调用你的模型。</div>
+                                    <div className="text-sm font-medium">API 渠道</div>
+                                    <div className="mt-1 text-xs text-stone-500">可添加多个渠道；API Key 仅保存在此浏览器，用于直接加载和调用各自的模型。</div>
                                 </div>
+                                <Button size="small" icon={<Plus size={14} />} onClick={addLocalChannel}>
+                                    添加渠道
+                                </Button>
                             </div>
                             {normalizeLocalChannels(config).map((channel) => (
                                 <div key={channel.id} className="space-y-2 rounded-md bg-stone-50 p-2 dark:bg-stone-900">
-                                    <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-                                        <Input value={JISUDENG_API_BASE_URL} aria-label="极速蹬 API 地址" disabled />
+                                    <div className="grid gap-2 md:grid-cols-[minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
+                                        <Input value={channel.name} aria-label="渠道名称" placeholder="渠道名称" onChange={(event) => patchLocalChannel(channel.id, { name: event.target.value })} />
+                                        <Input value={channel.baseUrl} aria-label={`${channel.name} API 地址`} placeholder="https://api.example.com" onChange={(event) => patchLocalChannel(channel.id, { baseUrl: event.target.value })} />
                                         <Input.Password value={channel.apiKey} placeholder="API Key" onChange={(event) => patchLocalChannel(channel.id, { apiKey: event.target.value })} />
                                         <div className="flex gap-2">
                                             <Button size="small" loading={loadingModels} onClick={() => void refreshLocalChannelModels(channel)}>
                                                 拉取
                                             </Button>
+                                            <Button size="small" type="text" danger icon={<Trash2 size={14} />} aria-label={`删除 ${channel.name}`} title="删除渠道" onClick={() => removeLocalChannel(channel.id)} />
                                         </div>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-x-2 text-xs text-stone-500">
@@ -490,6 +508,10 @@ function normalizeImageCount(value: string) {
 
 function uniqueModels(models: string[]) {
     return Array.from(new Set(models.map((model) => model.trim()).filter(Boolean)));
+}
+
+function emptyLocalChannel(): LocalModelChannel {
+    return { id: "jisudeng-api", protocol: "openai", name: "极速蹬 API", baseUrl: "https://api.jisudeng.com", apiKey: "", models: [] };
 }
 
 function formatBytes(bytes: number) {

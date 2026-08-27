@@ -465,7 +465,7 @@ export function useEffectiveConfig() {
         return {
             ...config,
             channelMode: "local" as const,
-            baseUrl: JISUDENG_API_BASE_URL,
+            baseUrl: localChannels[0]?.baseUrl || config.baseUrl,
             apiKey: localChannels[0]?.apiKey || config.apiKey,
             localChannels,
             models,
@@ -508,27 +508,37 @@ function normalizeVersionedBaseUrl(baseUrl: string) {
 }
 
 export function normalizeLocalChannels(config: Partial<AiConfig>): LocalModelChannel[] {
-    const source = Array.isArray(config.localChannels) ? config.localChannels[0] : undefined;
-    const models = Array.isArray(source?.models) && source.models.length ? source.models.filter(Boolean) : Array.isArray(config.models) ? config.models.filter(Boolean) : [];
-    const declaredModelIds = Array.isArray(source?.declaredModelIds) ? source.declaredModelIds.filter((model): model is string => typeof model === "string" && Boolean(model.trim())) : [];
-    const modelCapabilities = declaredModelIds.length ? Object.fromEntries(models.map((model) => [model, declaredModelIds.includes(model) ? source?.modelCapabilities?.[model] || [] : []])) : source?.modelCapabilities;
-    return [
-        {
-            id: "jisudeng-api",
-            protocol: "openai",
-            name: "极速蹬 API",
-            baseUrl: JISUDENG_API_BASE_URL,
-            apiKey: source?.apiKey || config.apiKey || "",
-            models,
-            modelCapabilities,
-            declaredModelIds,
-            modelDiscovery: source?.modelDiscovery,
-        },
-    ];
+    const channels = (Array.isArray(config.localChannels) ? config.localChannels : [])
+        .filter((channel) => {
+            const id = channel?.id || "";
+            return channel?.managedPlatform !== true && !id.startsWith("platform-managed:") && !(channel?.baseUrl?.trim() === "/api" && !channel?.apiKey?.trim());
+        })
+        .map((source, index) => {
+            const models = Array.isArray(source.models) ? source.models.filter((model): model is string => typeof model === "string" && Boolean(model.trim())) : [];
+            const declaredModelIds = Array.isArray(source.declaredModelIds) ? source.declaredModelIds.filter((model): model is string => typeof model === "string" && Boolean(model.trim())) : [];
+            const modelCapabilities = declaredModelIds.length ? Object.fromEntries(models.map((model) => [model, declaredModelIds.includes(model) ? source.modelCapabilities?.[model] || [] : []])) : source.modelCapabilities;
+            const protocol: LocalModelChannel["protocol"] = source.protocol === "kie" || source.protocol === "mimo" ? source.protocol : "openai";
+            return {
+                id: source.id?.trim() || `local-channel-${index + 1}`,
+                protocol,
+                name: source.name?.trim() || `渠道 ${index + 1}`,
+                baseUrl: source.baseUrl || "",
+                apiKey: source.apiKey || "",
+                models,
+                modelCapabilities,
+                ...(source.modelMediaCapabilities ? { modelMediaCapabilities: source.modelMediaCapabilities } : {}),
+                declaredModelIds,
+                modelDiscovery: source.modelDiscovery,
+            };
+        });
+    if (channels.length) return channels;
+
+    const models = Array.isArray(config.models) ? config.models.filter((model): model is string => typeof model === "string" && Boolean(model.trim())) : [];
+    return [{ id: "jisudeng-api", protocol: "openai", name: "极速蹬 API", baseUrl: config.baseUrl || JISUDENG_API_BASE_URL, apiKey: config.apiKey || "", models }];
 }
 
 export function hasConfiguredJisudengAPIKey() {
-    return Boolean(normalizeLocalChannels(useConfigStore.getState().config)[0]?.apiKey.trim());
+    return normalizeLocalChannels(useConfigStore.getState().config).some((channel) => Boolean(channel.baseUrl.trim() && channel.apiKey.trim()));
 }
 
 export function localModelsByCapability(channels: LocalModelChannel[], capability?: ModelCapability) {

@@ -18,7 +18,7 @@ func TestStorageSessionCannotEnterAccountOnlyRoute(t *testing.T) {
 	engine := gin.New()
 	engine.GET("/storage", StorageSessionAuth, func(c *gin.Context) { c.Status(http.StatusNoContent) })
 	engine.POST("/ai", UserAuth, func(c *gin.Context) { c.Status(http.StatusNoContent) })
-	cookie := &http.Cookie{Name: service.StorageSessionCookieName, Value: service.NewStorageSession("user-api-key")}
+	cookie := &http.Cookie{Name: service.StorageSessionCookieName, Value: service.NewStorageSession("https://api.example.test", "user-api-key")}
 
 	storageRequest := httptest.NewRequest(http.MethodGet, "/storage", nil)
 	storageRequest.AddCookie(cookie)

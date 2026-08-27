@@ -6,8 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"io"
-	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -20,10 +18,7 @@ import (
 const (
 	StorageSessionCookieName = "canvas_storage_session"
 	storageSessionScope      = "canvas_storage"
-	jisudengAPIBaseURL       = "https://api.jisudeng.com"
 )
-
-var storageSessionHTTPClient = &http.Client{Timeout: 15 * time.Second}
 
 type storageSessionClaims struct {
 	OwnerID string `json:"owner_id"`
@@ -31,36 +26,20 @@ type storageSessionClaims struct {
 	jwt.RegisteredClaims
 }
 
-func CreateStorageSession(ctx context.Context, baseURL, apiKey string) (string, error) {
-	if !isJisudengAPIBaseURL(baseURL) {
-		return "", safeMessageError{message: "仅支持极速蹬 API 地址 https://api.jisudeng.com"}
+func CreateStorageSession(_ context.Context, baseURL, apiKey string) (string, error) {
+	canonicalBaseURL, err := canonicalStorageSessionBaseURL(baseURL)
+	if err != nil {
+		return "", err
 	}
 	apiKey = strings.TrimSpace(apiKey)
 	if apiKey == "" {
 		return "", safeMessageError{message: "请先填写 API Key"}
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, jisudengAPIBaseURL+"/v1/models", nil)
-	if err != nil {
-		return "", safeMessageError{message: "模型校验请求创建失败"}
-	}
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-	response, err := storageSessionHTTPClient.Do(req)
-	if err != nil {
-		return "", safeMessageError{message: "极速蹬模型服务暂不可用，请稍后重试"}
-	}
-	defer response.Body.Close()
-	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 64<<10))
-	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
-		return "", safeMessageError{message: "API Key 无效或无权读取模型"}
-	}
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return "", safeMessageError{message: "极速蹬模型服务暂不可用，请稍后重试"}
-	}
-	return NewStorageSession(apiKey), nil
+	return NewStorageSession(canonicalBaseURL, apiKey), nil
 }
 
-func NewStorageSession(apiKey string) string {
-	ownerID := "api-key:" + storageSessionFingerprint(apiKey)
+func NewStorageSession(baseURL, apiKey string) string {
+	ownerID := "api-key:" + storageSessionFingerprint(baseURL, apiKey)
 	claims := storageSessionClaims{
 		OwnerID: ownerID,
 		Scope:   storageSessionScope,
@@ -91,17 +70,20 @@ func StorageSessionUser(tokenText string) (model.AuthUser, bool) {
 	return model.AuthUser{ID: claims.OwnerID, Username: "canvas-storage", Role: model.UserRoleUser}, true
 }
 
-func isJisudengAPIBaseURL(value string) bool {
+func canonicalStorageSessionBaseURL(value string) (string, error) {
 	parsed, err := url.Parse(strings.TrimSpace(value))
-	if err != nil || parsed.User != nil || parsed.Scheme != "https" || !strings.EqualFold(parsed.Host, "api.jisudeng.com") || parsed.RawQuery != "" || parsed.Fragment != "" {
-		return false
+	if err != nil || parsed.User != nil || !strings.EqualFold(parsed.Scheme, "https") || parsed.Hostname() == "" || parsed.RawQuery != "" || parsed.ForceQuery || parsed.Fragment != "" {
+		return "", safeMessageError{message: "API 地址必须是无参数的 HTTPS 地址"}
 	}
-	path := strings.TrimRight(parsed.EscapedPath(), "/")
-	return path == "" || path == "/v1"
+	parsed.Scheme = strings.ToLower(parsed.Scheme)
+	parsed.Host = strings.ToLower(parsed.Host)
+	parsed.Path = strings.TrimRight(parsed.Path, "/")
+	parsed.RawPath = ""
+	return parsed.String(), nil
 }
 
-func storageSessionFingerprint(apiKey string) string {
+func storageSessionFingerprint(baseURL, apiKey string) string {
 	mac := hmac.New(sha256.New, []byte(config.Cfg.JWTSecret))
-	_, _ = mac.Write([]byte(strings.TrimSpace(apiKey)))
+	_, _ = mac.Write([]byte(baseURL + "\n" + strings.TrimSpace(apiKey)))
 	return hex.EncodeToString(mac.Sum(nil))
 }
