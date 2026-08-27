@@ -367,18 +367,25 @@ func PlatformManagedBootstrap(ctx context.Context, canvasUserID string) (map[str
 	if err != nil {
 		return nil, err
 	}
+	return platformManagedBootstrapForScopes(ctx, session)
+}
+
+func platformManagedBootstrapForScopes(ctx context.Context, session PlatformManagedSession) (map[string]any, error) {
 	workspaces := map[string]any{}
 	var first map[string]any
-	missingPurposes := make([]string, 0, 2)
+	unavailablePurposes := make([]string, 0, 2)
+	hasBootstrapFailure := false
 	for _, purpose := range []string{"chat", "image", "video"} {
 		entry, exists := session.Sessions[purpose]
 		if !exists || entry.UserID <= 0 || entry.APIKeyID <= 0 || strings.TrimSpace(entry.APIKey) == "" {
-			missingPurposes = append(missingPurposes, purpose)
+			unavailablePurposes = append(unavailablePurposes, purpose)
 			continue
 		}
 		workspace, err := platformBootstrapForSession(ctx, entry)
 		if err != nil {
-			return nil, err
+			unavailablePurposes = append(unavailablePurposes, purpose)
+			hasBootstrapFailure = true
+			continue
 		}
 		if first == nil {
 			first = workspace
@@ -395,11 +402,17 @@ func PlatformManagedBootstrap(ctx context.Context, canvasUserID string) (map[str
 		"workspaces": workspaces,
 		"expires_at": session.ExpiresAt.UTC().Format(time.RFC3339),
 	}
-	if len(missingPurposes) > 0 {
+	if len(unavailablePurposes) > 0 {
+		state := "incomplete_managed_sessions"
+		message := "服务端尚未提供完整的媒体会话，请重新进入 AI 创作空间后重试"
+		if hasBootstrapFailure {
+			state = "partial_managed_capabilities"
+			message = "部分创作能力暂时不可用，请稍后重试"
+		}
 		result["compatibility"] = map[string]any{
-			"state":                "incomplete_managed_sessions",
-			"unavailable_purposes": missingPurposes,
-			"message":              "服务端尚未提供完整的媒体会话，请重新进入 AI 创作空间后重试",
+			"state":                state,
+			"unavailable_purposes": unavailablePurposes,
+			"message":              message,
 		}
 	}
 	return redactPlatformSecrets(result).(map[string]any), nil
