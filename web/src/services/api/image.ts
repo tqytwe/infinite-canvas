@@ -230,6 +230,9 @@ function applyImageGenerationOptions(body: Record<string, unknown>, config: AiCo
     if (isZhipuImageModel(config.model)) return;
     if (params.n > 1) body.n = params.n;
     if (isSenseNovaU1FastModel(config.model)) return;
+    if (isSenseNovaU15LiteModel(config.model)) {
+        body.watermark = config.imageWatermark !== "false";
+    }
     if (config.responseFormatB64Json) body.response_format = "b64_json";
     if (isSenseNovaImageModel(config.model)) return;
     if (config.streamImages) {
@@ -1084,6 +1087,7 @@ async function createCanvasImageTaskRequest(config: AiConfig & { seedIndex?: num
             formData.set("partial_images", String(params.streamPartialImages));
         }
         if (params.size) formData.set("size", params.size);
+        if (isSenseNovaU15LiteModel(config.model)) formData.set("watermark", String(config.imageWatermark !== "false"));
         const files = await Promise.all(references.map(async (image) => dataUrlToFile({ ...image, dataUrl: await imageToDataUrl(image) })));
         files.forEach((file) => formData.append("image", file));
         return { method: "POST", headers: tokenHeaders, body: formData };

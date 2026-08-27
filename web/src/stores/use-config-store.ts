@@ -83,6 +83,7 @@ export type AiConfig = {
     vquality: string;
     videoGenerateAudio: string;
     videoWatermark: string;
+    imageWatermark: string;
     videoCharacterOrientation: string;
     systemPrompt: string;
     models: string[];
@@ -151,6 +152,7 @@ export const defaultConfig: AiConfig = {
     vquality: "720",
     videoGenerateAudio: "false",
     videoWatermark: "false",
+    imageWatermark: "true",
     videoCharacterOrientation: "video",
     systemPrompt: "",
     models: [],
@@ -437,6 +439,7 @@ export const useConfigStore = create<ConfigStore>()(
                         vquality: config.vquality || "720",
                         videoGenerateAudio: config.videoGenerateAudio || "false",
                         videoWatermark: config.videoWatermark || "false",
+                        imageWatermark: config.imageWatermark || "true",
                         videoCharacterOrientation: config.videoCharacterOrientation === "image" ? "image" : "video",
                         canvasImageCount: config.canvasImageCount || "1",
                         imageModels: localModelsByCapability(localChannels, "image"),

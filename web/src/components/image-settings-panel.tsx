@@ -48,7 +48,7 @@ export function imageSizeOptionsForConfig(config: AiConfig, model = config.image
 type ImageSettingsPanelProps = {
     config: AiConfig;
     model?: string;
-    onConfigChange: (key: "quality" | "size" | "count", value: string) => void;
+    onConfigChange: (key: "quality" | "size" | "count" | "imageWatermark", value: string) => void;
     theme: CanvasTheme;
     showTitle?: boolean;
     showSize?: boolean;
@@ -76,6 +76,7 @@ export function ImageSettingsPanel({
     const dimensionStep = managedCapabilities?.dimensionStep || DIMENSION_STEP;
     const dimensionsEditable = !managedCapabilities?.supportedSizes.length;
     const quality = config.quality || "auto";
+    const supportsSenseNovaWatermarkControl = model.trim().toLowerCase() === "sensenova-u1.5-lite";
     const count = Math.max(1, Math.min(maxCount, Math.floor(Math.abs(Number(config.count)) || 1)));
     const activeSize = config.size || "auto";
     const selectedAspect = visibleAspectOptions.find((item) => (item.size || item.value) === activeSize || item.value === activeSize);
@@ -185,6 +186,12 @@ export function ImageSettingsPanel({
                             ))}
                             <CountInput value={count} max={maxCount} theme={theme} onChange={(value) => onConfigChange("count", String(value || 1))} />
                         </div>
+                    </div>
+                ) : null}
+                {supportsSenseNovaWatermarkControl ? (
+                    <div className="flex items-center justify-between gap-3">
+                        <SettingTitle color={theme.node.muted}>添加 SenseNova 水印</SettingTitle>
+                        <Switch size="small" checked={config.imageWatermark !== "false"} onChange={(checked) => onConfigChange("imageWatermark", String(checked))} />
                     </div>
                 ) : null}
             </div>
