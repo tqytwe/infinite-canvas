@@ -25,7 +25,15 @@ export function ModelPicker({ config, value, channelId, capability, onChange, cl
     const channelOptions = useMemo(() => {
         const channels =
             config.channelMode === "remote"
-                ? config.publicChannels.map((channel) => ({ id: channel.id, name: channel.name || "云端渠道", baseUrl: channel.baseUrl, models: channel.models, modelCapabilities: channel.modelCapabilities, declaredModelIds: undefined }))
+                ? config.publicChannels.map((channel) => ({
+                      id: channel.id,
+                      name: channel.name || "云端渠道",
+                      baseUrl: channel.baseUrl,
+                      models: channel.models,
+                      modelCapabilities: channel.modelCapabilities,
+                      declaredModelIds: undefined,
+                      purpose: undefined,
+                  }))
                 : normalizeLocalChannels(config).map((channel) => ({
                       id: channel.id,
                       name: channel.name || "本地渠道",
@@ -33,13 +41,13 @@ export function ModelPicker({ config, value, channelId, capability, onChange, cl
                       models: channel.models,
                       modelCapabilities: channel.modelCapabilities,
                       declaredModelIds: channel.declaredModelIds,
+                      purpose: channel.purpose,
                   }));
         const models = channels.flatMap((channel) =>
-            (channel.models ?? []).map((model) => ({ key: `${channel.id}::${model}`, channelId: channel.id, channelName: channel.name, model, modelCapabilities: channel.modelCapabilities, declaredModelIds: channel.declaredModelIds })),
+            (channel.models ?? []).map((model) => ({ key: `${channel.id}::${model}`, channelId: channel.id, channelName: channel.name, model, channel, modelCapabilities: channel.modelCapabilities, declaredModelIds: channel.declaredModelIds })),
         );
         if (!capability) return models;
-        const directImageChannel = capability === "image" && config.channelMode === "local" && !config.localChannels.some((channel) => channel.managedPlatform === true);
-        return directImageChannel ? models : models.filter((item) => modelMatchesCapability(item.model, capability, item));
+        return models.filter((item) => (config.channelMode === "local" ? item.channel.purpose === capability : modelMatchesCapability(item.model, capability, item)));
     }, [capability, config]);
     const currentOption = useMemo(() => {
         if (!value) return undefined;

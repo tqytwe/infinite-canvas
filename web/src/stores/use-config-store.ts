@@ -24,6 +24,7 @@ export type LocalModelChannel = {
     baseUrl: string;
     apiKey: string;
     models: string[];
+    purpose?: ModelCapability;
     modelCapabilities?: ModelCapabilities;
     modelMediaCapabilities?: Record<string, PlatformManagedModelMediaCapabilities>;
     declaredModelIds?: string[];
@@ -525,6 +526,7 @@ export function normalizeLocalChannels(config: Partial<AiConfig>): LocalModelCha
                 baseUrl: source.baseUrl || "",
                 apiKey: source.apiKey || "",
                 models,
+                purpose: normalizeDirectChannelPurpose(source.purpose),
                 modelCapabilities,
                 ...(source.modelMediaCapabilities ? { modelMediaCapabilities: source.modelMediaCapabilities } : {}),
                 declaredModelIds,
@@ -534,7 +536,7 @@ export function normalizeLocalChannels(config: Partial<AiConfig>): LocalModelCha
     if (channels.length) return channels;
 
     const models = Array.isArray(config.models) ? config.models.filter((model): model is string => typeof model === "string" && Boolean(model.trim())) : [];
-    return [{ id: "jisudeng-api", protocol: "openai", name: "极速蹬 API", baseUrl: config.baseUrl || JISUDENG_API_BASE_URL, apiKey: config.apiKey || "", models }];
+    return [{ id: "jisudeng-api", protocol: "openai", name: "极速蹬 API", baseUrl: config.baseUrl || JISUDENG_API_BASE_URL, apiKey: config.apiKey || "", models, purpose: "image" }];
 }
 
 export function hasConfiguredJisudengAPIKey() {
@@ -545,13 +547,16 @@ export function localModelsByCapability(channels: LocalModelChannel[], capabilit
     return normalizeModelList(channels.flatMap((channel) => channel.models.filter((model) => localChannelMatchesCapability(channel, model, capability))));
 }
 
-// A browser-direct channel represents one user-provided API key. The models
-// returned by that key are authoritative for the image workspace: a partial
-// optional capability extension must not hide its sibling models. Managed
-// platform channels retain their server-declared capability boundary.
+// A browser-direct channel is explicitly assigned to one workspace by the
+// user. Its model list is never inferred from model names or API extensions.
+// Managed platform channels retain their server-declared capability boundary.
 export function localChannelMatchesCapability(channel: LocalModelChannel, model: string, capability?: ModelCapability) {
-    if (capability === "image" && channel.managedPlatform !== true) return channel.models.includes(model);
+    if (channel.managedPlatform !== true) return !capability || (channel.purpose || "image") === capability;
     return modelMatchesCapability(model, capability, channel);
+}
+
+function normalizeDirectChannelPurpose(value: unknown): ModelCapability {
+    return value === "video" || value === "text" || value === "audio" ? value : "image";
 }
 
 // Server-declared media details are runtime-only and are accepted exclusively
