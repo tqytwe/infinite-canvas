@@ -628,7 +628,12 @@ func isArkSeedanceVideo(baseURL string, modelName string) bool {
 }
 
 func isAgnesVideoModel(modelName string) bool {
-	return strings.Contains(strings.ToLower(strings.TrimSpace(modelName)), "agnes-video")
+	switch strings.ToLower(strings.TrimSpace(modelName)) {
+	case "agnes-video-v2.0", "agnes-video-2.5", "agnes-video-2.5-flash":
+		return true
+	default:
+		return false
+	}
 }
 
 var errMissingModel = &aiError{"缺少模型名称"}

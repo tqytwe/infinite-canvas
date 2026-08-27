@@ -25,7 +25,7 @@ func TestPlatformAuthDisablesRemoteModelChannels(t *testing.T) {
 }
 
 func TestVideoModelNameRecognizesConfiguredAliasesWithoutClassifyingMinimaxText(t *testing.T) {
-	for _, name := range []string{"manxue2.5", "minimax_h3", "seedance2.5", "sd2.5", "veo-3.1", "veo-3.1-fast", "veo-3.1-i2v"} {
+	for _, name := range []string{"agnes-video-2.5", "agnes-video-2.5-flash", "agnes-video-v2.0", "manxue2.5", "minimax_h3", "minimax_h3-10s", "seedance2.5", "sd2.5", "veo-3.1", "veo-3.1-fast", "veo-3.1-i2v"} {
 		if !isVideoModelName(name) {
 			t.Fatalf("%q should be classified as video", name)
 		}

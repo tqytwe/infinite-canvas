@@ -568,7 +568,7 @@ func isVideoModelName(modelName string) bool {
 	normalized := strings.NewReplacer(".", "-", "_", "-", "/", "-").Replace(name)
 	return strings.Contains(name, "seedance") || strings.Contains(name, "video") || strings.Contains(name, "veo") ||
 		normalized == "sd2-5" || normalized == "sd-2-5" ||
-		normalized == "minimax-h3" || normalized == "manxue2-5" || normalized == "manxue-2-5"
+		normalized == "minimax-h3" || normalized == "minimax-h3-10s" || normalized == "manxue2-5" || normalized == "manxue-2-5"
 }
 
 func isImageModelName(modelName string) bool {

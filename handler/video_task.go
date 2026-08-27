@@ -353,7 +353,7 @@ func isTransientVideoTaskNotFound(task model.VideoTask, message string) bool {
 func isDocumentedJSONVideoModelName(modelName string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(modelName))
 	switch normalized {
-	case "manxue2.5", "minimax_h3", "seedance2.5", "sd2.5", "veo-3.1", "veo-3.1-fast", "veo-3.1-i2v", "sora-2":
+	case "manxue2.5", "minimax_h3", "minimax_h3-10s", "seedance2.5", "sd2.5", "veo-3.1", "veo-3.1-fast", "veo-3.1-i2v", "sora-2":
 		return true
 	default:
 		return strings.Contains(normalized, "seedance") || strings.Contains(normalized, "veo") || strings.HasPrefix(normalized, "sora-2")

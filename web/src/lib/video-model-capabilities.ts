@@ -1,5 +1,27 @@
 export function modelKey(modelName: string) {
-    return modelName.trim().toLowerCase().replace(/[._/]+/g, "-");
+    return modelName
+        .trim()
+        .toLowerCase()
+        .replace(/[._/]+/g, "-");
+}
+
+export type VideoRequestProfile = "agnes-v20" | "agnes-v25" | "documented-json" | "generic-form";
+
+// /v1/models does not describe provider-specific video payload fields. Keep the
+// audited aliases here instead of inferring a protocol from a model-name prefix.
+export function videoRequestProfile(modelName: string): VideoRequestProfile {
+    const model = modelKey(modelName);
+    if (model === "agnes-video-v2-0") return "agnes-v20";
+    if (model === "agnes-video-2-5" || model === "agnes-video-2-5-flash") return "agnes-v25";
+    if (isDocumentedSeedanceVideoModel(model) || isVeoVideoModel(model) || isSora2VideoModel(model) || model === "minimax-h3" || model === "minimax-h3-10s" || model === "manxue2-5" || model === "manxue-2-5") {
+        return "documented-json";
+    }
+    return "generic-form";
+}
+
+export function isAgnesVideoModel(modelName: string) {
+    const profile = videoRequestProfile(modelName);
+    return profile === "agnes-v20" || profile === "agnes-v25";
 }
 
 export function isCogVideoX3Model(modelName: string) {
@@ -25,8 +47,7 @@ export function isSora2VideoModel(modelName: string) {
 }
 
 export function isDocumentedJSONVideoModel(modelName: string) {
-    const model = modelKey(modelName);
-    return isDocumentedSeedanceVideoModel(model) || isVeoVideoModel(model) || isSora2VideoModel(model) || model === "minimax-h3" || model === "manxue2-5" || model === "manxue-2-5";
+    return videoRequestProfile(modelName) === "documented-json";
 }
 
 export const COGVIDEOX3_DURATIONS = ["5", "10"] as const;
@@ -87,7 +108,7 @@ export function supportsVideoAudioGeneration(modelName: string) {
         model.includes("doubao-seedance-2-0") ||
         model.includes("doubao-seedance-1-5") ||
         isSeedanceVideoModel(model) ||
-        isVeoVideoModel(model) && model.includes("official") ||
+        (isVeoVideoModel(model) && model.includes("official")) ||
         model === "wan2-6" ||
         model === "wan2-6-i2v-flash" ||
         model.includes("kling-v2-6") ||
