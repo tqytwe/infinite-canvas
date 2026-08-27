@@ -542,7 +542,16 @@ export function hasConfiguredJisudengAPIKey() {
 }
 
 export function localModelsByCapability(channels: LocalModelChannel[], capability?: ModelCapability) {
-    return normalizeModelList(channels.flatMap((channel) => filterModelsByCapability(channel.models, capability, channel)));
+    return normalizeModelList(channels.flatMap((channel) => channel.models.filter((model) => localChannelMatchesCapability(channel, model, capability))));
+}
+
+// A browser-direct channel represents one user-provided API key. The models
+// returned by that key are authoritative for the image workspace: a partial
+// optional capability extension must not hide its sibling models. Managed
+// platform channels retain their server-declared capability boundary.
+export function localChannelMatchesCapability(channel: LocalModelChannel, model: string, capability?: ModelCapability) {
+    if (capability === "image" && channel.managedPlatform !== true) return channel.models.includes(model);
+    return modelMatchesCapability(model, capability, channel);
 }
 
 // Server-declared media details are runtime-only and are accepted exclusively
@@ -603,9 +612,11 @@ export function channelIdForActiveModel(config: AiConfig, capability?: ModelCapa
             : normalizeLocalChannels(config);
     const channelForCapability = (requested: ModelCapability) => {
         const preferredChannelID = requested === "image" ? config.imageChannelId : requested === "video" ? config.videoChannelId : requested === "audio" ? config.audioChannelId : config.textChannelId;
-        const preferred = channels.find((channel) => channel.id === preferredChannelID && channel.models.includes(config.model) && modelMatchesCapability(config.model, requested, channel));
+        const matches = (channel: { id: string; models: string[]; modelCapabilities?: ModelCapabilities; declaredModelIds?: string[]; managedPlatform?: boolean }) =>
+            channel.models.includes(config.model) && (config.channelMode === "local" ? localChannelMatchesCapability(channel as LocalModelChannel, config.model, requested) : modelMatchesCapability(config.model, requested, channel));
+        const preferred = channels.find((channel) => channel.id === preferredChannelID && matches(channel));
         if (preferred?.id) return preferred.id;
-        return channels.find((channel) => channel.models.includes(config.model) && modelMatchesCapability(config.model, requested, channel))?.id || "";
+        return channels.find(matches)?.id || "";
     };
     if (capability) return channelForCapability(capability);
     for (const requested of [
@@ -627,7 +638,7 @@ export function channelIdForActiveModel(config: AiConfig, capability?: ModelCapa
 export function localChannelForActiveModel(config: AiConfig, capability?: ModelCapability) {
     const channels = normalizeLocalChannels(config);
     const preferredId = channelIdForActiveModel(config, capability);
-    const matching = channels.filter((channel) => channel.models.includes(config.model) && (!capability || modelMatchesCapability(config.model, capability, channel)));
+    const matching = channels.filter((channel) => channel.models.includes(config.model) && (!capability || localChannelMatchesCapability(channel, config.model, capability)));
     return matching.find((channel) => channel.id === preferredId) || matching[0] || (capability ? undefined : channels.find((channel) => channel.id === preferredId) || channels[0]);
 }
 

@@ -23,7 +23,7 @@ import {
 } from "@/services/image-storage";
 import { audioFormatOptions, audioVoiceOptions, glmTtsFormatOptions, glmTtsVoiceOptions, isGlmTtsModel, normalizeAudioSpeedValue, normalizeGlmTtsFormat, normalizeGlmTtsSpeed, normalizeGlmTtsVoice } from "@/lib/audio-generation";
 import { isMimoPresetTtsModel, isMimoTtsModel, isMimoVoiceCloneModel, isMimoVoiceDesignModel, mimoTtsFormatOptions, mimoTtsVoiceOptions } from "@/lib/mimo-tts";
-import { localModelsByCapability, modelMatchesCapability, normalizeLocalChannels, useConfigStore, useEffectiveConfig, type AiConfig, type LocalModelChannel, type ModelCapability } from "@/stores/use-config-store";
+import { localChannelMatchesCapability, localModelsByCapability, normalizeLocalChannels, useConfigStore, useEffectiveConfig, type AiConfig, type LocalModelChannel, type ModelCapability } from "@/stores/use-config-store";
 import { useUserStore } from "@/stores/use-user-store";
 import { nanoid } from "nanoid";
 
@@ -498,8 +498,8 @@ async function refreshChannelModels(config: AiConfig, channel: LocalModelChannel
 
 function channelIdForLocalModel(channels: LocalModelChannel[], model: string, currentId: string, capability: ModelCapability) {
     if (!channels.length) return "";
-    if (channels.some((channel) => channel.id === currentId && (!model || channel.models.includes(model)) && (!model || modelMatchesCapability(model, capability, channel)))) return currentId;
-    return channels.find((channel) => model && channel.models.includes(model) && modelMatchesCapability(model, capability, channel))?.id || channels[0].id;
+    if (channels.some((channel) => channel.id === currentId && (!model || channel.models.includes(model)) && (!model || localChannelMatchesCapability(channel, model, capability)))) return currentId;
+    return channels.find((channel) => model && channel.models.includes(model) && localChannelMatchesCapability(channel, model, capability))?.id || channels[0].id;
 }
 
 function normalizeImageCount(value: string) {
