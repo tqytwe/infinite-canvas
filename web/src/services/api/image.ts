@@ -1177,9 +1177,9 @@ export async function fetchImageModels(config: AiConfig): Promise<ModelDiscovery
     const channel = localChannelForActiveModel(config);
     if (isMimoChannel(channel || { baseUrl: config.baseUrl })) return legacyModelDiscovery([...mimoModels]);
     try {
-        const response = await axios.get<unknown>(buildApiUrl(config.baseUrl, "/models"), {
+        const response = await axios.get<unknown>(buildApiUrl(channel?.baseUrl || config.baseUrl, "/models"), {
             headers: {
-                Authorization: `Bearer ${config.apiKey}`,
+                Authorization: `Bearer ${channel?.apiKey || config.apiKey}`,
             },
             timeout: IMAGE_REQUEST_TIMEOUT_SECONDS * 1000,
         });

@@ -15,7 +15,7 @@ func TestStorageCookieCanAccessStorageRoutesButNotAIProxy(t *testing.T) {
 	t.Cleanup(func() { config.Cfg = previous })
 
 	engine := New()
-	cookie := &http.Cookie{Name: service.StorageSessionCookieName, Value: service.NewStorageSession("test-api-key")}
+	cookie := &http.Cookie{Name: service.StorageSessionCookieName, Value: service.NewStorageSession("https://api.example.test", "test-api-key")}
 
 	storageRequest := httptest.NewRequest(http.MethodPost, "/api/storage/files", nil)
 	storageRequest.AddCookie(cookie)

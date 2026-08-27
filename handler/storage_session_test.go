@@ -8,8 +8,8 @@ import (
 	"testing"
 )
 
-func TestCreateStorageSessionClearsCookieWithoutEchoingSubmittedKey(t *testing.T) {
-	request := httptest.NewRequest(http.MethodPost, "/api/auth/storage-session", bytes.NewBufferString(`{"baseUrl":"https://example.invalid","apiKey":"test-api-key"}`))
+func TestCreateStorageSessionRejectsInvalidAddressWithoutEchoingSubmittedKey(t *testing.T) {
+	request := httptest.NewRequest(http.MethodPost, "/api/auth/storage-session", bytes.NewBufferString(`{"baseUrl":"http://example.invalid","apiKey":"test-api-key"}`))
 	recorder := httptest.NewRecorder()
 
 	CreateStorageSession(recorder, request)
