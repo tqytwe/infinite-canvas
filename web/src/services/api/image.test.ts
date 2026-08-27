@@ -40,6 +40,26 @@ function managedSenseNovaConfig(): AiConfig {
     };
 }
 
+function managedSenseNovaU15Config(): AiConfig {
+    const config = managedSenseNovaConfig();
+    config.model = "sensenova-u1.5-lite";
+    config.imageModel = "sensenova-u1.5-lite";
+    config.localChannels[0] = {
+        ...config.localChannels[0],
+        models: ["sensenova-u1.5-lite"],
+        modelCapabilities: { "sensenova-u1.5-lite": ["image"] },
+        modelMediaCapabilities: {
+            "sensenova-u1.5-lite": {
+                adapter: "sensenova",
+                capabilityVersion: "v1",
+                modalities: ["image"],
+                image: { operations: ["create", "edit"], supportedSizes: ["1024x1024"], supportedRatios: ["1:1"], supportedFormats: ["png"] },
+            },
+        },
+    };
+    return config;
+}
+
 test("managed image requests normalize stale Responses mode at both execution boundaries", async () => {
     const originalFetch = globalThis.fetch;
     const runtime = globalThis as unknown as { window?: Pick<Window, "setTimeout" | "clearTimeout"> };
@@ -68,12 +88,41 @@ test("managed image requests normalize stale Responses mode at both execution bo
 
         assert.equal(requests[0]?.url, "/api/v1/images/generations");
         assert.equal((requests[0]?.body as { model?: string }).model, "sensenova-u1-fast");
+        assert.equal(Object.hasOwn(requests[0]?.body as object, "watermark"), false);
         assert.equal(requests[1]?.url, "/api/v1/canvas/image-tasks");
         assert.equal((requests[1]?.body as { endpoint?: string }).endpoint, "/images/generations");
         assert.equal(
             requests.some((request) => request.url.includes("/responses") || (request.body as { endpoint?: string })?.endpoint === "/responses"),
             false,
         );
+    } finally {
+        globalThis.fetch = originalFetch;
+        useUserStore.setState(originalState, true);
+        if (originalWindow) runtime.window = originalWindow;
+        else Reflect.deleteProperty(runtime, "window");
+    }
+});
+
+test("SenseNova U1.5 Lite sends the user's explicit watermark choice", async () => {
+    const originalFetch = globalThis.fetch;
+    const runtime = globalThis as unknown as { window?: Pick<Window, "setTimeout" | "clearTimeout"> };
+    const originalWindow = runtime.window;
+    const originalState = useUserStore.getState();
+    const requests: Array<Record<string, unknown>> = [];
+    useUserStore.setState({ token: "managed-session", hydrateUser: async () => undefined });
+    runtime.window = {
+        setTimeout: ((handler: TimerHandler, timeout?: number) => globalThis.setTimeout(handler, timeout) as unknown as number) as Window["setTimeout"],
+        clearTimeout: ((id?: number) => globalThis.clearTimeout(id)) as Window["clearTimeout"],
+    };
+    globalThis.fetch = (async (_input, init) => {
+        requests.push(JSON.parse(String(init?.body)));
+        return new Response(JSON.stringify({ data: [{ b64_json: "aGVsbG8=" }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }) as typeof fetch;
+
+    try {
+        const config = { ...managedSenseNovaU15Config(), imageWatermark: "false" };
+        await requestGeneration(config, "a lighthouse at dusk");
+        assert.equal(requests[0]?.watermark as boolean | undefined, false);
     } finally {
         globalThis.fetch = originalFetch;
         useUserStore.setState(originalState, true);

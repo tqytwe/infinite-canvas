@@ -35,7 +35,7 @@ type WorkflowVariable = {
     placeholder?: string;
 };
 
-export type WorkflowGenerationConfig = Pick<AiConfig, "model" | "imageModel" | "imageChannelId" | "quality" | "size" | "count" | "apiMode" | "timeout" | "streamImages" | "streamPartialImages" | "responseFormatB64Json" | "codexCli"> & {
+export type WorkflowGenerationConfig = Pick<AiConfig, "model" | "imageModel" | "imageChannelId" | "quality" | "size" | "count" | "apiMode" | "timeout" | "streamImages" | "streamPartialImages" | "responseFormatB64Json" | "imageWatermark" | "codexCli"> & {
     systemPrompt: string;
     promptTemplate: string;
     negativePrompt: string;
@@ -1849,6 +1849,7 @@ function createWorkflowConfig(config: AiConfig): WorkflowGenerationConfig {
         streamImages: config.streamImages || "",
         streamPartialImages: config.streamPartialImages || "1",
         responseFormatB64Json: config.responseFormatB64Json || "",
+        imageWatermark: config.imageWatermark || "true",
         codexCli: config.codexCli || "",
         systemPrompt: config.systemPrompts.workflow || config.systemPrompt || "",
         promptTemplate: "",
