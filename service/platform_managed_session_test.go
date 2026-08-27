@@ -181,6 +181,76 @@ func TestPlatformBootstrapRetainsVideoAvailabilityDiagnostics(t *testing.T) {
 	}
 }
 
+func TestPlatformManagedBootstrapKeepsHealthyScopesWhenVideoBootstrapFails(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Header.Get("X-NextChat-API-Key-ID") {
+		case "13":
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"code":1,"msg":"video unavailable"}`))
+		case "11":
+			_, _ = w.Write([]byte(`{"code":0,"data":{"user":{"id":7},"models":{"groups":[{"id":1,"models":[{"id":"chat-model","modalities":["chat"]}]}]}}}`))
+		case "12":
+			_, _ = w.Write([]byte(`{"code":0,"data":{"user":{"id":7},"models":{"groups":[{"id":2,"models":[{"id":"sensenova-u1-fast","modalities":["image"],"adapter":"sensenova","capability_version":"v1","image_capabilities":{"operations":["create"]}}]}]}}}`))
+		default:
+			t.Fatalf("unexpected API key ID %q", r.Header.Get("X-NextChat-API-Key-ID"))
+		}
+	}))
+	defer server.Close()
+	withPlatformSessionTestConfig(t, server.URL)
+
+	payload, err := platformManagedBootstrapForScopes(context.Background(), PlatformManagedSession{
+		ExpiresAt: time.Now().UTC().Add(time.Hour),
+		Sessions: map[string]PlatformManagedSessionKey{
+			"chat":  {UserID: 7, APIKey: "chat-key", APIKeyID: 11, Purpose: "chat"},
+			"image": {UserID: 7, APIKey: "image-key", APIKeyID: 12, Purpose: "image"},
+			"video": {UserID: 7, APIKey: "video-key", APIKeyID: 13, Purpose: "video"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("bootstrap error = %v", err)
+	}
+	workspaces, ok := payload["workspaces"].(map[string]any)
+	if !ok || workspaces["chat"] == nil || workspaces["image"] == nil {
+		t.Fatalf("healthy workspaces missing = %#v", payload["workspaces"])
+	}
+	if _, exists := workspaces["video"]; exists {
+		t.Fatalf("failed video workspace must not be exposed = %#v", workspaces["video"])
+	}
+	compatibility, ok := payload["compatibility"].(map[string]any)
+	if !ok || compatibility["state"] != "partial_managed_capabilities" {
+		t.Fatalf("compatibility = %#v", payload["compatibility"])
+	}
+	purposes, ok := compatibility["unavailable_purposes"].([]string)
+	if !ok || len(purposes) != 1 || purposes[0] != "video" {
+		t.Fatalf("unavailable purposes = %#v", compatibility["unavailable_purposes"])
+	}
+	raw, _ := json.Marshal(payload)
+	if !strings.Contains(string(raw), "sensenova-u1-fast") || strings.Contains(string(raw), "image-key") {
+		t.Fatalf("partial bootstrap payload = %s", raw)
+	}
+}
+
+func TestPlatformManagedBootstrapFailsWhenNoScopeSucceeds(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte(`{"code":1,"msg":"unavailable"}`))
+	}))
+	defer server.Close()
+	withPlatformSessionTestConfig(t, server.URL)
+
+	_, err := platformManagedBootstrapForScopes(context.Background(), PlatformManagedSession{
+		ExpiresAt: time.Now().UTC().Add(time.Hour),
+		Sessions: map[string]PlatformManagedSessionKey{
+			"chat":  {UserID: 7, APIKey: "chat-key", APIKeyID: 11, Purpose: "chat"},
+			"image": {UserID: 7, APIKey: "image-key", APIKeyID: 12, Purpose: "image"},
+			"video": {UserID: 7, APIKey: "video-key", APIKeyID: 13, Purpose: "video"},
+		},
+	})
+	if err == nil || !strings.Contains(err.Error(), "创作能力暂不可用") {
+		t.Fatalf("all-failed bootstrap error = %v", err)
+	}
+}
+
 func TestPlatformGroupSwitchRequiresPinnedReplacementAndPersistsPurposeSession(t *testing.T) {
 	withPlatformSessionTestConfig(t, "https://api.example.test")
 	session := PlatformManagedSession{
