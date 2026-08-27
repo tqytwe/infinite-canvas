@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { channelIdForActiveModel, defaultConfig, localChannelForActiveModel, modelMatchesCapability, normalizeLocalChannels, type AiConfig } from "./use-config-store";
+import { channelIdForActiveModel, defaultConfig, localChannelForActiveModel, localChannelMatchesCapability, localModelsByCapability, modelMatchesCapability, normalizeLocalChannels, type AiConfig, type LocalModelChannel } from "./use-config-store";
 
 test("remote model selection does not reuse a matching local channel", () => {
     const config: AiConfig = {
@@ -92,6 +92,45 @@ test("persisted mixed declarations do not retain legacy classifications", () => 
         "sensenova-u1.5-lite": [],
     });
     assert.equal(modelMatchesCapability("sensenova-u1.5-lite", "image", channel), false);
+});
+
+test("direct image channels retain every model returned by their API key", () => {
+    const channel: LocalModelChannel = {
+        id: "image-group",
+        protocol: "openai",
+        name: "图片生成",
+        baseUrl: "https://api.jisudeng.com",
+        apiKey: "test-key",
+        models: ["sensenova-u1-fast", "provider-image-v-next", "future-image-model"],
+        modelCapabilities: { "sensenova-u1-fast": ["image"], "provider-image-v-next": [], "future-image-model": [] },
+        declaredModelIds: ["sensenova-u1-fast"],
+        modelDiscovery: { state: "declared" },
+    };
+
+    assert.deepEqual(localModelsByCapability([channel], "image"), channel.models);
+    assert.equal(localChannelMatchesCapability(channel, "future-image-model", "image"), true);
+    assert.equal(localChannelMatchesCapability(channel, "future-image-model", "video"), false);
+
+    const config: AiConfig = { ...defaultConfig, channelMode: "local", model: "future-image-model", imageModel: "future-image-model", imageChannelId: "image-group", localChannels: [channel] };
+    assert.equal(channelIdForActiveModel(config, "image"), "image-group");
+    assert.equal(localChannelForActiveModel(config, "image")?.apiKey, "test-key");
+});
+
+test("managed image channels continue to require declared image capability", () => {
+    const channel: LocalModelChannel = {
+        id: "platform-managed:image:23",
+        protocol: "openai",
+        name: "受管图片",
+        baseUrl: "/api",
+        apiKey: "session-token",
+        models: ["declared-image", "undeclared"],
+        modelCapabilities: { "declared-image": ["image"], undeclared: [] },
+        declaredModelIds: ["declared-image", "undeclared"],
+        managedPlatform: true,
+    };
+
+    assert.deepEqual(localModelsByCapability([channel], "image"), ["declared-image"]);
+    assert.equal(localChannelMatchesCapability(channel, "undeclared", "image"), false);
 });
 
 test("normalization keeps user channels and removes only old managed channels", () => {

@@ -38,7 +38,8 @@ export function ModelPicker({ config, value, channelId, capability, onChange, cl
             (channel.models ?? []).map((model) => ({ key: `${channel.id}::${model}`, channelId: channel.id, channelName: channel.name, model, modelCapabilities: channel.modelCapabilities, declaredModelIds: channel.declaredModelIds })),
         );
         if (!capability) return models;
-        return models.filter((item) => modelMatchesCapability(item.model, capability, item));
+        const directImageChannel = capability === "image" && config.channelMode === "local" && !config.localChannels.some((channel) => channel.managedPlatform === true);
+        return directImageChannel ? models : models.filter((item) => modelMatchesCapability(item.model, capability, item));
     }, [capability, config]);
     const currentOption = useMemo(() => {
         if (!value) return undefined;
