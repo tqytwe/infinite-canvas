@@ -418,9 +418,7 @@ function workspaceGroups(workspace: PlatformWorkspace | undefined): PlatformWork
 }
 
 function platformVideoUnavailableMessage(groups: PlatformWorkspaceGroup[]) {
-    const code = groups
-        .map((group) => stringValue(group.video_unavailable_code).toLowerCase())
-        .find(Boolean);
+    const code = groups.map((group) => stringValue(group.video_unavailable_code).toLowerCase()).find(Boolean);
     switch (code) {
         case "not_mapped":
             return "当前视频分组尚未完成模型映射，请稍后重试";

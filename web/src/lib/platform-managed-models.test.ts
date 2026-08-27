@@ -72,7 +72,10 @@ test("managed Canvas remains compatible when older video groups omit availabilit
         },
     };
 
-    assert.deepEqual(platformManagedChannels(bootstrap).map((channel) => channel.id), ["platform-managed:video:23"]);
+    assert.deepEqual(
+        platformManagedChannels(bootstrap).map((channel) => channel.id),
+        ["platform-managed:video:23"],
+    );
     assert.equal(platformManagedCapabilityIssue(bootstrap, "video"), "");
 });
 
