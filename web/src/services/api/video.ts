@@ -271,7 +271,7 @@ async function createGrok2APIVideoRequestBody(config: AiConfig, model: string, p
     return body;
 }
 
-async function createVideoRequestBody(config: AiConfig, model: string, prompt: string, input: Required<VideoReferenceInput>) {
+export async function createVideoRequestBody(config: AiConfig, model: string, prompt: string, input: Required<VideoReferenceInput>) {
     const size = normalizeVideoSize(config.size);
     const managedCapabilities = platformManagedVideoCapabilitiesForConfig(config, model);
     if (!managedCapabilities && isGrok2APIVideoConfig(config, model)) return createGrok2APIVideoRequestBody(config, model, prompt, input);
@@ -281,12 +281,10 @@ async function createVideoRequestBody(config: AiConfig, model: string, prompt: s
         const references = input.references;
         const inputReferences = await Promise.all(references.slice(0, 7).map(imageToAgnesReference));
         const dimensions = size ? parseVideoDimensions(size) : null;
-        const frameRate = agnesFrameRate(config.videoSeconds);
         const body: Record<string, unknown> = {
             model,
             prompt,
-            num_frames: agnesNumFrames(config.videoSeconds, frameRate),
-            frame_rate: frameRate,
+            num_frames: agnesNumFrames(config.videoSeconds),
         };
         if (dimensions) {
             body.width = dimensions.width;
@@ -629,13 +627,8 @@ function publicHttpUrl(value?: string) {
     }
 }
 
-function agnesFrameRate(secondsValue: string) {
-    const seconds = Number(normalizeVideoSeconds(secondsValue));
-    return seconds > 18 ? Math.max(1, Math.floor(440 / seconds)) : 24;
-}
-
-function agnesNumFrames(secondsValue: string, frameRate: number) {
-    const target = Math.round(Number(normalizeVideoSeconds(secondsValue)) * frameRate) + 1;
+function agnesNumFrames(secondsValue: string) {
+    const target = Math.round(Number(normalizeVideoSeconds(secondsValue)) * 24) + 1;
     const capped = Math.min(441, Math.max(9, target));
     return capped - ((capped - 1) % 8);
 }
