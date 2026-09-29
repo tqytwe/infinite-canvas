@@ -2,6 +2,10 @@
 
 ## Unreleased
 
++ [修复] 视频接口返回 HTML 或纯文本时不再触发响应解析 TypeError，并给出非 JSON 响应提示
++ [修复] 直连视频接口明确返回 `model is required` 时，纯文本视频请求自动以 JSON 重试
++ [修复] 视频任务轮询始终携带当前模型，避免兼容接口返回 HTTP 400
+
 ## v0.6.9 - 2026-08-27
 
 + [修复] 为 Agnes Video V2.0、Agnes Video 2.5 与 Flash 使用各自的创建和轮询协议，避免 2.5 系列携带 V2.0 的帧字段。
