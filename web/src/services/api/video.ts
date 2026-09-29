@@ -23,6 +23,8 @@ import { buildApiUrl, channelIdForActiveModel, directAIProviderForConfig, localC
 import { useUserStore } from "@/stores/use-user-store";
 import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
+import { videoResponseFormatError } from "./video-response";
+import { postVideoWithModelFallback, videoPollParams } from "./video-request";
 
 export type VideoResponse = {
     id: string;
@@ -52,7 +54,7 @@ export type VideoResponse = {
     request_body?: string;
 };
 type ApiVideoEnvelope = { code: number; data?: VideoResponse | VideoResponse[] | null; msg?: string; message?: string };
-type ApiVideoResponse = VideoResponse | ApiVideoEnvelope;
+type ApiVideoResponse = VideoResponse | ApiVideoEnvelope | string;
 export type VideoGenerationResult = { id: string; url: string; durationMs: number; width: number; height: number; bytes: number; mimeType: string; task: VideoResponse };
 export type CreatedVideoGenerationTask = { task: VideoResponse; pollId: string; startedAt: number; requestBody: unknown };
 export type VideoProgressHandler = (progress: number, task: VideoResponse) => void;
@@ -146,9 +148,10 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
             ...(accountProxy && createOptions.sourceId ? { "X-Video-Task-Source-ID": createOptions.sourceId } : {}),
         };
         const directProvider = !accountProxy ? directAIProviderForConfig(config, "video") : null;
+        const createUrl = aiApiUrl(config, !accountProxy && (isGrok2APIVideoConfig(config, model) || isCogVideoX3Model(model)) ? "/videos/generations" : "/videos");
         const created = directProvider
             ? await (await import("@/services/api/direct-ai")).createDirectVideoTask(config, directProvider, body)
-            : unwrapVideoResponse((await axios.post<ApiVideoResponse>(aiApiUrl(config, !accountProxy && (isGrok2APIVideoConfig(config, model) || isCogVideoX3Model(model)) ? "/videos/generations" : "/videos"), body, { headers })).data);
+            : unwrapVideoResponse(await postVideoCreateRequest(createUrl, body, headers, !accountProxy));
         if (!created.id && !created.video_id) throw new Error("视频接口没有返回任务 ID");
         if (typeof created.progress === "number") onProgress?.(created.progress, created);
         return { task: created, pollId: videoPollId(model, created), startedAt, requestBody: body };
@@ -157,6 +160,10 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
         void writeVideoAICallLog(config, model, "/videos", "POST", startedAt, axios.isAxiosError(error) ? error.response?.status || 0 : 0, stringifyLogPayload(summarizeVideoRequestBody(body)), stringifyLogPayload(detail), message);
         throw new VideoRequestError(message, detail);
     }
+}
+
+async function postVideoCreateRequest(url: string, body: FormData | Record<string, unknown>, headers: Record<string, string>, allowJsonFallback: boolean): Promise<ApiVideoResponse> {
+    return postVideoWithModelFallback(body, allowJsonFallback, async (requestBody) => (await axios.post<ApiVideoResponse>(url, requestBody, { headers })).data);
 }
 
 function normalizeVideoTaskCreateOptions(options?: string | VideoTaskCreateOptions): VideoTaskCreateOptions {
@@ -176,7 +183,7 @@ export async function pollCreatedVideoGenerationTask(
     const pollOnce =
         directProvider && directPoll
             ? () => directPoll(config, directProvider, pollId)
-            : async () => unwrapVideoResponse((await axios.get<ApiVideoResponse>(aiVideoPollUrl(config, model, pollId), { headers: aiHeaders(config), params: usesAccountProxy(config) ? { model } : undefined })).data);
+            : async () => unwrapVideoResponse((await axios.get<ApiVideoResponse>(aiVideoPollUrl(config, model, pollId), { headers: aiHeaders(config), params: videoPollParams(model) })).data);
     let completed: VideoResponse | null = null;
     let completedWithoutURLAt = 0;
     try {
@@ -230,7 +237,7 @@ export async function pollVideoGenerationTaskStatus(config: AiConfig, task: Vide
     const directProvider = !usesAccountProxy(config) ? directAIProviderForConfig(config, "video") : null;
     const result = directProvider
         ? await (await import("@/services/api/direct-ai")).pollDirectVideoTask(config, directProvider, pollId)
-        : unwrapVideoResponse((await axios.get<ApiVideoResponse>(aiVideoPollUrl(config, model, pollId), { headers: aiHeaders(config), params: usesAccountProxy(config) ? { model } : undefined })).data);
+        : unwrapVideoResponse((await axios.get<ApiVideoResponse>(aiVideoPollUrl(config, model, pollId), { headers: aiHeaders(config), params: videoPollParams(model) })).data);
     return cacheProtectedGrokVideo(config, model, result);
 }
 
@@ -750,6 +757,7 @@ function normalizeVideoResolution(value: string) {
 
 function unwrapVideoResponse(payload: ApiVideoResponse): VideoResponse {
     if (!payload) throw new Error("接口没有返回视频任务");
+    if (typeof payload === "string") throw new VideoRequestError(videoResponseFormatError(payload), payload);
     if (isVideoEnvelope(payload)) {
         if (payload.code !== 0) throw new VideoRequestError(payload.msg || payload.message || "请求失败", payload);
         if (!payload.data || Array.isArray(payload.data)) throw new Error("接口没有返回视频任务");
