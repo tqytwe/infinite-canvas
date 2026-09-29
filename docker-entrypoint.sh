@@ -1,13 +1,13 @@
 #!/bin/sh
 set -eu
 
-# Zeabur's existing Canvas service exposes port 8080. Keep the Go API private
+# Zeabur's existing Canvas domain is bound to port 3000. Keep the Go API private
 # and serve the Next.js application on the public port.
 PORT=8081 /app/server &
 API_PID=$!
 
 cd /app/web
-API_BASE_URL=http://127.0.0.1:8081 PORT=8080 node server.js &
+API_BASE_URL=http://127.0.0.1:8081 PORT=3000 node server.js &
 WEB_PID=$!
 
 shutdown() {
