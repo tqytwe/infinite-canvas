@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -23,7 +24,7 @@ var adminModelHTTPClient = &http.Client{Timeout: 30 * time.Second}
 func PublicSettings() (model.PublicSetting, error) {
 	settings, err := repository.GetSettings()
 	settings = normalizeSettings(settings)
-	settings.Public.ModelChannel.Channels = publicChannelInfos(settings.Private.Channels)
+	settings.Public.ModelChannel.Channels = publicChannelInfos(settings.Private.Channels, settings.Public.ModelChannel.AvailableModels, settings.Public.ModelChannel.AvailableWorkflows)
 	if len(settings.Public.ModelChannel.AvailableModels) == 0 {
 		settings.Public.ModelChannel.AvailableModels = enabledChannelModels(settings.Private.Channels)
 	}
@@ -145,6 +146,9 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 	if setting.ModelChannel.AvailableModels == nil {
 		setting.ModelChannel.AvailableModels = []string{}
 	}
+	if setting.ModelChannel.AvailableWorkflows == nil {
+		setting.ModelChannel.AvailableWorkflows = []string{}
+	}
 	if setting.ModelChannel.ModelCosts == nil {
 		setting.ModelChannel.ModelCosts = []model.ModelCost{}
 	}
@@ -186,10 +190,26 @@ func normalizePublicSettingWithChannels(setting model.PublicSetting, channels []
 		setting.Auth.AllowRegister = &enabled
 	}
 	setting.ModelChannel.AvailableModels = filterEnabledModels(setting.ModelChannel.AvailableModels, enabledChannelModels(channels))
-	setting.ModelChannel.DefaultTextModel = repairDefaultModel(setting.ModelChannel.DefaultTextModel, setting.ModelChannel.AvailableModels, isTextModelName)
-	setting.ModelChannel.DefaultImageModel = repairDefaultModel(setting.ModelChannel.DefaultImageModel, setting.ModelChannel.AvailableModels, isImageModelName)
-	setting.ModelChannel.DefaultVideoModel = repairDefaultModel(setting.ModelChannel.DefaultVideoModel, setting.ModelChannel.AvailableModels, isVideoModelName)
-	setting.ModelChannel.DefaultModel = repairDefaultModel(setting.ModelChannel.DefaultModel, setting.ModelChannel.AvailableModels, isTextModelName)
+	workflows := []string{}
+	for _, channel := range channels {
+		if !isWorkflowChannelProtocol(channel.Protocol) {
+			continue
+		}
+		for _, entry := range channel.Workflows {
+			if entry.Enabled && entry.Provider == channel.Protocol {
+				workflows = append(workflows, workflowBillingName(WorkflowRef{Scope: "system", ChannelID: channel.ID, Kind: entry.Kind, WorkflowID: entry.WorkflowID}))
+			}
+		}
+	}
+	setting.ModelChannel.AvailableWorkflows = filterEnabledModels(setting.ModelChannel.AvailableWorkflows, workflows)
+	availableModels := setting.ModelChannel.AvailableModels
+	if len(availableModels) == 0 {
+		availableModels = enabledChannelModels(channels)
+	}
+	setting.ModelChannel.DefaultTextModel = repairChannelDefaultModel(setting.ModelChannel.DefaultTextModel, availableModels, channels, "text", isTextModelName)
+	setting.ModelChannel.DefaultImageModel = repairChannelDefaultModel(setting.ModelChannel.DefaultImageModel, availableModels, channels, "image", isImageModelName)
+	setting.ModelChannel.DefaultVideoModel = repairChannelDefaultModel(setting.ModelChannel.DefaultVideoModel, availableModels, channels, "video", isVideoModelName)
+	setting.ModelChannel.DefaultModel = repairChannelDefaultModel(setting.ModelChannel.DefaultModel, availableModels, channels, "text", isTextModelName)
 	return setting
 }
 
@@ -237,6 +257,7 @@ func normalizePrivateSetting(setting model.PrivateSetting) model.PrivateSetting 
 func hidePrivateAPIKeys(settings model.Settings) model.Settings {
 	for i := range settings.Private.Channels {
 		settings.Private.Channels[i].APIKey = ""
+		settings.Private.Channels[i].UploadAPIKey = ""
 	}
 	for i := range settings.Private.Storage.Providers {
 		settings.Private.Storage.Providers[i].SecretAccessKey = ""
@@ -248,11 +269,26 @@ func hidePrivateAPIKeys(settings model.Settings) model.Settings {
 
 func keepPrivateAPIKeys(settings *model.Settings, saved model.Settings) {
 	for i := range settings.Private.Channels {
-		if strings.TrimSpace(settings.Private.Channels[i].APIKey) != "" {
+		if !isWorkflowChannelProtocol(settings.Private.Channels[i].Protocol) {
+			if strings.TrimSpace(settings.Private.Channels[i].APIKey) != "" {
+				continue
+			}
+			if channel, ok := findSavedChannel(settings.Private.Channels[i], saved.Private.Channels, i); ok {
+				settings.Private.Channels[i].APIKey = channel.APIKey
+			}
 			continue
 		}
-		if channel, ok := findSavedChannel(settings.Private.Channels[i], saved.Private.Channels, i); ok {
-			settings.Private.Channels[i].APIKey = channel.APIKey
+		for _, channel := range saved.Private.Channels {
+			if channel.ID != settings.Private.Channels[i].ID || channel.Protocol != settings.Private.Channels[i].Protocol {
+				continue
+			}
+			if strings.TrimSpace(settings.Private.Channels[i].APIKey) == "" {
+				settings.Private.Channels[i].APIKey = channel.APIKey
+			}
+			if strings.TrimSpace(settings.Private.Channels[i].UploadAPIKey) == "" {
+				settings.Private.Channels[i].UploadAPIKey = channel.UploadAPIKey
+			}
+			break
 		}
 	}
 }
@@ -276,15 +312,22 @@ func findSavedChannel(channel model.ModelChannel, saved []model.ModelChannel, in
 }
 
 func SelectModelChannel(modelName string) (model.ModelChannel, error) {
-	return SelectModelChannelForModel(modelName, "")
+	return SelectModelChannelForModel(modelName, "", true)
 }
 
-func SelectModelChannelForModel(modelName string, channelID string) (model.ModelChannel, error) {
+func SelectModelChannelForModel(modelName string, channelID string, publicOnly bool) (model.ModelChannel, error) {
 	settings, err := repository.GetSettings()
 	if err != nil {
 		return model.ModelChannel{}, err
 	}
-	channels := modelChannelsForModel(normalizePrivateSetting(settings.Private).Channels, modelName)
+	privateChannels := normalizePrivateSetting(settings.Private).Channels
+	if publicOnly && len(settings.Public.ModelChannel.AvailableModels) > 0 {
+		selected := filterEnabledModels(settings.Public.ModelChannel.AvailableModels, enabledChannelModels(privateChannels))
+		if len(selected) > 0 && !slices.Contains(selected, modelName) {
+			return model.ModelChannel{}, safeMessageError{message: "模型未开放"}
+		}
+	}
+	channels := modelChannelsForModel(privateChannels, modelName)
 	if len(channels) == 0 {
 		return model.ModelChannel{}, errors.New("没有可用模型渠道")
 	}
@@ -364,7 +407,7 @@ func isArkAgentPlanChannel(channel model.ModelChannel) bool {
 func enabledChannelModels(channels []model.ModelChannel) []string {
 	models := []string{}
 	for _, channel := range channels {
-		if !channel.Enabled {
+		if !channel.Enabled || isWorkflowChannelProtocol(channel.Protocol) {
 			continue
 		}
 		models = append(models, channel.Models...)
@@ -398,6 +441,22 @@ func uniqueModelNames(models []string) []string {
 		result = append(result, name)
 	}
 	return result
+}
+
+func repairChannelDefaultModel(current string, models []string, channels []model.ModelChannel, capability string, preferred func(string) bool) string {
+	current = strings.TrimSpace(current)
+	if slices.Contains(models, current) {
+		for _, channel := range channels {
+			if !channel.Enabled || isWorkflowChannelProtocol(channel.Protocol) || !slices.Contains(channel.Models, current) {
+				continue
+			}
+			// Keep a configured automatic default; only an explicit conflicting category replaces it.
+			if explicit := channel.ModelCapabilities[current]; !validModelCapability(explicit) || explicit == capability {
+				return current
+			}
+		}
+	}
+	return repairDefaultModel(current, channelModelsByCapability(channels, models, capability), preferred)
 }
 
 func repairDefaultModel(current string, models []string, preferred func(string) bool) string {
@@ -434,6 +493,53 @@ func isImageModelName(modelName string) bool {
 	return strings.Contains(name, "seedream") || strings.Contains(name, "gpt-image") || strings.Contains(name, "image")
 }
 
+func ModelChannelMatchesCapability(channel model.ModelChannel, modelName, capability string) bool {
+	if explicit := channel.ModelCapabilities[modelName]; validModelCapability(explicit) {
+		return explicit == capability
+	}
+	switch capability {
+	case "image":
+		return isImageModelName(modelName)
+	case "video":
+		return isVideoModelName(modelName)
+	case "text":
+		return isTextModelName(modelName)
+	case "audio":
+		name := strings.ToLower(modelName)
+		return AutoDLModelKind(modelName) == "audio" || strings.Contains(name, "tts") || strings.Contains(name, "audio") || strings.Contains(name, "speech")
+	}
+	return false
+}
+
+func validModelCapability(capability string) bool {
+	return capability == "image" || capability == "video" || capability == "text" || capability == "audio"
+}
+
+func modelCapabilitiesForModels(capabilities map[string]string, models []string) map[string]string {
+	result := map[string]string{}
+	for _, name := range models {
+		if capability := capabilities[name]; validModelCapability(capability) {
+			result[name] = capability
+		}
+	}
+	return result
+}
+
+func channelModelsByCapability(channels []model.ModelChannel, allowedModels []string, capability string) []string {
+	result := []string{}
+	for _, channel := range channels {
+		if !channel.Enabled || isWorkflowChannelProtocol(channel.Protocol) {
+			continue
+		}
+		for _, name := range filterEnabledModels(channel.Models, allowedModels) {
+			if ModelChannelMatchesCapability(channel, name, capability) {
+				result = append(result, name)
+			}
+		}
+	}
+	return uniqueModelNames(result)
+}
+
 func isTextModelName(modelName string) bool {
 	return AutoDLModelKind(modelName) != "audio" && !isImageModelName(modelName) && !isVideoModelName(modelName)
 }
@@ -455,6 +561,10 @@ func normalizeModelChannel(channel model.ModelChannel) model.ModelChannel {
 		channel.Timeout = 600
 	}
 	return channel
+}
+
+func isWorkflowChannelProtocol(protocol string) bool {
+	return protocol == "runninghub" || protocol == "comfyui"
 }
 
 func resolveAdminChannel(index *int, channel model.ModelChannel) (model.ModelChannel, error) {
@@ -1046,6 +1156,9 @@ func providerSecureHash(parts []string) string {
 func modelChannelsForModel(channels []model.ModelChannel, modelName string) []model.ModelChannel {
 	result := []model.ModelChannel{}
 	for _, channel := range channels {
+		if isWorkflowChannelProtocol(channel.Protocol) {
+			continue
+		}
 		if !channel.Enabled || channel.BaseURL == "" || channel.APIKey == "" {
 			continue
 		}
@@ -1059,22 +1172,53 @@ func modelChannelsForModel(channels []model.ModelChannel, modelName string) []mo
 	return result
 }
 
-func publicChannelInfos(channels []model.ModelChannel) []model.PublicModelChannelInfo {
+func publicChannelInfos(channels []model.ModelChannel, availableModels, availableWorkflows []string) []model.PublicModelChannelInfo {
 	result := []model.PublicModelChannelInfo{}
+	allowed := map[string]bool{}
+	for _, name := range availableWorkflows {
+		allowed[name] = true
+	}
 	for _, channel := range channels {
+		if isWorkflowChannelProtocol(channel.Protocol) {
+			workflows := []model.WorkflowSummary{}
+			for _, entry := range channel.Workflows {
+				if !entry.Enabled || entry.Provider != channel.Protocol || (len(availableWorkflows) > 0 && !allowed[workflowBillingName(WorkflowRef{Scope: "system", ChannelID: channel.ID, Kind: entry.Kind, WorkflowID: entry.WorkflowID})]) {
+					continue
+				}
+				workflows = append(workflows, model.WorkflowSummary{
+					Provider: entry.Provider, Kind: entry.Kind, WorkflowID: entry.WorkflowID,
+					Title: entry.Title, Capability: entry.Capability, Enabled: true,
+				})
+			}
+			if len(workflows) > 0 {
+				result = append(result, model.PublicModelChannelInfo{
+					ID: channel.ID, Protocol: channel.Protocol, Name: channel.Name,
+					Models: []string{}, Workflows: workflows,
+				})
+			}
+			continue
+		}
 		if !channel.Enabled || channel.BaseURL == "" || len(channel.Models) == 0 {
 			continue
 		}
+		models := append([]string{}, channel.Models...)
+		if len(availableModels) > 0 {
+			models = filterEnabledModels(models, availableModels)
+			if len(models) == 0 {
+				continue
+			}
+		}
 		result = append(result, model.PublicModelChannelInfo{
-			ID:       channel.ID,
-			Protocol: channel.Protocol,
-			Name:     channel.Name,
-			BaseURL:  channel.BaseURL,
-			Models:   append([]string{}, channel.Models...),
-			Weight:   channel.Weight,
-			Timeout:  channel.Timeout,
-			Enabled:  channel.Enabled,
-			Remark:   channel.Remark,
+			ID:                channel.ID,
+			Protocol:          channel.Protocol,
+			Name:              channel.Name,
+			BaseURL:           channel.BaseURL,
+			Models:            models,
+			ModelCapabilities: modelCapabilitiesForModels(channel.ModelCapabilities, models),
+			Weight:            channel.Weight,
+			Timeout:           channel.Timeout,
+			Enabled:           channel.Enabled,
+			Remark:            channel.Remark,
 		})
 	}
 	return result

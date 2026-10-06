@@ -66,7 +66,7 @@ func proxyAIVideoTaskRequest(w http.ResponseWriter, r *http.Request) {
 		Fail(w, "未登录或权限不足")
 		return
 	}
-	channel, userChannelID, err := selectAIRequestChannel(user, modelName, r.Header.Get("X-Model-Channel-ID"), r.Header.Get(userModelChannelHeader))
+	channel, userChannelID, err := selectAIRequestChannel(user, modelName, r.Header.Get("X-Model-Channel-ID"), r.Header.Get(userModelChannelHeader), true)
 	if err != nil {
 		log.Printf("AI video select channel failed: model=%s err=%v", modelName, err)
 		failAIChannelSelect(w, err, "AI 接口请求失败")
@@ -147,7 +147,7 @@ func proxyAIVideoTaskRequest(w http.ResponseWriter, r *http.Request) {
 		Fail(w, message)
 		return
 	}
-	parsed := parseVideoTaskPayload(transformed, modelName)
+	parsed := parseVideoTaskPayload(transformed, modelName, channel.Protocol)
 	if parsed.UpstreamTaskID == "" && parsed.UpstreamVideoID == "" {
 		if credits > 0 {
 			refundVideoCredits(user.ID, modelName, credits, upstreamPath)
@@ -165,7 +165,7 @@ func proxyAIVideoTaskRequest(w http.ResponseWriter, r *http.Request) {
 		ChannelName:     channel.Name,
 		Source:          readVideoTaskSource(r),
 		SourceID:        readVideoTaskSourceID(r),
-		ClientTaskID:     readClientVideoTaskID(r),
+		ClientTaskID:    readClientVideoTaskID(r),
 		UpstreamTaskID:  parsed.UpstreamTaskID,
 		UpstreamVideoID: parsed.UpstreamVideoID,
 		Status:          parsed.Status,
@@ -239,7 +239,7 @@ func serveGeminiVideoTaskContent(w http.ResponseWriter, r *http.Request, id stri
 	if strings.TrimSpace(task.UserChannelID) != "" {
 		channel, err = service.SelectUserLocalModelChannelForModel(task.UserID, task.Model, task.UserChannelID)
 	} else {
-		channel, err = service.SelectModelChannelForModel(task.Model, task.ChannelID)
+		channel, err = service.SelectModelChannelForModel(task.Model, task.ChannelID, false)
 	}
 	if err != nil || !service.IsGeminiChannel(channel) {
 		return false
@@ -278,7 +278,7 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 	if strings.TrimSpace(task.UserChannelID) != "" {
 		channel, err = service.SelectUserLocalModelChannelForModel(task.UserID, task.Model, task.UserChannelID)
 	} else {
-		channel, err = service.SelectModelChannelForModel(task.Model, task.ChannelID)
+		channel, err = service.SelectModelChannelForModel(task.Model, task.ChannelID, false)
 	}
 	if err != nil {
 		return service.VideoTaskPollUpdate{}, err
@@ -298,6 +298,9 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 	}
 	service.SetModelChannelAuthHeader(request, channel)
 	startedAt := time.Now()
+	if createdAt, err := time.Parse(time.RFC3339Nano, task.CreatedAt); err == nil {
+		startedAt = createdAt
+	}
 	logContext := aiLogContext{
 		StartedAt:       startedAt,
 		Endpoint:        endpoint,
@@ -310,19 +313,18 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 	}
 	payload, status, err := doAIRequest(request, channel)
 	if err != nil {
-		saveAIProxyLog(logContext, 0, "", err.Error())
 		return service.VideoTaskPollUpdate{}, err
 	}
 	if status >= http.StatusBadRequest {
 		message := readUpstreamAIErrorMessage(payload, status)
-		saveAIProxyLog(logContext, status, string(payload), strings.TrimSpace(string(payload)))
 		if status == http.StatusTooManyRequests {
 			return service.VideoTaskPollUpdate{Status: task.Status, ErrorDetail: message, ResponseBody: string(payload)}, nil
 		}
+		saveAIProxyLog(logContext, status, string(payload), strings.TrimSpace(string(payload)))
 		return service.VideoTaskPollUpdate{Status: "failed", Error: message, ErrorDetail: message, ResponseBody: string(payload)}, nil
 	}
 	transformed := transformVideoStatusPayload(payload, request, channel, task.Model)
-	parsed := parseVideoTaskPayload(transformed, task.Model)
+	parsed := parseVideoTaskPayload(transformed, task.Model, channel.Protocol)
 	if service.IsArkChannel(channel) && parsed.Status == "expired" {
 		parsed.Status = "failed"
 	}
@@ -338,7 +340,9 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 	if parsed.ErrorDetail == "" && len(payload) > 0 && parsed.Error != "" {
 		parsed.ErrorDetail = string(payload)
 	}
-	saveAIProxyLog(logContext, status, string(transformed), firstNonEmpty(parsed.Error, ""))
+	if service.IsCompletedVideoTaskStatus(parsed.Status) || service.IsFailedVideoTaskStatus(parsed.Status) {
+		saveAIProxyLog(logContext, status, string(transformed), firstNonEmpty(parsed.Error, ""))
+	}
 	return service.VideoTaskPollUpdate{
 		Status:       parsed.Status,
 		Progress:     parsed.Progress,
@@ -428,12 +432,15 @@ type parsedVideoTaskPayload struct {
 	ErrorDetail     string
 }
 
-func parseVideoTaskPayload(payload []byte, modelName string) parsedVideoTaskPayload {
+func parseVideoTaskPayload(payload []byte, modelName string, protocol ...string) parsedVideoTaskPayload {
 	var root any
 	if len(payload) == 0 || json.Unmarshal(payload, &root) != nil {
 		return parsedVideoTaskPayload{Status: "processing"}
 	}
 	data := normalizeVideoPayloadMap(root)
+	if len(protocol) > 0 && strings.EqualFold(strings.TrimSpace(protocol[0]), service.ModelChannelProtocolStarframe) {
+		return parseStarframeVideoTaskPayload(data, payload)
+	}
 	result := parsedVideoTaskPayload{
 		UpstreamTaskID:  firstNonEmpty(readStringPath(data, "task_id"), readStringPath(data, "taskId"), readStringPath(data, "id"), readStringPath(data, "request_id")),
 		UpstreamVideoID: firstNonEmpty(readStringPath(data, "video_id"), readStringPath(data, "videoId")),
@@ -472,6 +479,9 @@ func normalizeVideoPayloadMap(value any) map[string]any {
 	case map[string]any:
 		if data, ok := typed["data"].(map[string]any); ok {
 			for key, item := range typed {
+				if key == "data" {
+					continue
+				}
 				if _, exists := data[key]; !exists {
 					data[key] = item
 				}
@@ -481,6 +491,9 @@ func normalizeVideoPayloadMap(value any) map[string]any {
 		if data, ok := typed["data"].([]any); ok && len(data) > 0 {
 			if item, ok := data[0].(map[string]any); ok {
 				for key, value := range typed {
+					if key == "data" {
+						continue
+					}
 					if _, exists := item[key]; !exists {
 						item[key] = value
 					}

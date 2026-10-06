@@ -1,18 +1,19 @@
 "use client";
 
 import { ReloadOutlined } from "@ant-design/icons";
-import { App, Button, Checkbox, Flex, Input, Modal, Space, Tabs, Typography } from "antd";
+import { App, Button, Checkbox, Flex, Input, Modal, Select, Space, Tabs, Typography } from "antd";
 import { useMemo, useState } from "react";
 import { useAutoDLWorkflowNames } from "@/hooks/use-autodl-workflow";
+import { assignModelCapabilities, type ModelCapability } from "@/stores/use-config-store";
 
 type ModelSelectTabKey = "new" | "current";
 
 type ChannelModelSelectorModalProps = {
-    channel?: { protocol?: string; baseUrl?: string };
+    channel?: { protocol?: string; baseUrl?: string; modelCapabilities?: Record<string, ModelCapability> };
     models: string[];
     sourceModels?: string[];
     onCancel: () => void;
-    onConfirm: (models: string[]) => void;
+    onConfirm: (models: string[], modelCapabilities: Record<string, ModelCapability>) => void;
     onFetchModels: () => Promise<string[] | undefined>;
     onModelsFetched?: (models: string[]) => void;
 };
@@ -27,6 +28,8 @@ export function ChannelModelSelectorModal({ channel, models, sourceModels = [], 
     const [newModel, setNewModel] = useState("");
     const [activeTab, setActiveTab] = useState<ModelSelectTabKey>("current");
     const [fetching, setFetching] = useState(false);
+    const [classification, setClassification] = useState<ModelCapability | "auto">("auto");
+    const [modelCapabilities, setModelCapabilities] = useState(() => channel?.modelCapabilities || {});
     const groups = useMemo(() => buildModelGroups(source, existing), [source, existing]);
     const activeModels = useMemo(() => {
         const normalizedKeyword = keyword.trim().toLowerCase();
@@ -48,6 +51,7 @@ export function ChannelModelSelectorModal({ channel, models, sourceModels = [], 
             setExisting(current);
             setSource(uniqueModels(fetchedModels));
             setSelected(uniqueModels([...fetchedModels, ...current]));
+            if (classification !== "auto") setModelCapabilities((current) => assignModelCapabilities(current, fetchedModels, classification));
             setKeyword("");
             setNewModel("");
             setActiveTab("new");
@@ -65,6 +69,7 @@ export function ChannelModelSelectorModal({ channel, models, sourceModels = [], 
         setExisting((current) => uniqueModels([...current, model]));
         setSelected((current) => uniqueModels([...current, model]));
         setNewModel("");
+        if (classification !== "auto") setModelCapabilities((current) => assignModelCapabilities(current, [model], classification));
         setActiveTab("current");
     };
 
@@ -72,7 +77,9 @@ export function ChannelModelSelectorModal({ channel, models, sourceModels = [], 
         setSelected((current) => (checked ? uniqueModels([...current, model]) : current.filter((item) => item !== model)));
     };
 
-    const selectActiveModels = () => setSelected((current) => uniqueModels([...current, ...activeModels]));
+    const selectActiveModels = () => {
+        setSelected((current) => uniqueModels([...current, ...activeModels]));
+    };
     const clearActiveModels = () => {
         const active = new Set(activeModels);
         setSelected((current) => current.filter((model) => !active.has(model)));
@@ -92,9 +99,16 @@ export function ChannelModelSelectorModal({ channel, models, sourceModels = [], 
             width={960}
             onCancel={onCancel}
             footer={
-                <Space>
+                <Space wrap>
+                    <Select<ModelCapability | "auto"> aria-label="已选模型分类" value={classification} disabled={fetching} style={{ width: 148 }}
+                        options={[{ value: "auto", label: "自动识别" }, { value: "text", label: "文本" }, { value: "image", label: "图片" }, { value: "video", label: "视频" }, { value: "audio", label: "音频" }]}
+                        onChange={setClassification}
+                        onSelect={(value) => {
+                            setModelCapabilities((current) => assignModelCapabilities(current, selected, value));
+                        }}
+                    />
                     <Button onClick={onCancel}>取消</Button>
-                    <Button type="primary" onClick={() => onConfirm(uniqueModels(selected))}>
+                    <Button type="primary" onClick={() => onConfirm(uniqueModels(selected), modelCapabilities)}>
                         确定
                     </Button>
                 </Space>

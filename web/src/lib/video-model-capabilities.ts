@@ -18,6 +18,7 @@ export function normalizeCogVideoX3Duration(value: string) {
 }
 
 export function supportsVideoFrameReferences(modelName: string, protocol = "") {
+    if (protocol === "starframe") return true;
     if (protocol === "autodl") return modelName === "minimax_h3_b99_002" || modelName === "minimax_h3_lightx2v";
     const model = modelKey(modelName);
     if (protocol === "88api") {

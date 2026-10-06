@@ -1,4 +1,5 @@
 import type { ModelChannelProtocol } from "@/lib/model-channel";
+import type { WorkflowEntry, WorkflowSummary } from "@/lib/workflow-channel";
 import { apiDelete, apiGet, apiPost, compactApiParams } from "@/services/api/request";
 import type { Prompt, PromptListResponse } from "@/services/api/prompts";
 import type { AgentSkill, AgentSkillFile } from "@/services/api/agent-skills";
@@ -186,14 +187,21 @@ export type AdminModelChannel = {
     baseUrl: string;
     apiKey: string;
     models: string[];
+    modelCapabilities?: Record<string, "image" | "video" | "text" | "audio">;
     weight: number;
     timeout: number;
     enabled: boolean;
     remark: string;
+    uploadApiKey?: string;
+    bridgeId?: string;
+    comfyUrl?: string;
+    workflowDir?: string;
+    workflows?: WorkflowEntry[];
 };
 
 export type AdminPublicModelChannelSettings = {
     availableModels: string[];
+    availableWorkflows: string[];
     modelCosts: AdminModelCost[];
     channels: AdminPublicModelChannelInfo[];
     defaultModel: string;
@@ -223,10 +231,12 @@ export type AdminPublicModelChannelInfo = {
     name: string;
     baseUrl: string;
     models: string[];
+    modelCapabilities?: AdminModelChannel["modelCapabilities"];
     weight: number;
     timeout: number;
     enabled: boolean;
     remark: string;
+    workflows?: WorkflowSummary[];
 };
 
 export type AdminPublicSettings = {
