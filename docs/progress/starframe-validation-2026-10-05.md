@@ -10,7 +10,9 @@ Date: 2026-10-05. This is a development record, not a production acceptance repo
 ## Source and scope
 
 - Fork baseline: `a6e16115ab20b8626c5000ff7a0ebb44e10ab828`.
-- Official release merged without committing: `v0.8.0`, ancestor `dd5519fa2aeb3d5022db38f53e94fc78bdf20ee5`.
+- Official release: `v0.8.0`, published tag commit `edd4452cb9b0d93dbb9c1ea5acdea1ee14015800` ([tag reference](https://api.github.com/repos/tigerowo/infinite-canvas/git/ref/tags/v0.8.0)).
+- Reviewed Canvas code merge commit: `fad7f12cfb086c1c3d02953c891d52b7ccbe2f0d`, with the fork baseline and official release commit as its two parents.
+- User-reported production branch: `upgrade/official-v071-20260920`; the actual production deployment commit remains unverified.
 - Worktree branch: `feat/starframe-video-v080`.
 - Explicit model classification, StarFrame JSON create/query/authenticated content handling, and existing fork fallback behavior are covered by server tests.
 - All 18 supplied full model IDs and a custom alias are preserved in protocol tests. This does not establish supplier availability or model-specific parameter support.
@@ -29,7 +31,7 @@ Date: 2026-10-05. This is a development record, not a production acceptance repo
 
 ## Not accepted yet
 
-- No release commit, push, PR CI, production deployment SHA or rollback/backup evidence is recorded here.
+- The local code commit above is not a production release. No push, PR CI, production deployment SHA or rollback/backup evidence is recorded here.
 - Main-gateway review fixes and complete gates require their own final evidence.
 - No paid supplier generation request or production configuration/database/account mutation was performed.
 - User-local production browser acceptance remains pending for guest, user and administrator, including both settings selectors, mixed classifications, same-value automatic reset, delayed discovery, themes, narrow viewports, playback and download.
