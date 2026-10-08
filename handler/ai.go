@@ -66,6 +66,10 @@ func AIVideo(w http.ResponseWriter, r *http.Request, id string) {
 	if serveAIVideoTask(w, r, id) {
 		return
 	}
+	if strings.HasPrefix(id, "sfv_") {
+		Fail(w, "视频任务不存在")
+		return
+	}
 	if isClientVideoTaskID(id) {
 		OK(w, map[string]any{"id": id, "task_id": id, "object": "video", "status": "queued", "progress": 0})
 		return
@@ -74,6 +78,9 @@ func AIVideo(w http.ResponseWriter, r *http.Request, id string) {
 }
 
 func AIVideoContent(w http.ResponseWriter, r *http.Request, id string) {
+	if serveStarframeVideoContent(w, r, id) {
+		return
+	}
 	for _, adapter := range builtinAIProtocols {
 		if adapter.videoContent != nil && adapter.videoContent(w, r, id) {
 			return

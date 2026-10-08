@@ -24,7 +24,7 @@ import { deleteStoredMedia, downloadRemoteMedia, resolveMediaUrl, uploadMediaFil
 import { deleteStoredImages, resolveImageUrl, uploadImage } from "@/services/image-storage";
 import { deleteVideoGenerationLogs, fetchVideoGenerationLogs, saveVideoGenerationLogs } from "@/services/api/generation-logs";
 import { createVideoGenerationTask, deleteVideoGenerationTask, listVideoGenerationTasks, pollVideoGenerationTaskStatus, VIDEO_POLL_INTERVAL_MS, VideoRequestError, VideoContentRetryError, type VideoResponse } from "@/services/api/video";
-import { starframeRetryClientTaskId } from "@/services/api/starframe-video";
+import { starframeRecoveryTaskId } from "@/services/api/starframe-video";
 import { comfyOutputStorageKey, getWorkflowTask, isRetryableWorkflowError, submitWorkflowTask, workflowMediaSource } from "@/services/api/workflow-generation";
 import { useAssetStore } from "@/stores/use-asset-store";
 import { channelProtocolForConfig, normalizeLocalChannels, useConfigStore, useEffectiveConfig, type AiConfig, type VideoElementItem, type VideoElementReference } from "@/stores/use-config-store";
@@ -748,7 +748,7 @@ export default function VideoPage() {
 
     const submitRetrySnapshot = (snapshot: NonNullable<ReturnType<typeof buildRequestSnapshot>>, task?: VideoResponse) => {
         try {
-            const clientTaskId = channelProtocolForConfig({ ...snapshot.config, model: snapshot.model }) === "starframe" ? starframeRetryClientTaskId(task) : undefined;
+            const clientTaskId = channelProtocolForConfig({ ...snapshot.config, model: snapshot.model }) === "starframe" ? starframeRecoveryTaskId(task) : undefined;
             void submitGenerationSnapshot({ ...snapshot, ...(clientTaskId ? { clientTaskId } : {}) });
             return true;
         } catch (error) {

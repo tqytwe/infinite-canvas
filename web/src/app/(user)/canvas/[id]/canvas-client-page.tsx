@@ -3766,7 +3766,7 @@ function InfiniteCanvasPage({ projectId }: { projectId: string }) {
                         size: isPanorama ? PANORAMA_IMAGE_SIZE : savedImageMetadata.size || effectiveConfig.size,
                         count: "1",
                     }
-                    : { ...buildGenerationConfig(effectiveConfig, sourceNode, node.type === CanvasNodeType.Text ? "text" : node.type === CanvasNodeType.Video ? "video" : node.type === CanvasNodeType.Audio ? "audio" : "image"), count: "1" };
+                    : { ...buildGenerationConfig(effectiveConfig, node.type === CanvasNodeType.Video ? node : sourceNode, node.type === CanvasNodeType.Text ? "text" : node.type === CanvasNodeType.Video ? "video" : node.type === CanvasNodeType.Audio ? "audio" : "image"), count: "1" };
             if (retryWorkflowRef && !useUserStore.getState().token) {
                 message.error("工作流生成需要先登录");
                 return;
@@ -3797,7 +3797,7 @@ function InfiniteCanvasPage({ projectId }: { projectId: string }) {
             setRunningNodeId(node.id);
             const retryStartedAt = Date.now();
             const retrySuffix = retryWorkflowRef ? nanoid() : node.id;
-            const retryVideoTaskId = node.type === CanvasNodeType.Video ? `client_video_task_${retrySuffix}` : "";
+            const retryVideoTaskId = node.type === CanvasNodeType.Video ? (node.metadata?.videoTaskId?.startsWith("sfv_") ? node.metadata.videoTaskId : `client_video_task_${retrySuffix}`) : "";
             const retryImageTaskId = isCanvasImageNodeType(node.type) ? `client_image_task_${retrySuffix}` : "";
             const retryAudioTaskId = node.type === CanvasNodeType.Audio ? `client_audio_task_${retrySuffix}` : "";
             setNodes((prev) => prev.map((item) => {

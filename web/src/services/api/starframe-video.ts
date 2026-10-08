@@ -105,3 +105,8 @@ export function carryStarframeClientTaskId<T extends object>(previous: { id?: st
         return next;
     }
 }
+
+export function starframeRecoveryTaskId(task?: {id?: string;task_id?:string;client_task_id?:string;request_body?:string}) {
+ const known=[task?.task_id,task?.id].find(id=>id?.startsWith("sfv_"));
+ return known || starframeRetryClientTaskId(task);
+}

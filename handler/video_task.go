@@ -66,6 +66,18 @@ func proxyAIVideoTaskRequest(w http.ResponseWriter, r *http.Request) {
 		Fail(w, "未登录或权限不足")
 		return
 	}
+	// Resume with the original channel, never the user's newly selected default.
+	if prior, found, lookupErr := service.GetUserVideoTask(user.ID, readClientVideoTaskID(r)); lookupErr != nil {
+		Fail(w, "视频任务读取失败")
+		return
+	} else if found && prior.SubmissionClaim {
+		if modelName != prior.Model {
+			Fail(w, "视频任务模型不匹配")
+			return
+		}
+		OK(w, service.VideoTaskResponse(prior))
+		return
+	}
 	channel, userChannelID, err := selectAIRequestChannel(user, modelName, r.Header.Get("X-Model-Channel-ID"), r.Header.Get(userModelChannelHeader), true)
 	if err != nil {
 		log.Printf("AI video select channel failed: model=%s err=%v", modelName, err)
@@ -114,7 +126,28 @@ func proxyAIVideoTaskRequest(w http.ResponseWriter, r *http.Request) {
 		Credits:         credits,
 		RequestBody:     summarizeAIRequest(body, contentType),
 	}
-	if credits > 0 {
+	isStarframe := strings.EqualFold(channel.Protocol, service.ModelChannelProtocolStarframe)
+	var claimedTask model.VideoTask
+	if isStarframe {
+		var requestFields struct {
+			ClientTaskID string `json:"client_task_id"`
+		}
+		if json.Unmarshal(body, &requestFields) != nil || requestFields.ClientTaskID != readClientVideoTaskID(r) {
+			Fail(w, "视频提交 ID 不一致")
+			return
+		}
+		var won bool
+		claimedTask, won, err = service.ClaimStarframeVideoTask(service.VideoTaskCreateInput{ClientTaskID: requestFields.ClientTaskID, UserID: user.ID, UserDisplayName: logContext.UserDisplayName, Model: modelName, ChannelID: channel.ID, UserChannelID: userChannelID, ChannelName: channel.Name, Source: readVideoTaskSource(r), SourceID: readVideoTaskSourceID(r), RequestBody: string(body), Credits: credits})
+		if err != nil {
+			FailError(w, err)
+			return
+		}
+		if !won {
+			OK(w, service.VideoTaskResponse(claimedTask))
+			return
+		}
+	}
+	if credits > 0 && !isStarframe {
 		if err := service.ConsumeUserCredits(user.ID, modelName, credits, upstreamPath); err != nil {
 			FailError(w, err)
 			return
@@ -122,7 +155,7 @@ func proxyAIVideoTaskRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	payload, status, err := doAIRequest(request, channel)
 	if err != nil {
-		if credits > 0 {
+		if credits > 0 && !isStarframe {
 			refundVideoCredits(user.ID, modelName, credits, upstreamPath)
 		}
 		saveAIProxyLog(logContext, 0, "", err.Error())
@@ -131,7 +164,7 @@ func proxyAIVideoTaskRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	if status >= http.StatusBadRequest {
 		message := readUpstreamAIErrorMessage(payload, status)
-		if credits > 0 {
+		if credits > 0 && !isStarframe {
 			refundVideoCredits(user.ID, modelName, credits, upstreamPath)
 		}
 		saveAIProxyLog(logContext, status, string(payload), strings.TrimSpace(string(payload)))
@@ -140,7 +173,7 @@ func proxyAIVideoTaskRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	transformed := transformVideoCreatePayload(payload, request, channel, modelName)
 	if message := readVideoCreateErrorMessage(payload, transformed, channel, modelName); message != "" {
-		if credits > 0 {
+		if credits > 0 && !isStarframe {
 			refundVideoCredits(user.ID, modelName, credits, upstreamPath)
 		}
 		saveAIProxyLog(logContext, status, string(payload), message)
@@ -149,14 +182,14 @@ func proxyAIVideoTaskRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	parsed := parseVideoTaskPayload(transformed, modelName, channel.Protocol)
 	if parsed.UpstreamTaskID == "" && parsed.UpstreamVideoID == "" {
-		if credits > 0 {
+		if credits > 0 && !isStarframe {
 			refundVideoCredits(user.ID, modelName, credits, upstreamPath)
 		}
 		saveAIProxyLog(logContext, status, string(transformed), "视频接口没有返回任务 ID")
 		Fail(w, "视频接口没有返回任务 ID")
 		return
 	}
-	task, err := service.CreateVideoTask(service.VideoTaskCreateInput{
+	taskInput := service.VideoTaskCreateInput{
 		UserID:          user.ID,
 		UserDisplayName: firstNonEmpty(user.DisplayName, user.Username),
 		Model:           modelName,
@@ -178,7 +211,13 @@ func proxyAIVideoTaskRequest(w http.ResponseWriter, r *http.Request) {
 		RequestBody:     logContext.RequestBody,
 		ResponseBody:    string(transformed),
 		Credits:         credits,
-	})
+	}
+	var task model.VideoTask
+	if isStarframe {
+		task, err = service.CompleteStarframeVideoTask(claimedTask, taskInput)
+	} else {
+		task, err = service.CreateVideoTask(taskInput)
+	}
 	if err != nil {
 		log.Printf("save video task failed: model=%s err=%v", modelName, err)
 		Fail(w, "AI 接口请求失败")
@@ -221,6 +260,26 @@ func serveAIVideoTask(w http.ResponseWriter, r *http.Request, id string) bool {
 	}
 	if !found {
 		return false
+	}
+	if !validVideoTaskAccess(r, task) {
+		Fail(w, "视频任务归属不匹配")
+		return true
+	}
+	if task.SubmissionClaim && strings.HasPrefix(task.UpstreamTaskID, "sfv_") && !service.IsCompletedVideoTaskStatus(task.Status) {
+		update, pollErr := pollVideoTaskFromUpstream(task)
+		if pollErr != nil {
+			Fail(w, "原视频任务查询失败")
+			return true
+		}
+		if err := service.UpdateVideoTaskFromPoll(task, update); err != nil {
+			Fail(w, "视频任务保存失败")
+			return true
+		}
+		task, _, err = service.GetUserVideoTask(user.ID, id)
+		if err != nil {
+			Fail(w, "视频任务读取失败")
+			return true
+		}
 	}
 	OK(w, service.VideoTaskResponse(task))
 	return true
@@ -283,6 +342,9 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 	if err != nil {
 		return service.VideoTaskPollUpdate{}, err
 	}
+	if task.SubmissionClaim && !strings.EqualFold(channel.Protocol, service.ModelChannelProtocolStarframe) {
+		return service.VideoTaskPollUpdate{}, errors.New("原视频渠道协议已改变")
+	}
 	pollID := firstNonEmpty(task.UpstreamTaskID, task.ID)
 	if isAIProtocolVideoID(task.Model, task.UpstreamVideoID) {
 		pollID = task.UpstreamVideoID
@@ -322,6 +384,14 @@ func pollVideoTaskFromUpstream(task model.VideoTask) (service.VideoTaskPollUpdat
 		}
 		saveAIProxyLog(logContext, status, string(payload), strings.TrimSpace(string(payload)))
 		return service.VideoTaskPollUpdate{Status: "failed", Error: message, ErrorDetail: message, ResponseBody: string(payload)}, nil
+	}
+	if strings.EqualFold(channel.Protocol, service.ModelChannelProtocolStarframe) {
+		var response struct {
+			ID string `json:"id"`
+		}
+		if json.Unmarshal(payload, &response) != nil || response.ID != pollID {
+			return service.VideoTaskPollUpdate{}, errors.New("视频响应任务 ID 不匹配")
+		}
 	}
 	transformed := transformVideoStatusPayload(payload, request, channel, task.Model)
 	parsed := parseVideoTaskPayload(transformed, task.Model, channel.Protocol)

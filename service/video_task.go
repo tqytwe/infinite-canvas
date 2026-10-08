@@ -113,7 +113,7 @@ func CreateVideoTask(input VideoTaskCreateInput) (model.VideoTask, error) {
 		saved = task
 		err = ConsumeUserCredits(saved.UserID, input.BillingName, saved.Credits, input.BillingPath, &saved)
 	} else {
-		saved, err = repository.SaveVideoTask(task)
+		saved, err = repository.SaveOwnedVideoTask(task)
 	}
 	if err == nil && input.WorkflowRef == "" && !IsCompletedVideoTaskStatus(saved.Status) && !IsFailedVideoTaskStatus(saved.Status) {
 		WakeVideoTaskPoller()
@@ -330,6 +330,9 @@ func waitForNextVideoTaskPoll() {
 
 func UpdateVideoTaskFromPoll(task model.VideoTask, update VideoTaskPollUpdate) error {
 	current := now()
+	if update.ResponseBody != "" && !IsFailedVideoTaskStatus(update.Status) && update.Error == "" {
+		task.Error, task.ErrorDetail, task.CompletedAt = "", "", ""
+	}
 	task.Status = NormalizeVideoTaskStatus(firstVideoTaskValue(update.Status, task.Status))
 	if task.Status == "" {
 		task.Status = "processing"
@@ -366,6 +369,9 @@ func UpdateVideoTaskFromPoll(task model.VideoTask, update VideoTaskPollUpdate) e
 	} else if task.Error != "" || IsFailedVideoTaskStatus(task.Status) {
 		task.Status = "failed"
 		task.CompletedAt = current
+	}
+	if task.SubmissionClaim {
+		return repository.CompleteClaimedVideoTask(task)
 	}
 	_, err := repository.SaveVideoTask(task)
 	return err

@@ -121,6 +121,11 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
     const model = config.model || config.videoModel;
     const systemPrompt = (config.systemPrompts.video || config.systemPrompt).trim();
     const createOptions = normalizeVideoTaskCreateOptions(options);
+    if (createOptions.clientTaskId?.startsWith("sfv_")) {
+        const task = await pollVideoGenerationTaskStatus(config, { id: createOptions.clientTaskId, task_id: createOptions.clientTaskId });
+        return { task, pollId: createOptions.clientTaskId, startedAt: Date.now(), requestBody: undefined };
+    }
+
     const body = await createVideoRequestBody(config, model, systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt, normalizeVideoReferenceInput(references), createOptions.clientTaskId);
     const startedAt = Date.now();
     try {

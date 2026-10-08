@@ -1,6 +1,9 @@
 package model
 
 type VideoTask struct {
+	SubmissionClaim bool    `json:"-" gorm:"index;not null;default:false"`
+	RequestHash     string  `json:"-"`
+	Hidden          bool    `json:"-" gorm:"index;not null;default:false"`
 	ID              string  `json:"id" gorm:"primaryKey"`
 	UserID          string  `json:"userId" gorm:"index"`
 	UserDisplayName string  `json:"userDisplayName"`

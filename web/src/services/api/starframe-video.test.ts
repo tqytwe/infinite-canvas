@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildStarframeVideoBody, normalizeStarframeVideoResult, starframeRetryClientTaskId, starframePollExpired, assertStarframeVideoContent, carryStarframeClientTaskId } from "./starframe-video";
+import { buildStarframeVideoBody, normalizeStarframeVideoResult, starframeRetryClientTaskId, starframePollExpired, assertStarframeVideoContent, carryStarframeClientTaskId, starframeRecoveryTaskId } from "./starframe-video";
 
 const models = [
     "ch0101-sd-2.0-1080p", "ch0101-sd-2.0-480p", "ch0101-sd-2.0-720p",
@@ -111,3 +111,8 @@ test("undocumented terminal aliases cannot mark a StarFrame task ready", () => {
         assert.equal(result.video_url, "");
     }
 });
+
+ test("known sfv task recovery always queries original identity", () => {
+ assert.equal(starframeRecoveryTaskId({id:"sfv_original",client_task_id:"order-original"}),"sfv_original");
+ assert.equal(starframeRecoveryTaskId({id:"client_video_task_original",task_id:"sfv_original"}),"sfv_original");
+ });

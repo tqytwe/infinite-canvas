@@ -484,3 +484,7 @@ RunningHub/ComfyUI 不加入上述普通模型筛选：系统工作流公开列�
 | `admin_adjust` | 后台手动调整 |
 | `ai_consume` | 调用后端模型接口消费 |
 | `ai_refund` | 后端模型接口调用失败返还 |
+
+### StarFrame 持久提交资格
+
+`video_tasks` 增加 `submission_claim`（非空布尔，默认 false）、`request_hash`、`hidden`（非空布尔，默认 false）。StarFrame 提交前与扣费一起事务插入唯一 ID，失败事务回滚扣费；已有资格永不重新提交。删除只隐藏已认领记录，终态清理保留记录。轮询只更新结果列，不能覆盖归属、提交资格或隐藏状态。`submission_unknown` 表示需按原订单对账，不能自动重新收费或 POST。
