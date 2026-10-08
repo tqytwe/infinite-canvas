@@ -47,6 +47,19 @@ type aiProtocolAdapter struct {
 // 表只初始化一次；每阶段只执行自身钩子，bool 表示停止匹配，不表示字段是否改变。
 var builtinAIProtocols = []aiProtocolAdapter{
 	{
+		id: service.ModelChannelProtocolStarframe,
+		path: func(channel model.ModelChannel, _ string, path string) (string, bool) {
+			return path, strings.EqualFold(strings.TrimSpace(channel.Protocol), service.ModelChannelProtocolStarframe)
+		},
+		prepare: prepareStarframeVideoRequest,
+		videoResponse: func(payload []byte, _ *http.Request, channel model.ModelChannel, _ string, _ bool) ([]byte, bool) {
+			if !strings.EqualFold(strings.TrimSpace(channel.Protocol), service.ModelChannelProtocolStarframe) {
+				return nil, false
+			}
+			return transformStarframeVideoResponse(payload), true
+		},
+	},
+	{
 		id: service.ModelChannelProtocolAutoDL,
 		path: func(channel model.ModelChannel, modelName string, path string) (string, bool) {
 			if !service.IsAutoDLChannel(channel) {
@@ -60,7 +73,7 @@ var builtinAIProtocols = []aiProtocolAdapter{
 			}
 			return path, true
 		},
-		prepare: prepareAutoDLRequest,
+		prepare:      prepareAutoDLRequest,
 		copyResponse: copyAutoDLResponse,
 		videoResponse: func(payload []byte, _ *http.Request, channel model.ModelChannel, _ string, _ bool) ([]byte, bool) {
 			if !service.IsAutoDLChannel(channel) {

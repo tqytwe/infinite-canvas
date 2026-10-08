@@ -17,8 +17,9 @@ import type { ReferenceImage } from "@/types/image";
 import type { ReferenceAudio, ReferenceVideo } from "@/types/media";
 import { isVideoEnvelope, videoResponseFormatError } from "./video-response";
 import { postVideoWithModelFallback, videoPollParams } from "./video-request";
+import { buildStarframeVideoBody, normalizeStarframeVideoResult, starframePollExpired, assertStarframeVideoContent, carryStarframeClientTaskId } from "./starframe-video";
 
-export type VideoResponse = { id: string; task_id?: string; video_id?: string; source_id?: string; sourceId?: string; channelId?: string; userChannelId?: string; channelName?: string; channel_id?: string; user_channel_id?: string; channel_name?: string; status?: string; video_url?: string; url?: string; storageKey?: string; progress?: number; error?: { message?: string }; size?: string; seconds?: string; model?: string; created_at?: string | number; createdAt?: string | number; started_at?: string | number; startedAt?: string | number; request_body?: string };
+export type VideoResponse = { id: string; client_task_id?: string; task_id?: string; video_id?: string; source_id?: string; sourceId?: string; channelId?: string; userChannelId?: string; channelName?: string; workflowRef?: string; channel_id?: string; user_channel_id?: string; channel_name?: string; status?: string; video_url?: string; url?: string; storageKey?: string; progress?: number; error?: { message?: string }; size?: string; seconds?: string; model?: string; created_at?: string | number; createdAt?: string | number; started_at?: string | number; startedAt?: string | number; request_body?: string };
 type ApiVideoEnvelope = { code: number; data?: VideoResponse | VideoResponse[] | null; msg?: string; message?: string };
 type ApiVideoResponse = VideoResponse | ApiVideoEnvelope | string;
 export type VideoGenerationResult = { id: string; url: string; durationMs: number; width: number; height: number; bytes: number; mimeType: string; task: VideoResponse };
@@ -34,6 +35,13 @@ export class VideoRequestError extends Error {
         super(message);
         this.name = "VideoRequestError";
         this.detail = formatErrorDetail(detail);
+    }
+}
+
+export class VideoContentRetryError extends VideoRequestError {
+    constructor(message: string, readonly task: VideoResponse, readonly status?: number) {
+        super(message, task);
+        this.name = "VideoContentRetryError";
     }
 }
 
@@ -101,21 +109,26 @@ export type VideoReferenceInput = {
     lastFrame?: ReferenceImage | null;
 };
 
-export async function requestVideoGeneration(config: AiConfig, prompt: string, references: ReferenceImage[] | VideoReferenceInput = [], videoReferencesOrProgress?: ReferenceVideo[] | ((progress: number) => void), audioReferences: ReferenceAudio[] = []) {
+export async function requestVideoGeneration(config: AiConfig, prompt: string, references: ReferenceImage[] | VideoReferenceInput = [], videoReferencesOrProgress?: ReferenceVideo[] | ((progress: number) => void), audioReferences: ReferenceAudio[] = [], options?: VideoTaskCreateOptions) {
     const legacyVideoReferences = Array.isArray(videoReferencesOrProgress) ? videoReferencesOrProgress : undefined;
     const onProgress = typeof videoReferencesOrProgress === "function" ? videoReferencesOrProgress : undefined;
     const input = legacyVideoReferences ? { references: Array.isArray(references) ? references : references.references || [], videoReferences: legacyVideoReferences, audioReferences } : references;
-    const created = await createVideoGenerationTask(config, prompt, input, onProgress ? (progress) => onProgress(progress) : undefined);
+    const created = await createVideoGenerationTask(config, prompt, input, onProgress ? (progress) => onProgress(progress) : undefined, options);
     return pollCreatedVideoGenerationTask(config, created.task, { startedAt: created.startedAt, requestBody: created.requestBody, onProgress: onProgress ? (progress) => onProgress(progress) : undefined });
 }
 
 export async function createVideoGenerationTask(config: AiConfig, prompt: string, references: ReferenceImage[] | VideoReferenceInput = [], onProgress?: VideoProgressHandler, options?: string | VideoTaskCreateOptions): Promise<CreatedVideoGenerationTask> {
     const model = config.model || config.videoModel;
     const systemPrompt = (config.systemPrompts.video || config.systemPrompt).trim();
-    const body = await createVideoRequestBody(config, model, systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt, normalizeVideoReferenceInput(references));
+    const createOptions = normalizeVideoTaskCreateOptions(options);
+    if (createOptions.clientTaskId?.startsWith("sfv_")) {
+        const task = await pollVideoGenerationTaskStatus(config, { id: createOptions.clientTaskId, task_id: createOptions.clientTaskId });
+        return { task, pollId: createOptions.clientTaskId, startedAt: Date.now(), requestBody: undefined };
+    }
+
+    const body = await createVideoRequestBody(config, model, systemPrompt ? `${systemPrompt}\n\n${prompt}` : prompt, normalizeVideoReferenceInput(references), createOptions.clientTaskId);
     const startedAt = Date.now();
     try {
-        const createOptions = normalizeVideoTaskCreateOptions(options);
         const accountProxy = usesAccountProxy(config);
         const headers = { ...aiHeaders(config), ...(accountProxy && createOptions.clientTaskId ? { "X-Client-Video-Task-ID": createOptions.clientTaskId } : {}), ...(accountProxy && createOptions.source ? { "X-Video-Task-Source": createOptions.source } : {}), ...(accountProxy && createOptions.sourceId ? { "X-Video-Task-Source-ID": createOptions.sourceId } : {}) };
         const directProvider = !accountProxy ? directAIProviderForConfig(config) : null;
@@ -131,6 +144,7 @@ export async function createVideoGenerationTask(config: AiConfig, prompt: string
             : unwrapVideoResponseForConfig(config, model, await postVideoCreateRequest(createUrl, requestBody, headers, !accountProxy));
         if (!created.id && !created.video_id) throw new Error("视频接口没有返回任务 ID");
         const task = await syncGeneratedVideo(created, config);
+        if (videoChannelProtocol(config, model) === "starframe") Object.assign(task, { client_task_id: (body as Record<string, unknown>).client_task_id });
         if (typeof task.progress === "number") onProgress?.(task.progress, task);
         return { task, pollId: videoPollId(model, task), startedAt, requestBody: body };
     } catch (error) {
@@ -161,8 +175,11 @@ export async function pollCreatedVideoGenerationTask(config: AiConfig, task: Vid
     try {
         if (initialDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, initialDelayMs));
         for (; ;) {
-            const video = await cacheProtectedVideo(config, model, await cacheProtectedGeminiVideo(config, model, await pollOnce()));
+            const result = await pollOnce();
+            const polled = videoChannelProtocol(config, model) === "starframe" ? carryStarframeClientTaskId(task, result) : result;
+            const video = await cacheProtectedVideo(config, model, await cacheProtectedGeminiVideo(config, model, polled));
             onPoll?.(video);
+            if (videoChannelProtocol(config, model) === "starframe" && starframePollExpired(video.status, startedAt, Date.now())) throw new VideoRequestError("视频任务仍未完成，请稍后从生成记录恢复查询", video);
             if (isFailedVideoStatus(video.status)) throw new VideoRequestError(video.error?.message || "视频生成失败", video);
             if (typeof video.progress === "number") onProgress?.(video.progress, video);
             if (isCompletedVideoStatus(video.status) || video.video_url || video.url) {
@@ -180,6 +197,7 @@ export async function pollCreatedVideoGenerationTask(config: AiConfig, task: Vid
     } catch (error) {
         const { message, detail } = readAxiosError(error, "视频生成失败");
         void writeVideoAICallLog(config, model, "/videos", "POST", startedAt, axios.isAxiosError(error) ? error.response?.status || 0 : 0, stringifyLogPayload(requestBody ? summarizeVideoRequestBody(requestBody) : { taskId: pollId }), stringifyLogPayload(detail), message);
+        if (error instanceof VideoContentRetryError) throw error;
         throw new VideoRequestError(message, detail);
     }
 }
@@ -192,7 +210,8 @@ export async function pollVideoGenerationTaskStatus(config: AiConfig, task: Vide
     const result = directProvider
         ? await (await import("@/services/api/direct-ai")).pollDirectVideoTask(config, directProvider, pollId)
         : unwrapVideoResponseForConfig(config, model, (await axios.get<ApiVideoResponse>(aiVideoPollUrl(config, model, pollId), { headers: aiHeaders(config), params: videoPollParams(model) })).data);
-    return syncGeneratedVideo(await cacheProtectedGeminiVideo(config, model, await cacheProtectedVideo(config, model, result)), config, true);
+    const polled = videoChannelProtocol(config, model) === "starframe" ? carryStarframeClientTaskId(task, result) : result;
+    return syncGeneratedVideo(await cacheProtectedGeminiVideo(config, model, await cacheProtectedVideo(config, model, polled)), config, true);
 }
 
 function videoSyncKey(config: AiConfig, task: VideoResponse) {
@@ -236,11 +255,25 @@ async function cacheProtectedVideo(config: AiConfig, model: string, task: VideoR
     const url = task.video_url || task.url || "";
     const needs88APIContent = videoChannelProtocol(config, model) === "88api" && !url;
     const needsGrokContent = isGrok2APIVideoConfig(config, model) && /\/v1\/videos\/[^/]+\/content(?:[?#]|$)/.test(url);
-    if (!isCompletedVideoStatus(task.status) || task.storageKey || (!needs88APIContent && !needsGrokContent)) return task;
+    const needsStarframeContent = videoChannelProtocol(config, model) === "starframe";
+    if (!isCompletedVideoStatus(task.status) || task.storageKey || (!needs88APIContent && !needsGrokContent && !needsStarframeContent)) return task;
     const taskId = task.task_id || task.id || task.video_id || "";
-    const response = await fetch(`${aiApiUrl(config, `/videos/${encodeURIComponent(taskId)}/content`)}?model=${encodeURIComponent(model)}`, { headers: aiHeaders(config) });
-    if (!response.ok) throw new VideoRequestError(`视频内容下载失败：${response.status}`, task);
-    const media = await uploadMediaFile(await response.blob(), "generated-video", `video-content:${videoSyncKey(config, task)}`);
+    let blob: Blob;
+    try {
+        const response = await fetch(`${aiApiUrl(config, `/videos/${encodeURIComponent(taskId)}/content`)}?model=${encodeURIComponent(model)}`, { headers: aiHeaders(config) });
+        if (!response.ok) {
+            if (needsStarframeContent && ([408, 425, 429].includes(response.status) || response.status >= 500)) {
+                throw new VideoContentRetryError(`视频已生成，内容暂时不可用：${response.status}`, task, response.status);
+            }
+            throw new VideoRequestError(`视频内容下载失败：${response.status}`, task);
+        }
+        blob = await response.blob();
+    } catch (error) {
+        if (needsStarframeContent && error instanceof TypeError) throw new VideoContentRetryError("视频已生成，内容下载网络中断，请稍后重试", task);
+        throw error;
+    }
+    if (needsStarframeContent) assertStarframeVideoContent(blob);
+    const media = await uploadMediaFile(blob, "generated-video", `video-content:${videoSyncKey(config, task)}`);
     return { ...task, url: media.url, video_url: media.url, storageKey: media.storageKey };
 }
 
@@ -326,7 +359,20 @@ async function create88APIVideoRequestBody(config: AiConfig, model: string, prom
     return body;
 }
 
-async function createVideoRequestBody(config: AiConfig, model: string, prompt: string, input: Required<VideoReferenceInput>) {
+async function createVideoRequestBody(config: AiConfig, model: string, prompt: string, input: Required<VideoReferenceInput>, clientTaskId?: string) {
+    if (videoChannelProtocol(config, model) === "starframe") {
+        const referenceUrl = (reference: ReferenceImage | ReferenceVideo | ReferenceAudio) => referenceTo88APIUrl(reference);
+        return buildStarframeVideoBody({
+            model, prompt, clientTaskId: clientTaskId || crypto.randomUUID(),
+            duration: Number(config.videoSeconds), resolution: normalizeVideoResolution(config.vquality),
+            aspectRatio: normalizeSeedanceRatio(config.size),
+            images: await Promise.all(input.references.map(referenceUrl)),
+            videos: await Promise.all(input.videoReferences.map(referenceUrl)),
+            audios: await Promise.all(input.audioReferences.map(referenceUrl)),
+            firstFrame: input.firstFrame ? await referenceUrl(input.firstFrame) : undefined,
+            lastFrame: input.lastFrame ? await referenceUrl(input.lastFrame) : undefined,
+        });
+    }
     if (videoChannelProtocol(config, model) === "autodl") {
         const capabilities = getAutoDLCapabilities(await fetchAutoDLWorkflow(autoDLBaseUrl(config, model), model));
         if (!capabilities) throw new VideoRequestError("当前 AutoDL 工作流尚未适配");
@@ -803,7 +849,13 @@ function unwrapVideoResponse(payload: ApiVideoResponse): VideoResponse {
     return normalizeVideoResponse(payload);
 }
 
-function unwrapVideoResponseForConfig(config: AiConfig, model: string, payload: ApiVideoResponse) {
+function unwrapVideoResponseForConfig(config: AiConfig, model: string, payload: ApiVideoResponse): VideoResponse {
+    if (videoChannelProtocol(config, model) === "starframe") {
+        if (typeof payload === "string") return unwrapVideoResponse(payload);
+        const error = videoPayloadErrorMessage(payload);
+        if (error) throw new VideoRequestError(error, payload);
+        return normalizeStarframeVideoResult(payload);
+    }
     if (isGeminiVideoModel(model) && isGeminiConfig(config, model)) return normalizeGeminiVideoResponse(payload);
     if (isMiniMaxH3Config(config, model)) {
         const root = payload as unknown as Record<string, unknown>;
@@ -902,10 +954,6 @@ function withoutVideoModel(body: FormData | Record<string, unknown>) {
     if (body instanceof FormData) return body;
     const { model: _model, ...nativeBody } = body;
     return nativeBody;
-}
-
-function isVideoEnvelope(payload: ApiVideoResponse): payload is ApiVideoEnvelope {
-    return "code" in payload && typeof payload.code === "number";
 }
 
 function readAxiosError(error: unknown, fallback: string) {

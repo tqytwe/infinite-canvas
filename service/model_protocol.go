@@ -9,13 +9,14 @@ import (
 )
 
 const (
-	ModelChannelProtocolOpenAI   = "openai"
-	ModelChannelProtocolGrok2API = "grok2api"
-	ModelChannelProtocolAPIMart  = "apimart"
-	ModelChannelProtocolKIE      = "kie"
-	ModelChannelProtocol88API    = "88api"
-	ModelChannelProtocolAutoDL   = "autodl"
-	ModelChannelProtocolArk      = "ark"
+	ModelChannelProtocolOpenAI    = "openai"
+	ModelChannelProtocolStarframe = "starframe"
+	ModelChannelProtocolGrok2API  = "grok2api"
+	ModelChannelProtocolAPIMart   = "apimart"
+	ModelChannelProtocolKIE       = "kie"
+	ModelChannelProtocol88API     = "88api"
+	ModelChannelProtocolAutoDL    = "autodl"
+	ModelChannelProtocolArk       = "ark"
 )
 
 type modelProtocolAdapter struct {
@@ -31,7 +32,7 @@ type modelProtocolRule struct {
 }
 
 var modelProtocolRegistry map[string]modelProtocolAdapter
-var modelProtocolIDs = []string{ModelChannelProtocolOpenAI, ModelChannelProtocolGemini, ModelChannelProtocolGrok2API, ModelChannelProtocolMiniMax, ModelChannelProtocolAPIMart, ModelChannelProtocolKIE, ModelChannelProtocolMiMo, ModelChannelProtocol88API, ModelChannelProtocolAutoDL, ModelChannelProtocolArk}
+var modelProtocolIDs = []string{ModelChannelProtocolOpenAI, ModelChannelProtocolStarframe, ModelChannelProtocolGemini, ModelChannelProtocolGrok2API, ModelChannelProtocolMiniMax, ModelChannelProtocolAPIMart, ModelChannelProtocolKIE, ModelChannelProtocolMiMo, ModelChannelProtocol88API, ModelChannelProtocolAutoDL, ModelChannelProtocolArk}
 
 func init() {
 	compatible := modelProtocolAdapter{
@@ -46,6 +47,11 @@ func init() {
 	for _, id := range modelProtocolIDs {
 		modelProtocolRegistry[id] = compatible
 	}
+	starframe := compatible
+	starframe.testModel = func(model.ModelChannel, string) (string, error) {
+		return "StarFrame 是异步视频协议，请在视频创作台测试生成、查询和下载。", nil
+	}
+	modelProtocolRegistry[ModelChannelProtocolStarframe] = starframe
 	gemini := compatible
 	gemini.buildURL = BuildGeminiChannelURL
 	gemini.setAuth = func(request *http.Request, channel model.ModelChannel) {
@@ -129,6 +135,9 @@ var modelDiscoveryRules = []modelProtocolRule{
 
 var modelConfigTestRules = []modelProtocolRule{
 	{ModelChannelProtocolAutoDL, func(channel model.ModelChannel, _ string) bool { return IsAutoDLChannel(channel) }},
+	{ModelChannelProtocolStarframe, func(channel model.ModelChannel, _ string) bool {
+		return strings.EqualFold(strings.TrimSpace(channel.Protocol), ModelChannelProtocolStarframe)
+	}},
 	{ModelChannelProtocolMiniMax, func(channel model.ModelChannel, _ string) bool { return IsMiniMaxChannel(channel) }},
 	{ModelChannelProtocol88API, func(channel model.ModelChannel, _ string) bool {
 		return strings.EqualFold(strings.TrimSpace(channel.Protocol), ModelChannelProtocol88API)
@@ -138,6 +147,9 @@ var modelConfigTestRules = []modelProtocolRule{
 
 var modelGenerationTestRules = []modelProtocolRule{
 	{ModelChannelProtocolAutoDL, func(channel model.ModelChannel, _ string) bool { return IsAutoDLChannel(channel) }},
+	{ModelChannelProtocolStarframe, func(channel model.ModelChannel, _ string) bool {
+		return strings.EqualFold(strings.TrimSpace(channel.Protocol), ModelChannelProtocolStarframe)
+	}},
 	{"model:glm-tts", func(_ model.ModelChannel, modelName string) bool {
 		return strings.EqualFold(strings.TrimSpace(modelName), "glm-tts")
 	}},
