@@ -3,10 +3,12 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"mime"
 	"net"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/tigerowo/infinite-canvas/service"
@@ -29,6 +31,9 @@ func prepareStarframeVideoRequest(input aiProtocolRequest) (aiProtocolRequest, b
 	if err := json.Unmarshal(input.body, &body); err != nil {
 		return input, true, fmt.Errorf("StarFrame 请求 JSON 无效")
 	}
+	if err := validateStarframeUniqueJSON(input.body); err != nil {
+		return input, true, err
+	}
 	for _, field := range []string{"model", "prompt", "mode", "client_task_id"} {
 		value, ok := body[field].(string)
 		if !ok || strings.TrimSpace(value) == "" {
@@ -38,10 +43,14 @@ func prepareStarframeVideoRequest(input aiProtocolRequest) (aiProtocolRequest, b
 	if !starframeTaskIDPattern.MatchString(body["client_task_id"].(string)) {
 		return input, true, fmt.Errorf("StarFrame client_task_id 格式无效")
 	}
-	if duration, exists := body["duration"]; exists {
-		if n, ok := duration.(float64); !ok || n <= 0 {
-			return input, true, fmt.Errorf("StarFrame duration 必须是正数")
-		}
+	duration, ok := body["duration"].(float64)
+	if !ok || duration < 1 || duration > 15 || math.Trunc(duration) != duration {
+		return input, true, fmt.Errorf("StarFrame duration 必须是 1–15 的整数")
+	}
+	switch body["resolution"] {
+	case "480p", "720p", "1080p":
+	default:
+		return input, true, fmt.Errorf("StarFrame resolution 必须是 480p、720p 或 1080p")
 	}
 	switch body["mode"] {
 	case "references":
@@ -96,19 +105,27 @@ func validStarframeReference(value any) bool {
 		return false
 	}
 	parsed, err := url.Parse(text)
-	if err != nil || parsed.User != nil || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+	if err != nil || parsed.User != nil || parsed.Fragment != "" || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
 		return false
 	}
+	if port := parsed.Port(); port != "" {
+		number, err := strconv.Atoi(port)
+		if err != nil || number < 1 || number > 65535 {
+			return false
+		}
+	}
 	host := strings.ToLower(parsed.Hostname())
-	if host == "localhost" || strings.HasSuffix(host, ".localhost") || strings.HasSuffix(host, ".local") {
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") || strings.HasSuffix(host, ".local") || strings.HasSuffix(host, ".internal") {
 		return false
 	}
 	if ip := net.ParseIP(host); ip != nil {
-		if v4 := ip.To4(); v4 != nil && v4[0] == 100 && v4[1] >= 64 && v4[1] <= 127 {
-			return false
-		}
-		return ip.IsGlobalUnicast() && !ip.IsPrivate() && !ip.IsLoopback() && !ip.IsLinkLocalUnicast()
+		_, public := starframePublicRemoteAddr(ip)
+		return public
 	}
+	if !strings.Contains(host, ".") || strings.Trim(host, "0123456789.") == "" {
+		return false
+	}
+
 	return true
 }
 

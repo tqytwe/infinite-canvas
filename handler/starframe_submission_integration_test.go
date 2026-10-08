@@ -71,6 +71,7 @@ func TestStarframeHTTPDurableSubmission(t *testing.T) {
 		r.Header.Set("X-Client-Video-Task-ID", id)
 		return r.WithContext(service.WithUser(context.Background(), user))
 	}
+	assertStarframeInvalidBillingParametersNeverClaimChargeOrPost(t, user, &posts)
 	var wg sync.WaitGroup
 	for i := 0; i < 32; i++ {
 		wg.Add(1)

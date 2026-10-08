@@ -18,8 +18,15 @@ function publicReference(value: string) {
     const octets = host.split(".").map(Number);
     const privateIPv4 = octets.length === 4 && octets.every((n) => Number.isInteger(n) && n >= 0 && n <= 255)
         && (octets[0] === 0 || octets[0] === 10 || octets[0] === 127 || octets[0] >= 224 || octets[0] === 169 && octets[1] === 254 || octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31 || octets[0] === 192 && octets[1] === 168 || octets[0] === 100 && octets[1] >= 64 && octets[1] <= 127);
+    const reservedIPv4 = octets.length === 4 && (
+        octets[0] === 192 && [[0, 0], [0, 2], [31, 196], [52, 193], [88, 99], [175, 48]].some(([second, third]) => octets[1] === second && octets[2] === third)
+        || octets[0] === 198 && (octets[1] === 18 || octets[1] === 19 || octets[1] === 51 && octets[2] === 100)
+        || octets[0] === 203 && octets[1] === 0 && octets[2] === 113);
+    // URL supplies the canonical IPv6 spelling; mirror the gateway's reserved prefixes.
+    const ipv6 = host.slice(1, -1).split(":").map(part => Number.parseInt(part || "0", 16));
+    const reservedIPv6 = host.includes(":") && (ipv6[0] === 0x2001 && ipv6[1] <= 0x1ff || ipv6[0] === 0x2002 || ipv6[0] === 0x2620 && ipv6[1] === 0x4f && ipv6[2] === 0x8000 || ipv6[0] === 0x3fff && ipv6[1] < 0x1000);
     const privateIPv6 = host.includes(":") && (!/^\[[23][0-9a-f]{0,3}:/i.test(host) || host.startsWith("[2001:db8:"));
-    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || privateIPv4 || privateIPv6 || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) {
+    if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.hash || url.port === "0" || reservedIPv4 || reservedIPv6 || privateIPv4 || privateIPv6 || !host.includes(":") && !host.includes(".") || host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) {
         throw new Error("StarFrame references require publicly accessible HTTP URLs");
     }
     return value;
@@ -28,7 +35,8 @@ function publicReference(value: string) {
 export function buildStarframeVideoBody(input: StarframeVideoInput): Record<string, unknown> {
     if (!input.model.trim() || !input.prompt.trim()) throw new Error("StarFrame model and prompt are required");
     if (!/^[A-Za-z0-9_.-]{1,128}$/.test(input.clientTaskId)) throw new Error("Invalid StarFrame client_task_id");
-    if (input.duration !== undefined && (!Number.isFinite(input.duration) || input.duration <= 0)) throw new Error("Invalid StarFrame duration");
+    if (input.duration === undefined || !Number.isInteger(input.duration) || input.duration < 1 || input.duration > 15) throw new Error("StarFrame duration 必须是 1–15 的整数");
+    if (!input.resolution || !["480p", "720p", "1080p"].includes(input.resolution)) throw new Error("StarFrame resolution 必须是 480p、720p 或 1080p");
     const hasFrames = Boolean(input.firstFrame || input.lastFrame);
     const hasReferences = Boolean(input.images?.length || input.videos?.length || input.audios?.length);
     if (hasFrames && (hasReferences || !input.firstFrame || !input.lastFrame)) throw new Error("StarFrame frames require first and last frames and cannot include references");

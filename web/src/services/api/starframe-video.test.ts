@@ -13,33 +13,33 @@ const models = [
 
 test("all user video IDs and custom aliases are preserved without name inference", () => {
     for (const model of [...models, "custom-name-not-in-catalog"]) {
-        assert.deepEqual(buildStarframeVideoBody({ model, prompt: "Scene", clientTaskId: "order-001" }), {
-            model, prompt: "Scene", client_task_id: "order-001", mode: "references",
+        assert.deepEqual(buildStarframeVideoBody({ model, prompt: "Scene", clientTaskId: "order-001", duration: 5, resolution: "720p" }), {
+            model, prompt: "Scene", client_task_id: "order-001", mode: "references", duration: 5, resolution: "720p",
         });
     }
 });
 
-test("duration is numeric and not clamped and resolution comes only from selection", () => {
-    const body = buildStarframeVideoBody({ model: models[0], prompt: "Scene", clientTaskId: "order-001", duration: 20, resolution: "720p", aspectRatio: "9:16" });
-    assert.equal(body.duration, 20);
+test("valid billing parameters are preserved without clamping or inference", () => {
+    const body = buildStarframeVideoBody({ model: models[0], prompt: "Scene", clientTaskId: "order-001", duration: 15, resolution: "720p", aspectRatio: "9:16" });
+    assert.equal(body.duration, 15);
     assert.equal(body.resolution, "720p");
     assert.equal(body.aspect_ratio, "9:16");
 });
 
 test("references use singular fields for one and plural for multiple URLs", () => {
-    const body = buildStarframeVideoBody({ model: models[0], prompt: "Scene", clientTaskId: "order-001", images: ["https://media.example/1.png", "https://media.example/2.png"], videos: ["https://media.example/1.mp4"] });
+    const body = buildStarframeVideoBody({ model: models[0], prompt: "Scene", clientTaskId: "order-001", duration: 5, resolution: "720p", images: ["https://media.example/1.png", "https://media.example/2.png"], videos: ["https://media.example/1.mp4"] });
     assert.deepEqual(body.references, { images: ["https://media.example/1.png", "https://media.example/2.png"], video: "https://media.example/1.mp4" });
 });
 
 test("frames require both URLs and cannot be mixed with references", () => {
-    const base = { model: models[0], prompt: "Scene", clientTaskId: "order-001" };
+    const base = { model: models[0], prompt: "Scene", clientTaskId: "order-001", duration: 5, resolution: "720p" };
     assert.throws(() => buildStarframeVideoBody({ ...base, firstFrame: "https://media.example/1.png" }));
     assert.throws(() => buildStarframeVideoBody({ ...base, firstFrame: "https://media.example/1.png", lastFrame: "https://media.example/2.png", images: ["https://media.example/ref.png"] }));
     assert.deepEqual(buildStarframeVideoBody({ ...base, firstFrame: "https://media.example/1.png", lastFrame: "https://media.example/2.png" }).frames, { first_frame: "https://media.example/1.png", last_frame: "https://media.example/2.png" });
 });
 
 test("invalid required fields and nonpublic reference literals are rejected", () => {
-    const base = { model: models[0], prompt: "Scene", clientTaskId: "order-001" };
+    const base = { model: models[0], prompt: "Scene", clientTaskId: "order-001", duration: 5, resolution: "720p" };
     for (const clientTaskId of ["", "bad id", "x".repeat(129)]) assert.throws(() => buildStarframeVideoBody({ ...base, clientTaskId }));
     assert.throws(() => buildStarframeVideoBody({ ...base, model: "" }));
     assert.throws(() => buildStarframeVideoBody({ ...base, prompt: " " }));
@@ -87,7 +87,7 @@ test("poll timeout does not reject completed or failed tasks", () => {
 });
 
 test("public IPv6 reference literals are allowed while private ones are not", () => {
-    const base = { model: models[0], prompt: "Scene", clientTaskId: "order-1" };
+    const base = { model: models[0], prompt: "Scene", clientTaskId: "order-1", duration: 5, resolution: "720p" };
     assert.doesNotThrow(() => buildStarframeVideoBody({ ...base, images: ["https://[2606:4700:4700::1111]/image.png"] }));
     assert.throws(() => buildStarframeVideoBody({ ...base, images: ["https://[::1]/image.png"] }));
 });
@@ -116,3 +116,25 @@ test("undocumented terminal aliases cannot mark a StarFrame task ready", () => {
  assert.equal(starframeRecoveryTaskId({id:"sfv_original",client_task_id:"order-original"}),"sfv_original");
  assert.equal(starframeRecoveryTaskId({id:"client_video_task_original",task_id:"sfv_original"}),"sfv_original");
  });
+
+ test("billing parameters must match gateway contract before submission", () => {
+    const base = { model: models[0], prompt: "Scene", clientTaskId: "order-001", duration: 5, resolution: "720p" };
+    for (const duration of [undefined, NaN, Infinity, -1, 0, 0.5, 1.5, 16, 20]) {
+        assert.throws(() => buildStarframeVideoBody({ ...base, duration }), /duration/);
+    }
+    for (const resolution of [undefined, "", "4k", "720P"]) {
+        assert.throws(() => buildStarframeVideoBody({ ...base, resolution }), /resolution/);
+    }
+    for (const duration of [1, 15]) for (const resolution of ["480p", "720p", "1080p"]) {
+        const body = buildStarframeVideoBody({ ...base, duration, resolution });
+        assert.equal(body.duration, duration);
+        assert.equal(body.resolution, resolution);
+    }
+});
+
+test("gateway rejects nonpublic or ambiguous material URLs before submission", () => {
+    const base = { model: models[0], prompt: "Scene", clientTaskId: "order-001", duration: 5, resolution: "720p" };
+    for (const url of ["https://media.example/a.png#fragment", "https://media.internal/a.png", "http://singlelabel/a.png", "https://media.example:0/a.png", "http://192.0.2.1/a.png", "http://198.18.0.1/a.png", "http://203.0.113.1/a.png", "https://[2001::1]/a.png", "https://[2620:4f:8000::1]/a.png", "https://[3fff::1]/a.png"]) {
+        assert.throws(() => buildStarframeVideoBody({ ...base, images: [url] }), url);
+    }
+});

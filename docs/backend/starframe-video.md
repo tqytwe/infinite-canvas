@@ -19,12 +19,12 @@
 ## 请求与获取
 
 - 创建使用 `POST /v1/videos` JSON，始终携带 `model`、`prompt`、`mode`、`client_task_id`，duration 是数字。不会删除模型分辨率后缀，也不会据后缀推断请求 resolution。
-- references 模式下，一个素材使用 `image` / `video` / `audio`，两个以上使用 `images` / `videos` / `audios`。同类单复数互斥，素材必须有可公开读取的 HTTP URL。
+- references 模式下，一个素材使用 `image` / `video` / `audio`，两个以上使用 `images` / `videos` / `audios`。同类单复数互斥，素材必须有可公开读取的 HTTP URL，不允许 userinfo、fragment、无效端口、内部域名或网关禁止的特殊用途 IP 字面量。Canvas 服务端同时拒绝重复 JSON 字段及超过网关限制的嵌套，校验发生在收费前。
 - frames 模式需要同时提供 `first_frame` 和 `last_frame`，不能混入 references。供应商没有公开每个模型的参数能力矩阵，不能保证所有模型都接受同一素材模式或参数组合。
 - 通过 `GET /v1/videos/:id` 查询。只有 completed 才取回内容；queued、in_progress、unknown 继续等待，failed 显示 `metadata.fail_reason`。
 - completed 的相对 content 路径不是公共播放 URL。客户端向固定 `/v1/videos/:id/content` 携带鉴权请求，再存为正常媒体地址供播放、下载。不会把 Bearer 放进播放器 URL。
 - 同单重试保留原 client_task_id；主平台将其映射到稳定的作用域 ID，避免不同用户共享上游账号时冲突。返回记录保留原客户端 ID。原 ID 丢失时不能猜一个新 ID 重新提交。
-- 首版主平台收费边界是整数 1–15 秒、480p/720p/1080p 及已配置的视频价格；不支持的收费参数会明确拒绝，而不是钳制或猜测费用。这是网关收费限制，不是供应商模型能力结论。
+- 首版主平台收费边界是整数 1–15 秒、480p/720p/1080p 及已配置的视频价格；duration 和 resolution 必填。Canvas 浏览器及服务端在占位、扣积分和 POST 前拒绝不支持的参数，不钳制或猜测费用。这是网关收费限制，不是供应商模型能力结论。
 
 ## 发布与验收
 
